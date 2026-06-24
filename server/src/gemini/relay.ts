@@ -1,0 +1,400 @@
+// The Gemini Live relay — the stability-critical heart of Nicole 2.0.
+//
+// One LiveSession bridges a single browser WebSocket to a Gemini Live session
+// server-side (the API key never reaches the browser). It owns:
+//   - opening the Gemini session with the assembled Nicole prompt + voice + tools
+//   - relaying audio/transcripts both directions
+//   - capturing session-resumption handles and AUTO-RECONNECTING on drops,
+//     reusing the handle so the conversation continues with no "Hello" re-intro
+//   - a PROACTIVE-RECONNECT watchdog that refreshes the session before Gemini's
+//     ~2h resume-handle boundary (shouldProactiveReconnect)
+//   - LIVE SUMMARIZATION: when the turn buffer grows large, compress older turns
+//     and reconnect seeded with [SUMMARY] so context never overflows (the fix for
+//     "can't run 30+ minutes")
+//   - dispatching memory tool calls (save_memory / forget_memory) + training
+//     scoring to handlers
+//
+// The Gemini client is injected (GenAILike) so the whole thing is unit-testable
+// with a fake — no API key needed in tests.
+
+import { buildLiveConfig } from './liveConfig.js';
+import { buildSystemPrompt } from '../prompt/nicolePrompt.js';
+import { formatMemoryBlock } from '../memory/memoryBlock.js';
+import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
+import { loadFacts } from '../memory/db.js';
+import { summarizeTurns } from './summarizer.js';
+import { shouldSummarize, splitForSummary, estimateTokens } from '../session/summaryTrigger.js';
+import {
+  shouldProactiveReconnect,
+  RESUME_HANDLE_MAX_AGE_MS,
+} from '../session/sessionTiming.js';
+import type { Turn, SessionConfig } from '../types.js';
+
+/** Minimal shape of a Gemini Live session we depend on. */
+export interface LiveSessionHandle {
+  sendRealtimeInput?: (payload: unknown) => void;
+  sendClientContent?: (payload: unknown) => void;
+  sendToolResponse?: (payload: unknown) => void;
+  send?: (payload: unknown) => void;
+  close?: () => void;
+}
+
+/** Callbacks Gemini invokes on the live session. */
+export interface LiveCallbacks {
+  onopen?: () => void;
+  onmessage?: (m: any) => void;
+  onerror?: (e: any) => void;
+  onclose?: (e: any) => void;
+}
+
+/** Minimal shape of the @google/genai client we depend on. */
+export interface GenAILike {
+  live: {
+    connect: (args: {
+      model: string;
+      config: Record<string, unknown>;
+      callbacks: LiveCallbacks;
+    }) => Promise<LiveSessionHandle>;
+  };
+}
+
+/** What the client WS adapter must provide so the relay can talk back. */
+export interface ClientChannel {
+  send: (msg: unknown) => void;
+  isOpen: () => boolean;
+  close: () => void;
+}
+
+export interface LiveSessionDeps {
+  ai: GenAILike;
+  model: string;
+  userId: string;
+  client: ClientChannel;
+  /** Injectable clock for deterministic tests. */
+  now?: () => number;
+  /** Override summarizer (tests inject a fake to avoid a real API call). */
+  summarize?: (turns: Turn[]) => Promise<string>;
+  /** Override fact loader (tests inject a fake to avoid a real DB). */
+  loadUserFacts?: (userId: string) => Promise<{ key: string; fact: string; factType: string; userId: string }[]>;
+  /** Override memory tool handler (tests). */
+  onMemoryTool?: (name: string, args: any, userId: string) => Promise<{ ok: boolean }>;
+  /** Called when a training_mark_progress tool fires (frontend relays it). */
+}
+
+/**
+ * Owns ONE browser<->Gemini bridge for its lifetime, surviving Gemini socket
+ * drops, proactive refreshes, and summary-driven reconnects transparently.
+ */
+export class LiveSession {
+  private session: LiveSessionHandle | null = null;
+  private readonly deps: LiveSessionDeps;
+  private readonly now: () => number;
+
+  private sessionConfig: SessionConfig | null = null;
+  private resumeHandle: string | null = null;
+  private resumeHandleAt: number | null = null;
+  private sessionOpenedAt = 0;
+
+  // Rolling conversation state.
+  private turns: Turn[] = [];
+  private runningSummary = '';
+  private pendingUserText = '';
+  private pendingNicoleText = '';
+
+  // True while the user is mid-utterance (don't reconnect mid-speech).
+  private userSpeaking = false;
+  // Guards against overlapping reconnect/summarize operations.
+  private busy = false;
+  private closed = false;
+
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+
+  constructor(deps: LiveSessionDeps) {
+    this.deps = deps;
+    this.now = deps.now ?? Date.now;
+  }
+
+  /** Open the first Gemini session for this client's chosen voice/mode. */
+  async connect(cfg: SessionConfig): Promise<void> {
+    this.sessionConfig = cfg;
+    await this.openGemini();
+    this.startWatchdog();
+  }
+
+  /** Forward a client message (mic audio / text) to Gemini. */
+  forwardClientMessage(payload: any): void {
+    if (!this.session) return;
+    // Track speaking state from a lightweight client hint if present.
+    if (payload && typeof payload === 'object' && 'userSpeaking' in payload) {
+      this.userSpeaking = !!payload.userSpeaking;
+    }
+    try {
+      if (typeof this.session.sendRealtimeInput === 'function') {
+        this.session.sendRealtimeInput(payload);
+      } else if (typeof this.session.sendClientContent === 'function') {
+        this.session.sendClientContent(payload);
+      } else if (typeof this.session.send === 'function') {
+        this.session.send(payload);
+      }
+    } catch {
+      /* surfaced via onerror */
+    }
+  }
+
+  /** Forward a tool response from the client to Gemini. */
+  forwardToolResponse(payload: unknown): void {
+    try {
+      this.session?.sendToolResponse?.(payload);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Change voice: reconnect (resume handle preserved) with the new voice. */
+  async setVoice(voiceName: string): Promise<void> {
+    if (!this.sessionConfig) return;
+    this.sessionConfig = { ...this.sessionConfig, voiceName };
+    await this.reconnect('voice-change');
+  }
+
+  /** Tear everything down — closes Gemini + stops the watchdog. */
+  close(): void {
+    this.closed = true;
+    this.stopWatchdog();
+    try {
+      this.session?.close?.();
+    } catch {
+      /* ignore */
+    }
+    this.session = null;
+  }
+
+  /** Expose turns (for the close-out summary + tests). */
+  getTurns(): Turn[] {
+    return this.turns;
+  }
+
+  // ---- internals -----------------------------------------------------------
+
+  private async buildConfig(): Promise<Record<string, unknown>> {
+    const cfg = this.sessionConfig!;
+    const loader = this.deps.loadUserFacts ?? loadFacts;
+    let memoryBlock = '';
+    try {
+      const facts = await loader(this.deps.userId);
+      memoryBlock = formatMemoryBlock(facts as any);
+    } catch {
+      memoryBlock = '';
+    }
+    const systemPrompt = buildSystemPrompt({
+      memoryBlock,
+      summary: this.runningSummary,
+      overlay: cfg.systemOverlay,
+      stylePrompt: cfg.stylePrompt,
+    });
+    return buildLiveConfig({
+      systemPrompt,
+      voiceName: cfg.voiceName,
+      tools: [{ functionDeclarations: MEMORY_TOOL_DECLS }],
+    });
+  }
+
+  private async openGemini(): Promise<void> {
+    const config = await this.buildConfig();
+    // Reuse a still-fresh resume handle so Gemini restores prior state.
+    const handleFresh =
+      this.resumeHandle != null &&
+      this.resumeHandleAt != null &&
+      this.now() - this.resumeHandleAt < RESUME_HANDLE_MAX_AGE_MS;
+    if (handleFresh) {
+      (config as any).sessionResumption = { handle: this.resumeHandle };
+    }
+
+    this.session = await this.deps.ai.live.connect({
+      model: this.deps.model,
+      config,
+      callbacks: {
+        onopen: () => this.deps.client.send({ type: 'ready' }),
+        onmessage: (m: any) => this.onGeminiMessage(m),
+        onerror: (e: any) =>
+          this.deps.client.send({ type: 'error', message: String(e?.message ?? e) }),
+        onclose: (e: any) => this.onGeminiClose(e),
+      },
+    });
+    this.sessionOpenedAt = this.now();
+  }
+
+  private onGeminiMessage(m: any): void {
+    // Relay verbatim to the browser (audio + everything).
+    if (this.deps.client.isOpen()) {
+      this.deps.client.send({ type: 'message', payload: m });
+    }
+
+    // Capture a fresh resume handle.
+    try {
+      const update = m?.sessionResumptionUpdate;
+      if (update?.newHandle && update?.resumable) {
+        this.resumeHandle = update.newHandle;
+        this.resumeHandleAt = this.now();
+      }
+    } catch {
+      /* never break the proxy */
+    }
+
+    // Accumulate transcripts → turns (for summary + close-out memory).
+    try {
+      const sc = m?.serverContent;
+      if (sc) {
+        if (sc.inputTranscription?.text) this.pendingUserText += sc.inputTranscription.text;
+        if (sc.outputTranscription?.text) this.pendingNicoleText += sc.outputTranscription.text;
+        if (sc.turnComplete) this.flushTurn();
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // Dispatch tool calls (memory). Gemini delivers function calls on toolCall.
+    void this.maybeHandleToolCalls(m);
+  }
+
+  private flushTurn(): void {
+    if (this.pendingUserText.trim()) {
+      this.turns.push({ role: 'user', text: this.pendingUserText.trim() });
+      this.pendingUserText = '';
+    }
+    if (this.pendingNicoleText.trim()) {
+      this.turns.push({ role: 'nicole', text: this.pendingNicoleText.trim() });
+      this.pendingNicoleText = '';
+    }
+    // After a completed turn, consider summarizing to keep context bounded.
+    void this.maybeSummarize();
+  }
+
+  private async maybeHandleToolCalls(m: any): Promise<void> {
+    try {
+      const calls = m?.toolCall?.functionCalls;
+      if (!Array.isArray(calls) || calls.length === 0) return;
+      const handler = this.deps.onMemoryTool ?? handleMemoryTool;
+      const responses: any[] = [];
+      for (const call of calls) {
+        const name = call?.name;
+        const args = call?.args ?? {};
+        if (name === 'save_memory' || name === 'forget_memory') {
+          const res = await handler(name, args, this.deps.userId);
+          responses.push({ id: call?.id, name, response: { result: res.ok ? 'ok' : 'error' } });
+        }
+        // training_mark_progress is handled client-side (drives the scorecard);
+        // we still ack it so Gemini isn't left waiting.
+        else if (name === 'training_mark_progress') {
+          responses.push({ id: call?.id, name, response: { result: 'ok' } });
+        }
+      }
+      if (responses.length && this.session?.sendToolResponse) {
+        this.session.sendToolResponse({ functionResponses: responses });
+      }
+    } catch {
+      /* tool errors never break the live session */
+    }
+  }
+
+  private async maybeSummarize(): Promise<void> {
+    if (this.busy || this.closed) return;
+    const estTokens = estimateTokens(this.turns.map((t) => t.text).join(' '));
+    if (!shouldSummarize(this.turns.length, estTokens)) return;
+    if (this.userSpeaking) return; // never summarize mid-utterance
+
+    this.busy = true;
+    try {
+      const { toSummarize, toKeep } = splitForSummary(this.turns);
+      if (toSummarize.length === 0) return;
+      const summarizer = this.deps.summarize ?? summarizeTurns;
+      const fresh = await summarizer(toSummarize);
+      // Merge with any prior running summary so nothing is lost.
+      this.runningSummary = this.runningSummary
+        ? `${this.runningSummary} ${fresh}`.trim()
+        : fresh;
+      this.turns = toKeep;
+      // Reconnect seeded with the new [SUMMARY] so the live context is light.
+      await this.reconnect('summary');
+    } catch {
+      /* if summarization fails, keep going on the existing session */
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private onGeminiClose(e: any): void {
+    if (this.closed) return;
+    const code = e?.code;
+    const reason = e?.reason ?? '';
+    // Auto-reconnect on drops, reusing the resume handle (seamless continue).
+    // Terminal billing/quota closes are relayed to the client to stop storms.
+    if (isTerminalClose(code, reason)) {
+      this.deps.client.send({ type: 'gemini-close', code, reason });
+      this.deps.client.close();
+      return;
+    }
+    this.deps.client.send({ type: 'reconnecting' });
+    void this.reconnect('drop').catch(() => {
+      if (this.deps.client.isOpen()) {
+        this.deps.client.send({ type: 'gemini-close', code, reason });
+        this.deps.client.close();
+      }
+    });
+  }
+
+  /** Close the current Gemini session and open a fresh one (handle reused). */
+  private async reconnect(_why: string): Promise<void> {
+    if (this.closed) return;
+    try {
+      this.session?.close?.();
+    } catch {
+      /* ignore */
+    }
+    this.session = null;
+    await this.openGemini();
+  }
+
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    // Check once a minute whether we should proactively refresh the session
+    // before the resume-handle boundary. Cheap; cleared on close.
+    this.watchdog = setInterval(() => void this.tickWatchdog(), 60_000);
+    // Avoid keeping the process alive solely for this timer.
+    (this.watchdog as any)?.unref?.();
+  }
+
+  private async tickWatchdog(): Promise<void> {
+    if (this.closed || this.busy || !this.session) return;
+    const sessionAge = this.now() - this.sessionOpenedAt;
+    const handleAge = this.resumeHandleAt == null ? null : this.now() - this.resumeHandleAt;
+    if (shouldProactiveReconnect(sessionAge, handleAge, this.userSpeaking)) {
+      this.busy = true;
+      try {
+        await this.reconnect('proactive');
+      } finally {
+        this.busy = false;
+      }
+    }
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdog) {
+      clearInterval(this.watchdog);
+      this.watchdog = null;
+    }
+  }
+}
+
+/**
+ * A terminal close is non-retryable (billing / quota / region). Everything else
+ * is a normal rotation/drop we reconnect through. Mirrors CHAT's filter.
+ */
+export function isTerminalClose(code: number | undefined, reason: string): boolean {
+  return (
+    code === 1011 &&
+    /spending cap|quota|exceeded|billing|credits?|deplet|prepay|resource exhausted|permission|not available in your country|location is not supported/i.test(
+      reason,
+    )
+  );
+}
