@@ -93,6 +93,12 @@ function handleAiLive(ws: WebSocket): void {
       return;
     }
 
+    // Silent text directive (e.g. training autostart "[NEW LESSON] begin now").
+    if (msg.type === 'client-text' && typeof msg.text === 'string') {
+      session.sendText(msg.text);
+      return;
+    }
+
     if (msg.type === 'tool-response') {
       session.forwardToolResponse(msg.payload);
       return;

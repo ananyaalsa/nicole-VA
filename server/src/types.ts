@@ -33,6 +33,7 @@ export interface SessionConfig {
 export type RelayClientMsg =
   | { type: 'connect'; config: SessionConfig }
   | { type: 'client-msg'; payload: unknown }
+  | { type: 'client-text'; text: string }
   | { type: 'tool-response'; payload: unknown }
   | { type: 'set-voice'; voiceName: string };
 

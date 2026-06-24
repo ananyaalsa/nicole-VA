@@ -141,6 +141,31 @@ export class LiveSession {
     }
   }
 
+  /**
+   * Send a TEXT turn to Gemini (not audio). Used for silent directives like the
+   * training autostart "[NEW LESSON] begin now" prompt — the system drives the
+   * session, the user doesn't have to speak first. Uses sendClientContent with a
+   * proper turns structure (sendRealtimeInput is audio-only).
+   */
+  sendText(text: string): void {
+    if (!this.session || !text) return;
+    try {
+      if (typeof this.session.sendClientContent === 'function') {
+        this.session.sendClientContent({
+          turns: [{ role: 'user', parts: [{ text }] }],
+          turnComplete: true,
+        });
+      } else if (typeof this.session.send === 'function') {
+        this.session.send({
+          turns: [{ role: 'user', parts: [{ text }] }],
+          turnComplete: true,
+        });
+      }
+    } catch {
+      /* surfaced via onerror */
+    }
+  }
+
   /** Forward a tool response from the client to Gemini. */
   forwardToolResponse(payload: unknown): void {
     try {

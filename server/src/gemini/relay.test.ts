@@ -212,6 +212,36 @@ describe('LiveSession memory tool dispatch', () => {
   });
 });
 
+describe('LiveSession.sendText (autostart directive)', () => {
+  it('sends a text turn via sendClientContent', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client } = makeClient();
+    // augment the fake session with sendClientContent
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    await ls.connect(CFG);
+    const s: any = sessions[0];
+    s.sendClientContent = vi.fn();
+    ls.sendText('[NEW LESSON] begin now');
+    expect(s.sendClientContent).toHaveBeenCalledWith({
+      turns: [{ role: 'user', parts: [{ text: '[NEW LESSON] begin now' }] }],
+      turnComplete: true,
+    });
+    ls.close();
+  });
+
+  it('is a no-op for empty text', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client } = makeClient();
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    await ls.connect(CFG);
+    const s: any = sessions[0];
+    s.sendClientContent = vi.fn();
+    ls.sendText('');
+    expect(s.sendClientContent).not.toHaveBeenCalled();
+    ls.close();
+  });
+});
+
 describe('LiveSession setVoice', () => {
   it('reconnects with the new voice', async () => {
     const { ai, sessions } = makeFakeAI();
