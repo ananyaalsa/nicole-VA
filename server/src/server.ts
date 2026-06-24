@@ -12,6 +12,7 @@ import { handleTrainingRoute } from './training/routes.js';
 import { ensureSchema } from './memory/db.js';
 import { ensureTrainingSchema } from './training/historyDb.js';
 import { LiveSession, type ClientChannel, type GenAILike } from './gemini/relay.js';
+import { SignalingRooms } from './rtc/signalingRoom.js';
 import type { SessionConfig } from './types.js';
 
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey }) as unknown as GenAILike;
@@ -47,15 +48,56 @@ const httpServer = createServer((req, res) => {
 
 // WebSocket relay on /ai-live.
 const wss = new WebSocketServer({ noServer: true });
+// WebRTC signaling on /rtc-signal (phone <-> PC handshake; no media).
+const rtcWss = new WebSocketServer({ noServer: true });
+const rtcRooms = new SignalingRooms();
+let rtcPeerSeq = 0;
 
 httpServer.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url ?? '/', 'http://localhost');
-  if (pathname !== '/ai-live') {
+  if (pathname === '/ai-live') {
+    wss.handleUpgrade(request, socket, head, (ws) => handleAiLive(ws));
+  } else if (pathname === '/rtc-signal') {
+    rtcWss.handleUpgrade(request, socket, head, (ws) => handleRtcSignal(ws));
+  } else {
     socket.destroy();
-    return;
   }
-  wss.handleUpgrade(request, socket, head, (ws) => handleAiLive(ws));
 });
+
+/** One phone/PC peer on the signaling channel. Relays its WebRTC handshake. */
+function handleRtcSignal(ws: WebSocket): void {
+  const id = `peer-${++rtcPeerSeq}`;
+  let room: string | null = null;
+  const peer = {
+    id,
+    send: (m: unknown) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
+    },
+  };
+
+  ws.on('message', (raw: Buffer) => {
+    let msg: any;
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+    if (msg.type === 'join' && typeof msg.room === 'string') {
+      room = msg.room;
+      rtcRooms.join(msg.room, peer);
+    } else if (msg.type === 'signal') {
+      const r = room;
+      if (r) rtcRooms.relay(r, id, msg.payload);
+    }
+  });
+
+  ws.on('close', () => {
+    if (room) rtcRooms.leave(room, id);
+  });
+  ws.on('error', () => {
+    if (room) rtcRooms.leave(room, id);
+  });
+}
 
 function handleAiLive(ws: WebSocket): void {
   const client: ClientChannel = {
