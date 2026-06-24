@@ -1,0 +1,116 @@
+.scorecard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 18, 30, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.scorecard__header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.scorecard__empty {
+  font-size: 0.86rem;
+  line-height: 1.4;
+  opacity: 0.5;
+  padding: 8px 0;
+}
+
+.scorecard__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.scorecard__entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  animation: scorecard-pop 0.25s ease;
+}
+
+@keyframes scorecard-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scorecard__entry--hit {
+  border-color: rgba(74, 222, 128, 0.4);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.16),
+    rgba(74, 222, 128, 0.06)
+  );
+}
+
+.scorecard__entry--miss {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.16),
+    rgba(248, 113, 113, 0.06)
+  );
+}
+
+.scorecard__indicator {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0b0b14;
+}
+
+.scorecard__entry--hit .scorecard__indicator {
+  background: #4ade80;
+}
+
+.scorecard__entry--miss .scorecard__indicator {
+  background: #f87171;
+}
+
+.scorecard__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scorecard__dimension {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #f1f1f8;
+}
+
+.scorecard__tip {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  opacity: 0.72;
+}
