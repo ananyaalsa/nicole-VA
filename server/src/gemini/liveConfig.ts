@@ -28,6 +28,12 @@ export interface BuildLiveConfigOpts {
   voiceName: string;
   /** Optional tool/function declarations exposed to the model. */
   tools?: unknown[];
+  /**
+   * When true, enable Gemini's built-in Google Search grounding so Nicole can
+   * answer real-time questions (news, weather, flights, prices, latest facts).
+   * Added as its own tool entry alongside any function declarations.
+   */
+  searchEnabled?: boolean;
 }
 
 /**
@@ -37,6 +43,12 @@ export interface BuildLiveConfigOpts {
 export function buildLiveConfig(
   opts: BuildLiveConfigOpts,
 ): Record<string, unknown> {
+  // Google Search grounding is its own tool entry; it coexists with the memory
+  // function declarations. Search goes first so it's the model's default reach.
+  const tools: unknown[] = [];
+  if (opts.searchEnabled) tools.push({ googleSearch: {} });
+  if (opts.tools) tools.push(...opts.tools);
+
   return {
     responseModalities: ['AUDIO'],
     speechConfig: {
@@ -46,7 +58,7 @@ export function buildLiveConfig(
     },
     systemInstruction: opts.systemPrompt,
     realtimeInputConfig: REALTIME_INPUT_CONFIG,
-    tools: opts.tools ?? [],
+    tools,
     // Empty object requests session-resumption handles from the server.
     sessionResumption: {},
     // Empty objects request both-side audio transcripts.

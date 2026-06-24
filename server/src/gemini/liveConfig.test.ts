@@ -58,11 +58,28 @@ describe('buildLiveConfig', () => {
   it('threads provided tools through', () => {
     const tools = [{ functionDeclarations: [] }];
     const cfg = buildLiveConfig({ ...base, tools }) as any;
-    expect(cfg.tools).toBe(tools);
+    expect(cfg.tools).toEqual(tools);
   });
 
   it('does NOT embed the model id in the config', () => {
     const cfg = buildLiveConfig(base) as any;
     expect(cfg.model).toBeUndefined();
+  });
+
+  it('enables Google Search grounding when searchEnabled is true', () => {
+    const cfg = buildLiveConfig({ ...base, searchEnabled: true }) as any;
+    expect(cfg.tools).toContainEqual({ googleSearch: {} });
+  });
+
+  it('keeps Google Search alongside provided function declarations', () => {
+    const tools = [{ functionDeclarations: [{ name: 'save_memory' }] }];
+    const cfg = buildLiveConfig({ ...base, tools, searchEnabled: true }) as any;
+    expect(cfg.tools).toContainEqual({ googleSearch: {} });
+    expect(cfg.tools).toContainEqual({ functionDeclarations: [{ name: 'save_memory' }] });
+  });
+
+  it('does NOT add Google Search when searchEnabled is false/absent', () => {
+    const cfg = buildLiveConfig(base) as any;
+    expect(cfg.tools).not.toContainEqual({ googleSearch: {} });
   });
 });

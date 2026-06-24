@@ -196,6 +196,9 @@ export class LiveSession {
       systemPrompt,
       voiceName: cfg.voiceName,
       tools: [{ functionDeclarations: MEMORY_TOOL_DECLS }],
+      // Real-time Google Search grounding so Nicole can answer news/weather/
+      // flights/prices/latest-fact questions with current info.
+      searchEnabled: true,
     });
   }
 
