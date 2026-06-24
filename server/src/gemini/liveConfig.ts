@@ -16,7 +16,13 @@ export const REALTIME_INPUT_CONFIG = {
     startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
     endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
     prefixPaddingMs: 600,
-    silenceDurationMs: 700,
+    // 1100ms (raised from CHAT's 700ms): Nicole waits a clear extra beat of
+    // silence before taking her turn, so a natural mid-thought pause or a brief
+    // one-second interruption (a phone buzz, a quick word to someone) doesn't
+    // make her jump in. Makes her a patient listener. Combined with the
+    // sustained-frame barge-in gate on the client, momentary noise never
+    // triggers her.
+    silenceDurationMs: 1100,
   },
 } as const;
 

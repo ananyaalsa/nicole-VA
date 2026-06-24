@@ -47,8 +47,31 @@ const INPUT_SAMPLE_RATE = 16000;
 const PROCESSOR_BUFFER_SIZE = 4096;
 /** Cap on transcript history to keep memory bounded. */
 const MAX_TRANSCRIPT_LINES = 400;
-/** RMS over the mic above which we consider the user to be speaking (barge-in). */
-const BARGE_IN_RMS_THRESHOLD = 0.04;
+
+// --- Barge-in / noise gating ----------------------------------------------
+// A good listener does NOT stop talking for a cough, a one-second phone buzz,
+// a background voice, or a door. She only yields to REAL, SUSTAINED speech from
+// the user. So barge-in requires the mic energy to stay above a floor for
+// several consecutive frames, not just one momentary spike.
+
+/** RMS floor below which audio is treated as background noise (ignored for barge-in). */
+const BARGE_IN_RMS_THRESHOLD = 0.08;
+/**
+ * How many consecutive over-threshold frames are required before we treat it as
+ * a real interruption. One frame (4096 samples @16kHz) ≈ 256ms, so 3 frames
+ * ≈ ~750ms of sustained speech — long enough to ignore blips/coughs, short
+ * enough to feel responsive when the user genuinely starts talking.
+ */
+const BARGE_IN_SUSTAIN_FRAMES = 3;
+/** Mic constraints: turn on the browser's built-in echo + noise + gain DSP. */
+const MIC_CONSTRAINTS: MediaStreamConstraints = {
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: 1,
+  },
+};
 
 let lineCounter = 0;
 function nextLineId(): string {
@@ -125,6 +148,8 @@ export function useNicoleSession(
   const playHeadRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const wantMicRef = useRef(true);
+  // Count of consecutive over-threshold mic frames, for sustained barge-in.
+  const sustainedSpeechRef = useRef(0);
   const voiceRef = useRef(voiceName);
 
   // In-flight (streaming) transcript lines, keyed by speaker.
@@ -356,16 +381,31 @@ export function useNicoleSession(
           const frame = new Float32Array(input.length);
           frame.set(input);
 
-          // Barge-in: RMS over the mic frame.
+          // Barge-in gate: only a REAL, SUSTAINED utterance interrupts Nicole.
+          // A single loud frame (a cough, a phone buzz, a door, a stray word
+          // from someone nearby) is NOT enough — the energy must stay above the
+          // noise floor for several consecutive frames before she yields. This
+          // makes her a patient listener instead of flinching at every blip.
           let sumSq = 0;
           for (let i = 0; i < frame.length; i++) sumSq += frame[i] * frame[i];
           const rms = Math.sqrt(sumSq / frame.length);
+
+          if (rms > BARGE_IN_RMS_THRESHOLD) {
+            sustainedSpeechRef.current += 1;
+          } else {
+            // Reset on any quiet frame — momentary noise can't accumulate.
+            sustainedSpeechRef.current = 0;
+          }
+
+          const nicoleIsSpeaking =
+            queueRef.current.length > 0 || activeSourcesRef.current.size > 0;
           if (
             wantMicRef.current &&
-            rms > BARGE_IN_RMS_THRESHOLD &&
-            (queueRef.current.length > 0 || activeSourcesRef.current.size > 0)
+            nicoleIsSpeaking &&
+            sustainedSpeechRef.current >= BARGE_IN_SUSTAIN_FRAMES
           ) {
             stopPlayback();
+            sustainedSpeechRef.current = 0;
           }
 
           sendMicFrame(frame);
@@ -468,7 +508,16 @@ export function useNicoleSession(
       }
     ).mediaDevices;
     if (md?.getUserMedia) {
-      const stream = await md.getUserMedia({ audio: true });
+      // Request the browser's built-in echo cancellation + noise suppression +
+      // auto-gain so steady background noise (fans, traffic, hum, room echo) is
+      // filtered before it ever reaches us or Gemini. Fall back to plain audio
+      // if the constraints aren't supported.
+      let stream: MediaStream;
+      try {
+        stream = await md.getUserMedia(MIC_CONSTRAINTS);
+      } catch {
+        stream = await md.getUserMedia({ audio: true });
+      }
       streamRef.current = stream;
       wantMicRef.current = true;
       setMicOn(true);
