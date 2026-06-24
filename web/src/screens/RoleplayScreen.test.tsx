@@ -66,6 +66,19 @@ vi.mock('../components/AuroraBackground', () => ({
   default: () => <div data-testid="aurora" />,
 }));
 
+// DictationField uses a live session for mic; stub useDictation so it's inert.
+vi.mock('../engine/useDictation', () => ({
+  useDictation: () => ({
+    listening: false,
+    text: '',
+    start: vi.fn(async () => {}),
+    stop: vi.fn(),
+    toggle: vi.fn(),
+    reset: vi.fn(),
+  }),
+  joinUserTranscript: () => '',
+}));
+
 import { RoleplayScreen } from './RoleplayScreen';
 
 beforeEach(() => {
@@ -189,7 +202,7 @@ describe('RoleplayScreen', () => {
     });
     render(<RoleplayScreen />);
     fireEvent.click(await screen.findByTestId('profile-card'));
-    const ta = screen.getByTestId('custom-dictation') as HTMLTextAreaElement;
+    const ta = screen.getByTestId('dictation-input') as HTMLTextAreaElement;
     fireEvent.change(ta, { target: { value: 'A skeptical CFO on a renewal call' } });
     fireEvent.click(screen.getByTestId('build-button'));
     await screen.findByTestId('custom-ready');

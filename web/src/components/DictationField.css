@@ -1,0 +1,91 @@
+.dictation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.dictation-field.is-disabled { opacity: 0.6; pointer-events: none; }
+
+.dictation-field__label {
+  display: block;
+}
+
+.dictation-field__box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.dictation-field__input {
+  width: 100%;
+  resize: vertical;
+  padding: 14px 16px 48px;
+  font: inherit;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(6, 22, 28, 0.6);
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--r-sharp, 2px);
+  outline: none;
+}
+.dictation-field__input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px rgba(62, 240, 255, 0.3);
+}
+.dictation-field__input::placeholder { color: var(--muted-dim, #436069); }
+
+/* Mic button pinned to the bottom-left inside the textarea box. */
+.dictation-field__mic {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  background: rgba(3, 9, 13, 0.85);
+  border: 1px solid var(--edge-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+.dictation-field__mic:hover {
+  border-color: var(--cyan);
+  color: var(--cyan-bright);
+  box-shadow: 0 0 14px rgba(62, 240, 255, 0.35);
+}
+.dictation-field__mic.is-listening {
+  color: var(--bad, #ff5d6c);
+  border-color: rgba(255, 93, 108, 0.6);
+}
+
+.dictation-field__mic-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.dictation-field__mic.is-listening .dictation-field__mic-dot {
+  animation: dictation-pulse 1s ease-in-out infinite;
+}
+
+.dictation-field__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--bad, #ff5d6c);
+}
+
+@keyframes dictation-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dictation-field__mic-dot { animation: none; }
+}

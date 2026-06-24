@@ -22,17 +22,53 @@
   flex: 0 0 auto;
 }
 
+/* Custom-training builder (mic + editable). */
+.lesson-card--custom { border-style: dashed; }
+.lesson-card--custom.is-open { border-color: var(--cyan); }
+
+.training__custom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  padding: 18px;
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--r-sharp, 2px);
+  background: rgba(6, 22, 28, 0.5);
+}
+.training__custom-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.training__build-btn {
+  padding: 11px 22px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #02141a;
+  background: var(--cyan);
+  border: none;
+  border-radius: var(--r-sharp, 2px);
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(62, 240, 255, 0.4);
+}
+.training__build-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.training__build-error { color: var(--bad, #ff5d6c); font-size: 0.85rem; }
+
 .training__picker {
   position: relative;
   z-index: 1;
   height: 100%;
-  max-width: 1080px;
+  max-width: 1500px;
   margin: 0 auto;
-  padding: clamp(24px, 5vh, 64px) clamp(20px, 4vw, 40px);
+  padding: clamp(24px, 5vh, 56px) clamp(24px, 5vw, 72px);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: clamp(20px, 3vh, 32px);
+  gap: clamp(18px, 2.4vh, 28px);
   overflow: hidden;
 }
 
@@ -75,24 +111,27 @@
 .training__lessons {
   list-style: none;
   margin: 0;
-  padding: 4px;
+  padding: 2px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
+  /* A balanced, even grid — no ragged orphan card. Equal-height rows. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: clamp(14px, 1.6vw, 22px);
   /* If the lessons can't fit the viewport, scroll the list — never the page. */
   min-height: 0;
   overflow-y: auto;
 }
+.training__lessons > li { display: flex; min-width: 0; }
 
 .lesson-card {
-  --cut: 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
+  --cut: 16px;
+  display: grid;
+  /* index/badge row · title · objective · moves (flex) · cta pinned bottom */
+  grid-template-rows: auto auto auto 1fr auto;
+  gap: 12px;
   width: 100%;
   text-align: left;
-  padding: 24px 24px 20px;
+  padding: 22px 24px 18px;
   color: inherit;
   cursor: pointer;
   transition:
@@ -105,18 +144,24 @@
 .lesson-card:hover {
   transform: translateY(-3px);
   border-color: var(--cyan);
-  background: rgba(8, 28, 34, 0.8);
+  background: rgba(8, 28, 34, 0.82);
   box-shadow: 0 0 0 1px rgba(62, 240, 255, 0.3), 0 18px 50px -24px rgba(62, 240, 255, 0.7);
 }
 .lesson-card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
+/* Top row: framework badge (left) + index (right) on one line. */
+.lesson-card__toprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .lesson-card__index {
-  align-self: flex-end;
-  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--edge-strong);
-  letter-spacing: 0.1em;
-  margin-bottom: -8px;
+  letter-spacing: 0.12em;
 }
 
 .lesson-card__framework {
@@ -150,8 +195,9 @@
 .lesson-card__moves {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 .lesson-card__move {
   display: inline-flex;
@@ -176,12 +222,16 @@
 }
 
 .lesson-card__cta {
-  margin-top: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--edge);
   color: var(--cyan);
   display: inline-flex;
   gap: 6px;
   align-items: center;
+  justify-content: space-between;
 }
+.lesson-card:hover .lesson-card__cta { color: var(--cyan-bright); }
 
 .training__back {
   align-self: flex-start;

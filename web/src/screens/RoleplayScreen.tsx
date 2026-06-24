@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import AuroraBackground from '../components/AuroraBackground';
 import { NicolePresence } from '../components/NicolePresence';
+import { DictationField } from '../components/DictationField';
 import {
   fetchProfiles,
   generateCustomSpec,
@@ -202,17 +203,12 @@ export function RoleplayScreen({ onExit }: RoleplayScreenProps): JSX.Element {
 
         {activeProfile && activeProfile.id === 'custom' && (
           <section className="roleplay__custom" data-testid="custom-builder">
-            <label className="hud-label" htmlFor="roleplay-dictation">
-              Describe who you want to practice against and the situation
-            </label>
-            <textarea
-              id="roleplay-dictation"
-              className="roleplay__textarea"
-              data-testid="custom-dictation"
-              rows={4}
+            <DictationField
+              label="Describe who you want to practice against and the situation"
               value={dictation}
-              placeholder="e.g. A skeptical CFO who thinks our tool is too expensive, on a renewal call…"
-              onChange={(e) => setDictation(e.target.value)}
+              onChange={setDictation}
+              rows={4}
+              placeholder="Type it, or tap Dictate and speak — e.g. A skeptical CFO who thinks our tool is too expensive, on a renewal call…"
             />
             <div className="roleplay__custom-actions">
               <button

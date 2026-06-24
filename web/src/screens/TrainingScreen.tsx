@@ -4,6 +4,9 @@ import AuroraBackground from '../components/AuroraBackground';
 import { NicolePresence } from '../components/NicolePresence';
 import { Transcript } from '../components/Transcript';
 import { HistoryPanel } from '../components/HistoryPanel';
+import { DictationField } from '../components/DictationField';
+import { generateCustomSpec } from '../training/trainingApi';
+import { Icon } from '../components/Icon';
 
 // Same lazy 3D avatar used on the Talk screen.
 const SophiaAvatar = lazy(() => import('../avatar3d/SophiaAvatar'));
@@ -54,6 +57,32 @@ export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
   const [lesson, setLesson] = useState<ClientLessonSpec | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Custom training: describe (type or dictate) a skill -> AI builds a lesson
+  // Nicole teaches end-to-end, just like the authored ones.
+  const [showCustom, setShowCustom] = useState(false);
+  const [customText, setCustomText] = useState('');
+  const [building, setBuilding] = useState(false);
+  const [buildError, setBuildError] = useState<string | null>(null);
+
+  const buildCustom = useCallback(async () => {
+    if (!customText.trim()) return;
+    setBuilding(true);
+    setBuildError(null);
+    try {
+      const res = await generateCustomSpec({ dictation: customText });
+      if (res.ok && res.spec) {
+        // A TrainingSpec is a superset of ClientLessonSpec — Nicole teaches it.
+        setLesson(res.spec as unknown as ClientLessonSpec);
+      } else {
+        setBuildError(res.error ?? 'Could not build that training. Try rephrasing.');
+      }
+    } catch (e) {
+      setBuildError((e as Error)?.message ?? 'Build failed.');
+    } finally {
+      setBuilding(false);
+    }
+  }, [customText]);
+
   const exitSession = useCallback(() => {
     setLesson(null);
   }, []);
@@ -83,12 +112,14 @@ export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
             <h1 className="training__title">Pick one skill to drill</h1>
             <button
               type="button"
-              className="ghost-btn training__history-btn"
+              className="icon-btn icon-btn--cyan training__history-btn"
               data-testid="history-button"
               onClick={() => setShowHistory(true)}
+              title="History"
+              aria-label="History"
             >
-              History
-              <span className="ghost-btn-arrow" aria-hidden="true">→</span>
+              <Icon name="history" />
+              <span className="icon-btn__label">History</span>
             </button>
           </div>
           <p className="training__lede">
@@ -106,11 +137,13 @@ export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
                 data-testid="lesson-card"
                 onClick={() => setLesson(l)}
               >
-                <span className="lesson-card__index hud-label">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="lesson-card__framework">
-                  {l.coreFramework.name}
+                <span className="lesson-card__toprow">
+                  <span className="lesson-card__framework">
+                    {l.coreFramework.name}
+                  </span>
+                  <span className="lesson-card__index">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                 </span>
                 <span className="lesson-card__title">{l.title}</span>
                 <span className="lesson-card__objective">{l.objective}</span>
@@ -130,7 +163,57 @@ export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
               </button>
             </li>
           ))}
+
+          {/* Custom: design your own skill for Nicole to teach. */}
+          <li>
+            <button
+              type="button"
+              className={`lesson-card lesson-card--custom hud-panel${showCustom ? ' is-open' : ''}`}
+              data-testid="custom-lesson-card"
+              onClick={() => setShowCustom((v) => !v)}
+            >
+              <span className="lesson-card__toprow">
+                <span className="lesson-card__framework">CUSTOM</span>
+              </span>
+              <span className="lesson-card__title">Build your own skill</span>
+              <span className="lesson-card__objective">
+                Describe any skill you want to get better at — type it or speak it —
+                and Nicole builds the lesson and coaches you through it.
+              </span>
+              <span className="lesson-card__cta hud-label">
+                {showCustom ? 'Close' : 'Design it'} <span aria-hidden="true">→</span>
+              </span>
+            </button>
+          </li>
         </ul>
+
+        {showCustom && (
+          <section className="training__custom" data-testid="training-custom-builder">
+            <DictationField
+              label="What do you want to get better at?"
+              value={customText}
+              onChange={setCustomText}
+              rows={3}
+              placeholder="Type it, or tap Dictate and speak — e.g. saying no to my boss without sounding rude…"
+            />
+            <div className="training__custom-actions">
+              <button
+                type="button"
+                className="training__build-btn"
+                data-testid="training-build-button"
+                disabled={building || !customText.trim()}
+                onClick={() => void buildCustom()}
+              >
+                {building ? 'Building…' : 'Build & enter room'}
+              </button>
+              {buildError && (
+                <span className="training__build-error" data-testid="training-build-error">
+                  {buildError}
+                </span>
+              )}
+            </div>
+          </section>
+        )}
 
         {onExit && (
           <button
