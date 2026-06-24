@@ -8,8 +8,8 @@ describe('REALTIME_INPUT_CONFIG', () => {
         startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
         endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
         prefixPaddingMs: 600,
-        // Raised from 700ms so Nicole is a more patient listener.
-        silenceDurationMs: 1100,
+        // Slightly patient (800ms) without making her deaf to normal speech.
+        silenceDurationMs: 800,
       },
     });
   });

@@ -49,26 +49,32 @@ const PROCESSOR_BUFFER_SIZE = 4096;
 const MAX_TRANSCRIPT_LINES = 400;
 
 // --- Barge-in / noise gating ----------------------------------------------
-// A good listener does NOT stop talking for a cough, a one-second phone buzz,
-// a background voice, or a door. She only yields to REAL, SUSTAINED speech from
-// the user. So barge-in requires the mic energy to stay above a floor for
-// several consecutive frames, not just one momentary spike.
+// Goal: she should hear you at a NORMAL speaking volume, while a cough or a
+// one-second blip still doesn't cut her off. The barge-in gate below ONLY
+// governs interrupting her mid-speech — it must NOT be so high that normal
+// speech fails to register. Kept low + a short sustain so interrupting is easy.
 
-/** RMS floor below which audio is treated as background noise (ignored for barge-in). */
-const BARGE_IN_RMS_THRESHOLD = 0.08;
+/** RMS floor below which audio is ignored for barge-in. Low so a normal voice interrupts. */
+const BARGE_IN_RMS_THRESHOLD = 0.045;
 /**
- * How many consecutive over-threshold frames are required before we treat it as
- * a real interruption. One frame (4096 samples @16kHz) ≈ 256ms, so 3 frames
- * ≈ ~750ms of sustained speech — long enough to ignore blips/coughs, short
- * enough to feel responsive when the user genuinely starts talking.
+ * Consecutive over-threshold frames before we treat it as a real interruption.
+ * One frame (4096 samples @16kHz) ≈ 256ms, so 2 frames ≈ ~500ms — enough to
+ * shrug off a single-frame blip/cough, short enough that normal speech
+ * interrupts her almost immediately.
  */
-const BARGE_IN_SUSTAIN_FRAMES = 3;
-/** Mic constraints: turn on the browser's built-in echo + noise + gain DSP. */
+const BARGE_IN_SUSTAIN_FRAMES = 2;
+/**
+ * Mic constraints. We keep ECHO CANCELLATION on (stops Nicole's own voice from
+ * feeding back into the mic — essential for a speaker setup), but leave
+ * NOISE SUPPRESSION and AUTO-GAIN OFF: both were swallowing a normal-volume
+ * voice (AGC dropped the gain in a quiet room; suppression clipped soft speech),
+ * forcing the user to shout. Off = your voice comes through at its true level.
+ */
 const MIC_CONSTRAINTS: MediaStreamConstraints = {
   audio: {
     echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
+    noiseSuppression: false,
+    autoGainControl: false,
     channelCount: 1,
   },
 };
