@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import AuroraBackground from '../components/AuroraBackground';
 import { NicoleAura, type AuraState } from '../components/NicoleAura';
@@ -53,14 +53,16 @@ export function TalkScreen({ onTrain, onRoleplay }: TalkScreenProps): JSX.Elemen
   const sendVideoFrame = session.sendVideoFrame;
   const camera = useCamera({ onFrame: sendVideoFrame });
 
-  // Clean teardown on unmount so leaving the screen never leaks audio/sockets.
-  useEffect(
-    () => () => {
-      camera.stop();
-      stop();
-    },
-    [stop, camera],
-  );
+  // Clean teardown on unmount ONLY. We keep the latest stop fns in a ref so this
+  // effect can depend on [] — depending on `camera`/`stop` (recreated each render)
+  // would re-run the cleanup every render and tear the live session down mid-
+  // connect (the "WebSocket closed before established" bug).
+  const teardownRef = useRef<() => void>(() => {});
+  teardownRef.current = () => {
+    camera.stop();
+    stop();
+  };
+  useEffect(() => () => teardownRef.current(), []);
 
   const speaking = amplitude > SPEAKING_AMP;
   const auraState: AuraState = speaking ? 'speaking' : connected && micOn ? 'listening' : 'idle';

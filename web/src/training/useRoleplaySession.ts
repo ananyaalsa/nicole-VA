@@ -76,28 +76,39 @@ export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult 
 
   const sentOpenRef = useRef(false);
 
+  // Keep the latest session methods in refs so the effects below can depend only
+  // on primitive state (session.connected), NOT on the `session` object — which
+  // useNicoleSession recreates every render. Depending on it would re-run the
+  // teardown each render and kill the live session mid-connect.
+  const sendTextRef = useRef(session.sendText);
+  sendTextRef.current = session.sendText;
+  const stopRef = useRef(session.stop);
+  stopRef.current = session.stop;
+  const startRef = useRef(session.start);
+  startRef.current = session.start;
+
   // Once connected, fire the silent [OPEN] so the character speaks first.
   useEffect(() => {
     if (session.connected && !sentOpenRef.current) {
       sentOpenRef.current = true;
       // Small delay so the live session is fully ready to accept a turn.
       const t = setTimeout(() => {
-        session.sendText(OPEN_DIRECTIVE);
+        sendTextRef.current(OPEN_DIRECTIVE);
       }, 500);
       return () => clearTimeout(t);
     }
     if (!session.connected) {
       sentOpenRef.current = false;
     }
-  }, [session.connected, session]);
+  }, [session.connected]);
 
-  // Clean teardown on unmount.
-  useEffect(() => () => session.stop(), [session]);
+  // Clean teardown on unmount ONLY.
+  useEffect(() => () => stopRef.current(), []);
 
   const start = useCallback(async () => {
     sentOpenRef.current = false;
-    await session.start();
-  }, [session]);
+    await startRef.current();
+  }, []);
 
   return {
     connected: session.connected,

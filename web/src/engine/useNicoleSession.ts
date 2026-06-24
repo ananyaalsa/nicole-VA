@@ -552,17 +552,29 @@ export function useNicoleSession(
       // Stop and clear playback.
       stopPlayback();
 
-      // Close socket.
+      // Close socket. If it's still CONNECTING, calling close() now aborts the
+      // handshake ("WebSocket is closed before the connection is established").
+      // Defer the close until it opens so the abort is clean either way.
       const ws = wsRef.current;
       if (ws) {
-        ws.onopen = null;
         ws.onmessage = null;
         ws.onerror = null;
         ws.onclose = null;
-        try {
-          ws.close();
-        } catch {
-          /* ignore */
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try {
+              ws.close();
+            } catch {
+              /* ignore */
+            }
+          };
+        } else {
+          ws.onopen = null;
+          try {
+            ws.close();
+          } catch {
+            /* ignore */
+          }
         }
         wsRef.current = null;
       }
