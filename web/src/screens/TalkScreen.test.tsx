@@ -6,6 +6,8 @@ const start = vi.fn(async () => {});
 const stop = vi.fn();
 const toggleMic = vi.fn();
 const setVoice = vi.fn();
+const sendText = vi.fn();
+const sendVideoFrame = vi.fn();
 let sessionState = {
   connected: false,
   micOn: true,
@@ -15,13 +17,34 @@ let sessionState = {
   stop,
   toggleMic,
   setVoice,
+  sendText,
+  sendVideoFrame,
 };
 vi.mock('../engine/useNicoleSession', () => ({
   useNicoleSession: () => sessionState,
 }));
+// Mock the camera hook so we can assert the button wiring without real getUserMedia.
+const cameraStart = vi.fn(async () => {});
+const cameraStop = vi.fn();
+let cameraState = {
+  on: false,
+  stream: null as MediaStream | null,
+  facing: 'user' as const,
+  start: cameraStart,
+  stop: cameraStop,
+  flip: vi.fn(),
+  error: null as string | null,
+};
+vi.mock('../engine/useCamera', () => ({
+  useCamera: () => cameraState,
+}));
 // AuroraBackground uses canvas; keep it but canvas is stubbed by jsdom — render lightweight.
 vi.mock('../components/AuroraBackground', () => ({
   default: () => <div data-testid="aurora" />,
+}));
+// SophiaAvatar mounts a WebGL canvas (three.js) jsdom can't run — stub it.
+vi.mock('../avatar3d/SophiaAvatar', () => ({
+  default: () => <div data-testid="sophia-avatar" />,
 }));
 
 import { TalkScreen } from './TalkScreen';
@@ -31,7 +54,10 @@ beforeEach(() => {
   stop.mockClear();
   toggleMic.mockClear();
   setVoice.mockClear();
-  sessionState = { connected: false, micOn: true, transcript: [], amplitude: 0, start, stop, toggleMic, setVoice };
+  cameraStart.mockClear();
+  cameraStop.mockClear();
+  sessionState = { connected: false, micOn: true, transcript: [], amplitude: 0, start, stop, toggleMic, setVoice, sendText, sendVideoFrame };
+  cameraState = { on: false, stream: null, facing: 'user', start: cameraStart, stop: cameraStop, flip: vi.fn(), error: null };
 });
 
 describe('TalkScreen', () => {
@@ -54,6 +80,21 @@ describe('TalkScreen', () => {
     render(<TalkScreen />);
     expect(screen.getByRole('button', { name: /mute/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /end/i })).toBeInTheDocument();
+  });
+
+  it('camera button is NOT disabled when disconnected and opens the camera', () => {
+    render(<TalkScreen />);
+    const cam = screen.getByTestId('camera-button') as HTMLButtonElement;
+    expect(cam.disabled).toBe(false);
+    fireEvent.click(cam);
+    expect(cameraStart).toHaveBeenCalled();
+  });
+
+  it('camera button turns the camera off when it is already on', () => {
+    cameraState = { ...cameraState, on: true };
+    render(<TalkScreen />);
+    fireEvent.click(screen.getByTestId('camera-button'));
+    expect(cameraStop).toHaveBeenCalled();
   });
 
   it('offers a Training entry when onTrain is provided', () => {

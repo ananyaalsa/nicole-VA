@@ -104,8 +104,7 @@ export function TalkScreen({ onTrain, onRoleplay }: TalkScreenProps): JSX.Elemen
             className={`ghost-btn${camera.on ? ' is-active' : ''}`}
             data-testid="camera-button"
             onClick={() => (camera.on ? camera.stop() : void camera.start())}
-            disabled={!connected}
-            title={connected ? 'Let Nicole see through your camera' : 'Start talking first'}
+            title="Let Nicole see through your camera"
           >
             {camera.on ? 'Camera on' : 'Camera'}
           </button>
