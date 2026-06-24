@@ -1,157 +1,198 @@
-/**
- * Authored training lessons Nicole delivers in coaching mode. Each lesson is a
- * complete {@link ClientLessonSpec} — real, usable teaching content — so the
- * per-phase prompt builder ({@link buildPhasePrompt}) has a concrete framework,
- * worked examples and practice prompts to drive a full session.
- */
 import type { ClientLessonSpec } from './lessonPrompts';
 
-/** SALES — handling the classic "it's too expensive" price objection. */
+/**
+ * The real teaching lessons Nicole coaches in TRAINING mode — ported faithfully
+ * from the CHAT project's sales-training lesson specs (cold-call-open / discovery
+ * -questions / price-objection) plus a STAR interview lesson. These are the skills
+ * Nicole TEACHES step-by-step (intro → teach → model → practice → roleplay →
+ * debrief), distinct from Roleplay mode (pure practice, no teaching).
+ */
+
+/** Opening a Cold Call — framework PIN. (CHAT: lessons/cold-call-open.ts) */
+const COLD_CALL_OPEN: ClientLessonSpec = {
+  skillId: 'cold_call_open',
+  title: 'Opening a Cold Call',
+  objective: 'Earn the first 30 seconds of a cold call without getting hung up on.',
+  hook: "You've got 5 seconds before they say 'not interested.' What's your opener?",
+  coreFramework: {
+    name: 'PIN',
+    moves: [
+      { step: 'Pattern-interrupt', intent: 'break the sales-call script so they pause', keyLine: "Hi — I know this is a cold call, can I have 20 seconds and you decide if it's worth more?" },
+      { step: 'Interest', intent: 'one sharp reason relevant to them', keyLine: 'We help teams like yours cut onboarding time in half.' },
+      { step: 'Next-step', intent: 'ask for a small yes, not the meeting yet', keyLine: 'Worth two minutes now, or should I send something first?' },
+    ],
+  },
+  mnemonic: 'PIN — Pattern-interrupt, Interest, Next-step',
+  workedExamples: [
+    {
+      label: 'good',
+      dialogue: [
+        'You: Hi, I know this is a cold call — can I have 20 seconds and you decide if it is worth more?',
+        'Prospect: ...fine, go.',
+        'You: We help ops teams like yours cut onboarding time in half. Worth two minutes now, or should I send something first?',
+      ],
+      whyNotes: ['Pattern-interrupt earns the pause.', 'Interest is specific, not a feature dump.', 'Next-step asks for a small yes.'],
+    },
+    {
+      label: 'avoid',
+      dialogue: [
+        'You: Hi, how are you today? I am calling from Acme, we are a leading provider of...',
+        'Prospect: Not interested. *click*',
+      ],
+      whyNotes: ['"How are you today" + a pitch = instant hang-up. No pattern-interrupt, no relevance.'],
+    },
+  ],
+  guidedPracticePrompts: [
+    'They just picked up. Give me your pattern-interrupt line.',
+    'Now your one-line interest hook.',
+    'Now ask for the small next step.',
+  ],
+  expectations: ['interrupts the expected script', 'gives a relevant reason fast', 'asks for a small commitment, not the full meeting'],
+};
+
+/** Discovery: Ask Before You Pitch — framework ASK. (CHAT: lessons/discovery-questions.ts) */
+const DISCOVERY_QUESTIONS: ClientLessonSpec = {
+  skillId: 'discovery_questions',
+  title: 'Discovery: Ask Before You Pitch',
+  objective: 'Run a discovery that surfaces the real problem before pitching anything.',
+  hook: 'A prospect is on the call. The fastest way to lose them is to pitch. So what do you do instead?',
+  coreFramework: {
+    name: 'ASK',
+    moves: [
+      { step: 'Ask open', intent: 'open-ended question that invites the story', keyLine: 'Walk me through how you handle this today.' },
+      { step: 'Stay quiet', intent: 'let silence pull out the real answer', keyLine: '(let them finish — do not jump in)' },
+      { step: 'Keep digging', intent: 'follow the thread to the cost/impact', keyLine: 'And when that breaks, what does it cost you?' },
+    ],
+  },
+  mnemonic: 'ASK — Ask open, Stay quiet, Keep digging',
+  workedExamples: [
+    {
+      label: 'good',
+      dialogue: [
+        'You: Walk me through how you handle onboarding today.',
+        'Prospect: Honestly it is a mess, spreadsheets everywhere.',
+        'You: (stays quiet)',
+        'Prospect: ...and it takes us like three weeks per hire.',
+        'You: And when it drags like that, what does it cost you?',
+      ],
+      whyNotes: ['Open question invites the story.', 'Silence pulls out the real pain.', 'Digging reaches the cost — now you can tie value.'],
+    },
+    {
+      label: 'avoid',
+      dialogue: [
+        'You: Do you struggle with onboarding? Because our tool fixes that with automated workflows and...',
+        'Prospect: We are fine, thanks.',
+      ],
+      whyNotes: ['Closed question + immediate pitch = no discovery, easy "no".'],
+    },
+  ],
+  guidedPracticePrompts: [
+    'Open the discovery with one open-ended question.',
+    'They paused — what do you do?',
+    'Dig one level deeper toward the cost.',
+  ],
+  expectations: ['asks open-ended, not yes/no', 'tolerates silence', 'digs to the cost/impact before pitching'],
+};
+
+/** Handling the Price Objection — framework AER. (CHAT: lessons/price-objection.ts) */
 const PRICE_OBJECTION: ClientLessonSpec = {
   skillId: 'price_objection',
   title: 'Handling the Price Objection',
-  objective:
-    'Respond to "it\'s too expensive" without panicking or discounting — keep the conversation on value, not price.',
-  hook: 'A buyer says "honestly, it\'s just too expensive." What\'s the worst thing you could say back?',
+  objective: 'Handle a price objection without dropping the price or getting defensive.',
+  hook: "A prospect just said 'that's too expensive.' Quick — what's the WORST thing you could say back?",
   coreFramework: {
-    name: 'ACE',
+    name: 'AER',
     moves: [
-      {
-        step: 'Acknowledge',
-        intent:
-          'Validate the concern so the buyer feels heard instead of pushed back on — never argue or get defensive.',
-        keyLine: "That's totally fair to raise — price matters, and I'd ask the same.",
-      },
-      {
-        step: 'Clarify',
-        intent:
-          'Ask one calm question to find what "expensive" actually means: too expensive vs. what, on what budget, against which outcome.',
-        keyLine: "When you say expensive, is it more than you expected, or more than the result is worth to you right now?",
-      },
-      {
-        step: 'Elevate',
-        intent:
-          'Reframe from sticker price to the cost of the problem and the value of solving it — anchor on outcomes, not the number.',
-        keyLine: "What's it costing you every month this stays unsolved? That's the number worth comparing against.",
-      },
+      { step: 'Acknowledge', intent: 'validate the concern without conceding', keyLine: 'Totally fair to ask about price.' },
+      { step: 'Explore', intent: 'find the real concern — budget vs value', keyLine: 'When you say expensive, compared to what exactly?' },
+      { step: 'Reframe', intent: 'shift from the number to value / cost of inaction', keyLine: "Let's look at what it costs to NOT fix this." },
     ],
   },
-  mnemonic: 'ACE — Acknowledge, Clarify, Elevate.',
+  mnemonic: 'AER — Acknowledge, Explore, Reframe',
   workedExamples: [
     {
       label: 'good',
       dialogue: [
-        'Buyer: This is way more than I wanted to spend.',
-        'You: That\'s completely fair to bring up — budget matters. Can I ask, is it more than you budgeted, or more than the outcome feels worth right now?',
-        'Buyer: More than I budgeted, I guess.',
-        'You: Got it. So if we look at what the slow process is costing you each month, the question becomes which number is actually bigger — the price, or the problem.',
+        'Prospect: You are way more expensive than the other quote.',
+        'You: Totally fair to bring up price.',
+        'You: When you say expensive — compared to what exactly?',
+        'Prospect: The vendor down the street is 30% less.',
+        'You: Got it. If this saved your team 10 hours a week, what would that be worth?',
       ],
       whyNotes: [
-        'Acknowledges first so the buyer relaxes instead of digging in.',
-        'Clarifies the real objection before answering it.',
-        'Elevates to cost-of-inaction so value, not price, becomes the comparison.',
+        'Acknowledge: warm, no apology, no defensiveness.',
+        'Explore: a real question that surfaces the true concern before responding.',
+        'Reframe: moves the conversation from the number to value / ROI.',
       ],
     },
     {
       label: 'avoid',
-      dialogue: [
-        'Buyer: This is way more than I wanted to spend.',
-        'You: Okay, okay — I can probably do fifteen percent off if that helps?',
-      ],
-      whyNotes: [
-        'Discounts instantly, training the buyer that the price was never real.',
-        'Skips Acknowledge and Clarify, so you never learn what "expensive" meant.',
-        'Competes on price — a race you lose — instead of on value.',
-      ],
+      dialogue: ['Prospect: You are too expensive.', 'You: Okay, I can do 15% off.'],
+      whyNotes: ['Dropped price instantly — taught the prospect to push on price every time. Never auto-discount.'],
     },
   ],
   guidedPracticePrompts: [
-    'I\'ll be the buyer: "That\'s a lot more than your competitor." Give me your Acknowledge line first.',
-    'Now Clarify — ask me one question to find out what I really mean by expensive.',
-    'Finish with Elevate — reframe me onto the cost of not solving this.',
+    "Prospect says 'too expensive.' Give me just your Acknowledge line.",
+    'Now give me the Explore question.',
+    'Now the Reframe — tie it to value.',
   ],
   expectations: [
-    'Acknowledges the concern before responding to it.',
-    'Asks at least one clarifying question instead of assuming.',
-    'Reframes to value / cost-of-inaction rather than dropping the price.',
-    'Stays calm and curious — no defensiveness, no instant discount.',
+    'Acknowledges before rebutting.',
+    'Explores before reframing.',
+    'Reframes to value / cost of inaction.',
+    'Never auto-discounts.',
   ],
 };
 
-/** INTERVIEW — answering the open-ended "tell me about yourself". */
-const TELL_ME_ABOUT_YOURSELF: ClientLessonSpec = {
-  skillId: 'tell_me_about_yourself',
-  title: "Answering 'Tell Me About Yourself'",
-  objective:
-    'Give a crisp, confident 60–90 second answer to "tell me about yourself" that lands you as a strong fit — not a rambling life story.',
-  hook: 'An interviewer opens with "so, tell me about yourself." Where do most people go wrong in the first ten seconds?',
+/** Interview: Answer behavioral questions with STAR. */
+const INTERVIEW_STAR: ClientLessonSpec = {
+  skillId: 'interview_star',
+  title: 'Answering Behavioral Questions with STAR',
+  objective: 'Answer "tell me about a time…" questions with a clear, complete STAR structure.',
+  hook: "The interviewer asks 'tell me about a time you failed.' How do you keep it from rambling?",
   coreFramework: {
-    name: 'PPF',
+    name: 'STAR',
     moves: [
-      {
-        step: 'Present',
-        intent:
-          'Open with who you are professionally right now in one sharp line — your current role and a relevant strength.',
-        keyLine: "I'm a product designer focused on turning messy workflows into interfaces people actually enjoy using.",
-      },
-      {
-        step: 'Past',
-        intent:
-          'Give one or two relevant proof points from your background that built you toward this role — pick relevance over completeness.',
-        keyLine: "Before this I spent three years at a fintech startup where I redesigned the onboarding flow and cut drop-off by 40%.",
-      },
-      {
-        step: 'Future',
-        intent:
-          'Connect to why you want THIS role and company, so the answer points forward at them, not just backward at you.',
-        keyLine: "What pulls me to this role is the chance to do that same outcome-driven design work at the scale your team operates at.",
-      },
+      { step: 'Situation', intent: 'set the scene in one or two sentences', keyLine: 'At my last role, our launch was two weeks from deadline and behind.' },
+      { step: 'Task', intent: 'what you specifically were responsible for', keyLine: 'I owned getting the checkout flow shipped on time.' },
+      { step: 'Action', intent: 'the concrete steps YOU took (not "we")', keyLine: 'I cut scope to the core path and paired with QA daily.' },
+      { step: 'Result', intent: 'the outcome, with a number if you can', keyLine: 'We shipped on time and conversion went up 12%.' },
     ],
   },
-  mnemonic: 'PPF — Present, Past, Future.',
+  mnemonic: 'STAR — Situation, Task, Action, Result',
   workedExamples: [
     {
       label: 'good',
       dialogue: [
-        'Interviewer: Tell me about yourself.',
-        'You: Sure — I\'m a product designer who specializes in making complex workflows feel simple.',
-        'You: Over the last three years at a fintech startup I led the onboarding redesign and brought drop-off down by about forty percent.',
-        'You: What excites me about this role is doing that same kind of outcome-focused design, but at your scale and on a product I actually use.',
+        'Interviewer: Tell me about a time you handled a tight deadline.',
+        'You: At my last role, a launch was two weeks out and behind. (Situation)',
+        'You: I owned shipping the checkout flow on time. (Task)',
+        'You: I cut scope to the core path and paired with QA every day. (Action)',
+        'You: We shipped on time and conversion rose 12%. (Result)',
       ],
-      whyNotes: [
-        'Present opens with a sharp professional identity, not "well, I was born in...".',
-        'Past offers ONE relevant, quantified proof point instead of a full résumé.',
-        'Future ties it to this specific role, signalling genuine interest and fit.',
-      ],
+      whyNotes: ['Each move is one or two crisp sentences.', 'Action is "I", not a vague "we".', 'Result has a real number.'],
     },
     {
       label: 'avoid',
       dialogue: [
-        'Interviewer: Tell me about yourself.',
-        'You: Well, I grew up in Ohio, I have two dogs, I studied biology even though I never really used it, then I kind of fell into design, and honestly I\'m not totally sure what I want next but I\'m open to anything...',
+        'Interviewer: Tell me about a time you handled a tight deadline.',
+        'You: Um, we always have deadlines, and the team works hard, and it usually works out fine...',
       ],
-      whyNotes: [
-        'Starts with personal trivia the interviewer did not ask for.',
-        'No relevant proof points — nothing that signals fit for the role.',
-        '"Open to anything" reads as unfocused; Future should point at THIS job.',
-      ],
+      whyNotes: ['No situation, no specific action, no result. Vague "we" hides what YOU did.'],
     },
   ],
   guidedPracticePrompts: [
-    'Give me just your Present line — one sentence on who you are professionally, no backstory.',
-    'Now your Past — pick ONE relevant accomplishment, ideally with a number, and say it in two sentences.',
-    'Close with Future — tie it to why you want this specific role. Keep the whole thing under 90 seconds.',
+    'Set the Situation for a deadline story in one or two sentences.',
+    'Now state your Task — what were YOU responsible for?',
+    'Give the Action you personally took, then the Result with a number.',
   ],
-  expectations: [
-    'Opens with a clear present-tense professional identity.',
-    'Chooses relevant proof points over a full chronological history.',
-    'Ends pointing forward at this role and company, not trailing off.',
-    'Stays concise — roughly 60 to 90 seconds, no rambling.',
-  ],
+  expectations: ['names all four STAR parts', 'uses "I" for the action, not "we"', 'ends on a concrete result'],
 };
 
-/** All authored lessons, in the order they appear in the lesson picker. */
+/** All teaching lessons shown in the Training picker. */
 export const LESSONS: ClientLessonSpec[] = [
+  COLD_CALL_OPEN,
+  DISCOVERY_QUESTIONS,
   PRICE_OBJECTION,
-  TELL_ME_ABOUT_YOURSELF,
+  INTERVIEW_STAR,
 ];
