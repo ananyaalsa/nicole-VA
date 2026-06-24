@@ -8,7 +8,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI } from '@google/genai';
 import { config } from './config.js';
 import { handleMemoryRoute } from './memory/routes.js';
+import { handleTrainingRoute } from './training/routes.js';
 import { ensureSchema } from './memory/db.js';
+import { ensureTrainingSchema } from './training/historyDb.js';
 import { LiveSession, type ClientChannel, type GenAILike } from './gemini/relay.js';
 import type { SessionConfig } from './types.js';
 
@@ -25,6 +27,14 @@ const httpServer = createServer((req, res) => {
 
   if (url.pathname.startsWith('/api/memory')) {
     void handleMemoryRoute(req, res).catch((err) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+    });
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/training')) {
+    void handleTrainingRoute(req, res).catch((err) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(err?.message ?? err) }));
     });
@@ -115,9 +125,11 @@ function handleAiLive(ws: WebSocket): void {
 }
 
 async function main(): Promise<void> {
-  // Make sure the nicole2_memory table exists before serving (best-effort).
+  // Make sure the nicole2_memory + nicole2_training_history tables exist before
+  // serving (best-effort).
   try {
     await ensureSchema();
+    await ensureTrainingSchema();
   } catch (err) {
     console.warn('[server] ensureSchema failed (continuing):', (err as Error).message);
   }
