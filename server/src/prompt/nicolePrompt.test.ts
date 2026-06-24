@@ -22,6 +22,20 @@ describe('NICOLE_BASE_PROMPT', () => {
     expect(NICOLE_BASE_PROMPT).toMatch(/remember/i);
   });
 
+  it('enables proactive, silent web search', () => {
+    expect(NICOLE_BASE_PROMPT).toContain('WEB SEARCH');
+    expect(NICOLE_BASE_PROMPT).toMatch(/google search/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/let me google|let me search/i); // names the banned phrases
+  });
+
+  it('lets the user direct her delivery / tone (slower, calmer, frustrated, excited)', () => {
+    expect(NICOLE_BASE_PROMPT).toContain('VOICE & DELIVERY CONTROL');
+    expect(NICOLE_BASE_PROMPT).toMatch(/slow down/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/calm/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/frustrated/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/excited|energetic/i);
+  });
+
   it('strips out all phone / document / persona / premium tooling', () => {
     expect(NICOLE_BASE_PROMPT).not.toContain('make_phone_call');
     expect(NICOLE_BASE_PROMPT).not.toContain('business plan');
