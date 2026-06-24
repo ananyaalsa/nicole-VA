@@ -1,0 +1,55 @@
+/* Nicole 2.0 — global tokens + base.
+   A deep twilight studio: Nicole is a presence, not a dashboard. */
+:root {
+  /* Palette */
+  --bg: #0b0e1a;          /* deep space navy */
+  --panel: #151b2e;       /* slate panel */
+  --violet: #7c5cff;      /* Nicole's signature aura */
+  --violet-soft: #9d7bff;
+  --cyan: #22d3ee;        /* listening / live accent */
+  --text: #f0edff;        /* soft lavender-white */
+  --muted: #8b93b0;       /* secondary slate */
+
+  --aura-core: #9d7bff;
+
+  /* Type */
+  --font-display: 'Sora', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button { font-family: inherit; }
+
+/* Visible keyboard focus everywhere (accessibility floor). */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Thin, on-theme scrollbars for the transcript etc. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 92, 255, 0.4) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.4);
+  border-radius: 999px;
+}

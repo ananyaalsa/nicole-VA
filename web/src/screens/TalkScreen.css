@@ -1,0 +1,130 @@
+.talk-screen {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  color: var(--text, #f0edff);
+  overflow: hidden;
+}
+
+/* Header ------------------------------------------------------------------ */
+.talk-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 28px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #c4b1ff, #7c5cff 70%);
+  box-shadow: 0 0 16px rgba(124, 92, 255, 0.8);
+}
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.talk-header-actions { display: flex; align-items: center; gap: 12px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a5170; }
+.status-dot.status-listening { background: #22d3ee; box-shadow: 0 0 10px #22d3ee; }
+.status-dot.status-speaking { background: #9d7bff; box-shadow: 0 0 10px #9d7bff; }
+.status-text {
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted, #8b93b0);
+}
+
+/* Stage ------------------------------------------------------------------- */
+.talk-stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 420px);
+  gap: 24px;
+  padding: 8px 28px 16px;
+  min-height: 0;
+}
+.stage-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.stage-avatar svg { width: clamp(180px, 26vmin, 320px); height: auto; }
+
+.stage-side {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 16px;
+  min-height: 0;
+  padding-bottom: 8px;
+}
+
+/* Controls ---------------------------------------------------------------- */
+.talk-controls {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 18px 28px 30px;
+}
+
+.primary-btn,
+.control-btn,
+.ghost-btn {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: transform 120ms ease, background 200ms ease, border-color 200ms ease;
+}
+.primary-btn:active,
+.control-btn:active { transform: translateY(1px); }
+
+.talk-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 28px;
+  font-size: 15px; font-weight: 600; letter-spacing: 0.02em;
+  color: #0b0e1a;
+  background: linear-gradient(180deg, #c4b1ff, #7c5cff);
+  box-shadow: 0 8px 30px rgba(124, 92, 255, 0.45);
+}
+.talk-btn:hover { transform: translateY(-1px); }
+.talk-btn-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #0b0e1a; opacity: 0.6;
+}
+
+.control-btn {
+  padding: 12px 24px; font-size: 14px; font-weight: 500;
+  color: var(--text, #f0edff);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+}
+.control-btn.is-off { color: #ffb4b4; border-color: rgba(255, 120, 120, 0.4); }
+.control-btn.is-end { color: #ff9d9d; }
+.control-btn:hover { background: rgba(255, 255, 255, 0.12); }
+
+.ghost-btn {
+  padding: 7px 16px; font-size: 13px;
+  color: var(--muted, #8b93b0);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: transparent;
+}
+.ghost-btn:hover { color: var(--text, #f0edff); border-color: rgba(255, 255, 255, 0.28); }
+
+/* Responsive -------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .talk-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .stage-side { grid-template-rows: 220px auto; }
+}

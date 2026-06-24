@@ -1,0 +1,85 @@
+.nicole-aura {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+}
+
+.aura-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(260px, 38vmin, 460px);
+  height: clamp(260px, 38vmin, 460px);
+  border-radius: 50%;
+  /* Default (idle) violet aura. */
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--aura-core, #9d7bff) 0%,
+    rgba(124, 92, 255, 0.35) 38%,
+    rgba(124, 92, 255, 0) 70%
+  );
+  filter: blur(8px);
+  /* opacity + transform are driven inline from amplitude; ease the smoothing. */
+  transition: opacity 90ms linear, transform 90ms ease-out, background 600ms ease;
+  will-change: transform, opacity;
+  z-index: 0;
+}
+
+.aura-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(157, 123, 255, 0.18);
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+.aura-ring-1 {
+  width: clamp(300px, 44vmin, 540px);
+  height: clamp(300px, 44vmin, 540px);
+  animation: aura-breathe 7s ease-in-out infinite;
+}
+.aura-ring-2 {
+  width: clamp(360px, 52vmin, 640px);
+  height: clamp(360px, 52vmin, 640px);
+  border-color: rgba(34, 211, 238, 0.1);
+  animation: aura-breathe 9s ease-in-out infinite reverse;
+}
+
+.aura-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+}
+
+/* State hues — listening cools to cyan, speaking flares brighter violet. */
+.nicole-aura.is-listening .aura-glow {
+  background: radial-gradient(
+    circle at 50% 50%,
+    #5fe6ff 0%,
+    rgba(34, 211, 238, 0.32) 40%,
+    rgba(34, 211, 238, 0) 70%
+  );
+}
+.nicole-aura.is-speaking .aura-glow {
+  background: radial-gradient(
+    circle at 50% 50%,
+    #c4b1ff 0%,
+    rgba(140, 105, 255, 0.45) 38%,
+    rgba(124, 92, 255, 0) 70%
+  );
+}
+
+@keyframes aura-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+  50% { transform: translate(-50%, -50%) scale(1.05); opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-glow { transition: opacity 200ms linear, background 600ms ease; }
+  .aura-ring { animation: none; }
+}
