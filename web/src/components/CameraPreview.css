@@ -1,0 +1,92 @@
+.camera-preview {
+  position: fixed;
+  right: clamp(16px, 3vw, 40px);
+  bottom: clamp(96px, 14vh, 140px);
+  width: clamp(180px, 22vw, 280px);
+  z-index: 20;
+  overflow: hidden;
+  padding: 0;
+}
+
+.camera-preview__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  /* Mirror the front camera so it reads like a selfie. */
+  transform: scaleX(-1);
+  background: #000;
+}
+
+.camera-preview__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-top: 1px solid var(--edge);
+  background: rgba(3, 9, 13, 0.7);
+}
+
+.camera-preview__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.camera-preview__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bad, #ff5d6c);
+  box-shadow: 0 0 8px var(--bad, #ff5d6c);
+  animation: camera-blink 1.4s ease-in-out infinite;
+}
+
+.camera-preview__actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.camera-preview__btn {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgba(62, 240, 255, 0.08);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-sharp, 2px);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.camera-preview__btn:hover {
+  background: rgba(62, 240, 255, 0.18);
+  border-color: var(--edge-strong);
+}
+
+.camera-error {
+  position: fixed;
+  right: clamp(16px, 3vw, 40px);
+  bottom: clamp(60px, 9vh, 96px);
+  z-index: 20;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: var(--bad, #ff5d6c);
+  background: rgba(3, 9, 13, 0.85);
+  border: 1px solid rgba(255, 93, 108, 0.5);
+}
+
+@keyframes camera-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-preview__dot { animation: none; }
+}

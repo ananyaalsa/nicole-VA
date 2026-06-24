@@ -9,7 +9,9 @@ import { NicolePresence } from '../components/NicolePresence';
 const SophiaAvatar = lazy(() => import('../avatar3d/SophiaAvatar'));
 import { Transcript } from '../components/Transcript';
 import { VoiceSwitcher } from '../components/VoiceSwitcher';
+import { CameraPreview } from '../components/CameraPreview';
 import { useNicoleSession } from '../engine/useNicoleSession';
+import { useCamera } from '../engine/useCamera';
 import { VOICES, DEFAULT_VOICE } from '../audio/voices';
 import './TalkScreen.css';
 
@@ -47,8 +49,18 @@ export function TalkScreen({ onTrain, onRoleplay }: TalkScreenProps): JSX.Elemen
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt });
   const { connected, micOn, transcript, amplitude, start, stop, toggleMic } = session;
 
+  // Camera / vision: while on, stream ~1 frame/sec to Nicole so she can see.
+  const sendVideoFrame = session.sendVideoFrame;
+  const camera = useCamera({ onFrame: sendVideoFrame });
+
   // Clean teardown on unmount so leaving the screen never leaks audio/sockets.
-  useEffect(() => () => stop(), [stop]);
+  useEffect(
+    () => () => {
+      camera.stop();
+      stop();
+    },
+    [stop, camera],
+  );
 
   const speaking = amplitude > SPEAKING_AMP;
   const auraState: AuraState = speaking ? 'speaking' : connected && micOn ? 'listening' : 'idle';
@@ -87,8 +99,21 @@ export function TalkScreen({ onTrain, onRoleplay }: TalkScreenProps): JSX.Elemen
               <span className="ghost-btn-arrow" aria-hidden="true">→</span>
             </button>
           )}
+          <button
+            type="button"
+            className={`ghost-btn${camera.on ? ' is-active' : ''}`}
+            data-testid="camera-button"
+            onClick={() => (camera.on ? camera.stop() : void camera.start())}
+            disabled={!connected}
+            title={connected ? 'Let Nicole see through your camera' : 'Start talking first'}
+          >
+            {camera.on ? 'Camera on' : 'Camera'}
+          </button>
         </div>
       </header>
+
+      {camera.on && <CameraPreview stream={camera.stream} onFlip={() => void camera.flip()} onClose={camera.stop} />}
+      {camera.error && <p className="camera-error" role="alert">{camera.error}</p>}
 
       <main className="talk-stage">
         {/* LEFT — contained transcript console. */}

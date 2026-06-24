@@ -37,6 +37,8 @@ export interface UseNicoleSessionResult {
   setVoice: (v: string) => void;
   /** Send a silent text directive to the model (e.g. roleplay "[OPEN]" autostart). */
   sendText: (text: string) => void;
+  /** Send a single camera frame (base64 JPEG, no data: prefix) for vision. */
+  sendVideoFrame: (base64Jpeg: string) => void;
 }
 
 // --- Tuning constants ------------------------------------------------------
@@ -727,6 +729,18 @@ export function useNicoleSession(
     }
   }, []);
 
+  const sendVideoFrame = useCallback((base64Jpeg: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN && base64Jpeg) {
+      ws.send(
+        JSON.stringify({
+          type: 'client-msg',
+          payload: { video: { data: base64Jpeg, mimeType: 'image/jpeg' } },
+        }),
+      );
+    }
+  }, []);
+
   return {
     connected,
     micOn,
@@ -737,6 +751,7 @@ export function useNicoleSession(
     toggleMic,
     setVoice,
     sendText,
+    sendVideoFrame,
   };
 }
 

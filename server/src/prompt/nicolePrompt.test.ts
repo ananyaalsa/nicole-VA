@@ -22,6 +22,13 @@ describe('NICOLE_BASE_PROMPT', () => {
     expect(NICOLE_BASE_PROMPT).toMatch(/remember/i);
   });
 
+  it('tells her she can see through the camera and to describe in detail', () => {
+    expect(NICOLE_BASE_PROMPT).toContain('CAMERA / VISION');
+    expect(NICOLE_BASE_PROMPT).toMatch(/you can see/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/what do you see/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/detail/i);
+  });
+
   it('enables proactive, silent web search', () => {
     expect(NICOLE_BASE_PROMPT).toContain('WEB SEARCH');
     expect(NICOLE_BASE_PROMPT).toMatch(/google search/i);
