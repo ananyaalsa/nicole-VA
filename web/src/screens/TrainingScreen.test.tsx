@@ -28,6 +28,17 @@ vi.mock('../training/useCoachingSession', () => ({
     useCoachingSessionMock(opts),
 }));
 
+// AuroraBackground + SophiaAvatar touch canvas/WebGL jsdom can't run — stub them.
+vi.mock('../components/AuroraBackground', () => ({
+  default: () => <div data-testid="aurora" />,
+}));
+vi.mock('../avatar3d/SophiaAvatar', () => ({
+  default: () => <div data-testid="sophia-avatar" />,
+}));
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { displayName: 'Gaurav', preferredVoice: 'Aoede', onboardingDone: true } }),
+}));
+
 import { TrainingScreen } from './TrainingScreen';
 import { LESSONS } from '../training/lessons';
 

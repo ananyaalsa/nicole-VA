@@ -6,6 +6,7 @@ import {
   int16ToFloat32,
 } from '../audio/pcm';
 import { PlaybackQueue } from '../audio/playbackQueue';
+import { extractToolCalls } from './uiCommands';
 import type { Speaker, TranscriptLine } from './types';
 
 export type { TranscriptLine, Speaker } from './types';
@@ -24,6 +25,10 @@ export interface UseNicoleSessionOptions {
   systemOverlay?: string;
   /** Optional per-voice style prompt forwarded in the connect config. */
   stylePrompt?: string;
+  /** Called when Nicole calls UI-control tools (set_camera, switch_mode, …). */
+  onToolCall?: (calls: { name: string; args: Record<string, unknown> }[]) => void;
+  /** When true, Nicole's audio output is muted (session stays live). */
+  aiMuted?: boolean;
 }
 
 export interface UseNicoleSessionResult {
@@ -138,6 +143,8 @@ export function useNicoleSession(
     serverWs,
     systemOverlay,
     stylePrompt,
+    onToolCall,
+    aiMuted = false,
   } = opts;
 
   const [connected, setConnected] = useState(false);
@@ -161,6 +168,12 @@ export function useNicoleSession(
   // Count of consecutive over-threshold mic frames, for sustained barge-in.
   const sustainedSpeechRef = useRef(0);
   const voiceRef = useRef(voiceName);
+  // Latest tool-call callback + AI-mute flag, kept in refs so the message
+  // handler (a stable callback) always sees the current values.
+  const onToolCallRef = useRef(onToolCall);
+  onToolCallRef.current = onToolCall;
+  const aiMutedRef = useRef(aiMuted);
+  aiMutedRef.current = aiMuted;
 
   // In-flight (streaming) transcript lines, keyed by speaker.
   const openLineRef = useRef<Record<Speaker, string | null>>({
@@ -297,15 +310,22 @@ export function useNicoleSession(
           return;
       }
 
+      // UI-control tool calls (set_camera, switch_mode, …) ride at the message
+      // level, not under serverContent — extract them before the sc guard so
+      // Nicole can operate the UI.
+      const toolCalls = extractToolCalls(msg.payload);
+      if (toolCalls.length) onToolCallRef.current?.(toolCalls);
+
       const sc = msg.payload?.serverContent;
       if (!sc) return;
 
-      // Audio parts → decode → enqueue → schedule playback.
+      // Audio parts → decode → enqueue → schedule playback. When the AI is muted
+      // we DROP the audio (don't play it) but keep the session fully live.
       const parts = sc.modelTurn?.parts ?? [];
       let enqueuedAudio = false;
       for (const part of parts) {
         const data = part.inlineData?.data;
-        if (data) {
+        if (data && !aiMutedRef.current) {
           const ab = base64ToArrayBuffer(data);
           const int16 = new Int16Array(ab);
           const float = int16ToFloat32(int16);

@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
+// WaveBackdrop draws on a <canvas>; jsdom has no 2D context. Stub it so the
+// screen renders without the "getContext not implemented" noise/crash.
+beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as never;
+});
+
 // Mock the session hook — it touches AudioContext / getUserMedia / WebSocket.
 const start = vi.fn(async () => {});
 const stop = vi.fn();
@@ -46,6 +52,14 @@ vi.mock('../components/AuroraBackground', () => ({
 vi.mock('../avatar3d/SophiaAvatar', () => ({
   default: () => <div data-testid="sophia-avatar" />,
 }));
+// Auth context — provide a fake signed-in user so the screen renders.
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { displayName: 'Gaurav', preferredVoice: 'Aoede', onboardingDone: true } }),
+}));
+// ProfilePanel pulls auth/api — stub it.
+vi.mock('../components/ProfilePanel', () => ({
+  ProfilePanel: () => null,
+}));
 
 import { TalkScreen } from './TalkScreen';
 
@@ -78,22 +92,31 @@ describe('TalkScreen', () => {
   it('shows Mute/End controls when connected', () => {
     sessionState = { ...sessionState, connected: true };
     render(<TalkScreen />);
-    expect(screen.getByRole('button', { name: /mute/i })).toBeInTheDocument();
+    expect(screen.getByTestId('mute-mic-button')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /end/i })).toBeInTheDocument();
   });
 
-  it('camera button is NOT disabled when disconnected and opens the camera', () => {
+  it('shows the camera control in the header and opens the camera on click', () => {
     render(<TalkScreen />);
     const cam = screen.getByTestId('camera-button') as HTMLButtonElement;
-    expect(cam.disabled).toBe(false);
     fireEvent.click(cam);
     expect(cameraStart).toHaveBeenCalled();
   });
 
+  it('shows Mute mic and Mute Nicole controls when connected', () => {
+    sessionState = { ...sessionState, connected: true };
+    render(<TalkScreen />);
+    expect(screen.getByTestId('mute-mic-button')).toBeInTheDocument();
+    expect(screen.getByTestId('mute-ai-button')).toBeInTheDocument();
+  });
+
   it('camera button turns the camera off when it is already on', () => {
+    sessionState = { ...sessionState, connected: true };
     cameraState = { ...cameraState, on: true };
     render(<TalkScreen />);
-    fireEvent.click(screen.getByTestId('camera-button'));
+    // The camera control appears in both the header and the live controls when
+    // connected — clicking either toggles it off.
+    fireEvent.click(screen.getAllByTestId('camera-button')[0]);
     expect(cameraStop).toHaveBeenCalled();
   });
 

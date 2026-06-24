@@ -21,6 +21,7 @@ import { buildLiveConfig } from './liveConfig.js';
 import { buildSystemPrompt } from '../prompt/nicolePrompt.js';
 import { formatMemoryBlock } from '../memory/memoryBlock.js';
 import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
+import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES } from './uiControlTools.js';
 import { loadFacts } from '../memory/db.js';
 import { summarizeTurns } from './summarizer.js';
 import { shouldSummarize, splitForSummary, estimateTokens } from '../session/summaryTrigger.js';
@@ -220,7 +221,9 @@ export class LiveSession {
     return buildLiveConfig({
       systemPrompt,
       voiceName: cfg.voiceName,
-      tools: [{ functionDeclarations: MEMORY_TOOL_DECLS }],
+      tools: [
+        { functionDeclarations: [...MEMORY_TOOL_DECLS, ...UI_CONTROL_TOOL_DECLS] },
+      ],
       // Real-time Google Search grounding so Nicole can answer news/weather/
       // flights/prices/latest-fact questions with current info.
       searchEnabled: true,
@@ -314,6 +317,13 @@ export class LiveSession {
         // training_mark_progress is handled client-side (drives the scorecard);
         // we still ack it so Gemini isn't left waiting.
         else if (name === 'training_mark_progress') {
+          responses.push({ id: call?.id, name, response: { result: 'ok' } });
+        }
+        // UI-control tools (set_camera, switch_mode, set_voice, mute_ai,
+        // mute_mic, end_session) are performed by the BROWSER — the raw toolCall
+        // is already relayed to the client in onGeminiMessage. Here we just ack
+        // Gemini so the turn completes.
+        else if (UI_CONTROL_TOOL_NAMES.has(name)) {
           responses.push({ id: call?.id, name, response: { result: 'ok' } });
         }
       }

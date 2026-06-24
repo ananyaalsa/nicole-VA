@@ -78,6 +78,9 @@ vi.mock('../engine/useDictation', () => ({
   }),
   joinUserTranscript: () => '',
 }));
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { displayName: 'Gaurav', preferredVoice: 'Aoede', onboardingDone: true } }),
+}));
 
 import { RoleplayScreen } from './RoleplayScreen';
 
