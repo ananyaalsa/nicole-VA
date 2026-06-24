@@ -54,7 +54,11 @@ vi.mock('../avatar3d/SophiaAvatar', () => ({
 }));
 // Auth context — provide a fake signed-in user so the screen renders.
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({ user: { displayName: 'Gaurav', preferredVoice: 'Aoede', onboardingDone: true } }),
+  useAuth: () => ({
+    user: { displayName: 'Gaurav', email: 'g@x.com', preferredVoice: 'Aoede', onboardingDone: true },
+    token: 'test-token',
+    updateUser: vi.fn(),
+  }),
 }));
 // ProfilePanel pulls auth/api — stub it.
 vi.mock('../components/ProfilePanel', () => ({
@@ -96,9 +100,10 @@ describe('TalkScreen', () => {
     expect(screen.getByRole('button', { name: /end/i })).toBeInTheDocument();
   });
 
-  it('shows the camera control in the header and opens the camera on click', () => {
+  it('shows the camera control when connected and opens the camera on click', () => {
+    sessionState = { ...sessionState, connected: true };
     render(<TalkScreen />);
-    const cam = screen.getByTestId('camera-button') as HTMLButtonElement;
+    const cam = screen.getAllByTestId('camera-button')[0] as HTMLButtonElement;
     fireEvent.click(cam);
     expect(cameraStart).toHaveBeenCalled();
   });

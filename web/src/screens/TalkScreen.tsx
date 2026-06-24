@@ -8,6 +8,7 @@ import { ProfilePanel } from '../components/ProfilePanel';
 import { useNicoleSession } from '../engine/useNicoleSession';
 import { useCamera } from '../engine/useCamera';
 import { useUiCommands } from '../engine/useUiCommands';
+import { makeProfileActions } from '../engine/profileActions';
 import { useAuth } from '../auth/AuthContext';
 import { VOICES, DEFAULT_VOICE } from '../audio/voices';
 import './TalkScreen.css';
@@ -69,7 +70,7 @@ const STARTERS = [
 ];
 
 export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: TalkScreenProps): JSX.Element {
-  const { user, token } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const [voice, setVoice] = useState<string>(defaultVoice ?? DEFAULT_VOICE);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -108,6 +109,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
 
   const stylePrompt = useMemo(() => VOICES.find((v) => v.name === voice)?.stylePrompt, [voice]);
 
+  // Profile actions Nicole can perform by voice (About / Goals / display name).
+  const profile = useMemo(() => makeProfileActions(token, updateUser), [token, updateUser]);
+
   // Nicole controls the UI by voice — every command is registered in one place.
   const { onToolCall } = useUiCommands({
     set_camera: (a) => { if (a.on) void camera.start(); else camera.stop(); },
@@ -116,6 +120,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
     mute_ai: (a) => setAiMuted(!!a.muted),
     mute_mic: (a) => { if (!!a.muted === micOn) toggleMic(); },
     end_session: () => { camera.stop(); stop(); },
+    set_about: (a) => { if (typeof a.text === 'string') void profile.setAbout(a.text); },
+    set_goal: (a) => { if ((a.action === 'add' || a.action === 'remove') && typeof a.goal === 'string') void profile.setGoal(a.action, a.goal); },
+    set_display_name: (a) => { if (typeof a.name === 'string') void profile.setDisplayName(a.name); },
   });
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall });
@@ -149,19 +156,16 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
           <span className="topbar-brand-name">Nicole</span>
         </div>
         <nav className="topbar-nav" aria-label="Mode navigation">
-          <button type="button" className="topbar-nav-item is-active" aria-current="page">Talk</button>
-          {onTrain    && <button type="button" className="topbar-nav-item" onClick={onTrain}>Training</button>}
-          {onRoleplay && <button type="button" className="topbar-nav-item" onClick={onRoleplay}>Roleplay</button>}
+          <button type="button" className="topbar-nav-item is-active" aria-current="page" data-tooltip="Free-form voice conversation with Nicole" data-tooltip-pos="bottom">Talk</button>
+          {onTrain    && <button type="button" className="topbar-nav-item" onClick={onTrain} data-tooltip="Structured sales training drills & lessons" data-tooltip-pos="bottom">Training</button>}
+          {onRoleplay && <button type="button" className="topbar-nav-item" onClick={onRoleplay} data-tooltip="Practice with AI roleplay scenarios" data-tooltip-pos="bottom">Roleplay</button>}
         </nav>
         <div className="topbar-right">
-          <span className={`status-chip status-${auraState}`}>
+          <span className={`status-chip status-${auraState}`} data-tooltip={connected ? (speaking ? 'Nicole is speaking' : micOn ? 'Nicole is listening to you' : 'Session active — say something') : 'Click Start talking to begin'} data-tooltip-pos="bottom">
             <span className="status-dot" aria-hidden="true" />
             <span className="status-text">{connected ? (speaking ? 'Speaking' : micOn ? 'Listening' : 'Ready') : 'Ready'}</span>
           </span>
-          <button type="button" className={`ctrl-btn ctrl-btn--cam${camera.on ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on ? camera.stop() : void camera.start())} title="Camera">
-            <Icon name="camera" size={16} />
-          </button>
-          <button type="button" className="topbar-avatar-btn" onClick={() => setProfileOpen(true)} aria-label="Open profile" title={user?.displayName ?? 'Profile'}>
+          <button type="button" className="topbar-avatar-btn" onClick={() => setProfileOpen(true)} aria-label="Open profile">
             {userInitial}
           </button>
         </div>
@@ -177,7 +181,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
           <p className="presence-state">{connected ? (auraState === 'idle' ? 'Your Personal VA' : auraState === 'listening' ? 'Listening...' : 'Speaking') : 'Your Personal VA'}</p>
 
           <div className="voice-selector">
-            <button type="button" className="voice-current-btn" data-testid="voice-switcher" onClick={() => setVoiceOpen((o) => !o)} aria-expanded={voiceOpen}>
+            <button type="button" className="voice-current-btn" data-testid="voice-switcher" onClick={() => setVoiceOpen((o) => !o)} aria-expanded={voiceOpen} data-tooltip="Change Nicole's voice" data-tooltip-pos="top">
               <span className="voice-current-name">{voice}</span>
               <span className="voice-current-label">{activeVoice?.label ?? ''}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
@@ -233,25 +237,25 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
           )}
           <div className="talk-controls">
             {!connected ? (
-              <button type="button" className="talk-start-btn" onClick={() => void start()}>
+              <button type="button" className="talk-start-btn" onClick={() => void start()} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Start talking
               </button>
             ) : (
               <div className="live-controls">
-                <button type="button" className={`ctrl-btn ctrl-btn--mic${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? false : true} title={micOn ? 'Mute your mic' : 'Unmute your mic'}>
+                <button type="button" className={`ctrl-btn ctrl-btn--mic${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? false : true} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
                   <Icon name={micOn ? 'mic' : 'mic-off'} size={18} />
                   <span className="control-btn__label">{micOn ? 'Mute' : 'Unmute'}</span>
                 </button>
-                <button type="button" className={`ctrl-btn ctrl-btn--cam${camera.on ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on ? camera.stop() : void camera.start())} title={camera.on ? 'Turn off camera' : 'Let Nicole see you'}>
+                <button type="button" className={`ctrl-btn ctrl-btn--cam${camera.on ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on ? camera.stop() : void camera.start())} data-tooltip={camera.on ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
                   <Icon name="camera" size={18} />
                   <span className="control-btn__label">{camera.on ? 'Camera on' : 'Camera'}</span>
                 </button>
-                <button type="button" className={`ctrl-btn ctrl-btn--ai${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} aria-pressed={aiMuted ? true : false} title={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"}>
+                <button type="button" className={`ctrl-btn ctrl-btn--ai${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
                   <Icon name={aiMuted ? 'mic-off' : 'mic'} size={18} />
                   <span className="control-btn__label">{aiMuted ? 'Unmute Nicole' : 'Mute Nicole'}</span>
                 </button>
-                <button type="button" className="ctrl-btn ctrl-btn--end" onClick={() => { camera.stop(); stop(); }} title="End session">
+                <button type="button" className="ctrl-btn ctrl-btn--end" onClick={() => { camera.stop(); stop(); }} data-tooltip="End this session" data-tooltip-pos="top">
                   <Icon name="end" size={18} />
                   <span className="control-btn__label">End</span>
                 </button>

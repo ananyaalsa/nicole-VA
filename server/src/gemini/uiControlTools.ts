@@ -38,6 +38,9 @@ export const UI_CONTROL_TOOL_NAMES = new Set([
   'mute_ai',
   'mute_mic',
   'end_session',
+  'set_about',
+  'set_goal',
+  'set_display_name',
 ]);
 
 export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
@@ -117,5 +120,47 @@ export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
       'End the current voice session entirely. Use when the user says "end the ' +
       'session", "hang up", "I\'m done", or "stop".',
     parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'set_about',
+    description:
+      "Update the user's profile 'About you' — a short description of who they " +
+      'are (role, industry, communication style) that you use every session. ' +
+      'Use when they say "update my about to…", "set my profile to…", "I\'m a…".',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The new About-you text.' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'set_goal',
+    description:
+      "Add or remove one of the user's goals. Use when they say \"add cold " +
+      'calling to my goals", "remove interview prep", "I want to work on closing". ' +
+      'Adding merges with their existing goals; removing drops just that one.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['add', 'remove'], description: 'Whether to add or remove the goal.' },
+        goal: { type: 'string', description: 'The goal text, e.g. "Cold calling".' },
+      },
+      required: ['action', 'goal'],
+    },
+  },
+  {
+    name: 'set_display_name',
+    description:
+      "Change the user's display name (what you call them and what shows on " +
+      'their profile). Use when they say "change my name to…", "call me…".',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The new display name.' },
+      },
+      required: ['name'],
+    },
   },
 ];

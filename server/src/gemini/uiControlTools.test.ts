@@ -2,11 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES, UI_VOICES } from './uiControlTools.js';
 
 describe('UI_CONTROL_TOOL_DECLS', () => {
-  it('declares all six UI-control tools', () => {
+  it('declares all UI-control tools (incl. profile)', () => {
     const names = UI_CONTROL_TOOL_DECLS.map((d) => d.name).sort();
     expect(names).toEqual(
-      ['end_session', 'mute_ai', 'mute_mic', 'set_camera', 'set_voice', 'switch_mode'].sort(),
+      [
+        'end_session', 'mute_ai', 'mute_mic', 'set_camera', 'set_voice', 'switch_mode',
+        'set_about', 'set_goal', 'set_display_name',
+      ].sort(),
     );
+  });
+
+  it('set_goal takes an add/remove action + a goal', () => {
+    const decl = UI_CONTROL_TOOL_DECLS.find((d) => d.name === 'set_goal')!;
+    expect(decl.parameters.properties.action.enum).toEqual(['add', 'remove']);
+    expect(decl.parameters.required).toEqual(['action', 'goal']);
   });
 
   it('every declared name is in the routing set', () => {
