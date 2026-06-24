@@ -35,6 +35,8 @@ export interface UseNicoleSessionResult {
   stop: () => void;
   toggleMic: () => void;
   setVoice: (v: string) => void;
+  /** Send a silent text directive to the model (e.g. roleplay "[OPEN]" autostart). */
+  sendText: (text: string) => void;
 }
 
 // --- Tuning constants ------------------------------------------------------
@@ -718,6 +720,13 @@ export function useNicoleSession(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const sendText = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN && text) {
+      ws.send(JSON.stringify({ type: 'client-text', text }));
+    }
+  }, []);
+
   return {
     connected,
     micOn,
@@ -727,6 +736,7 @@ export function useNicoleSession(
     stop,
     toggleMic,
     setVoice,
+    sendText,
   };
 }
 

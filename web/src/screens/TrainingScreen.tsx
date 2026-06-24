@@ -1,8 +1,12 @@
-import { useCallback, useState } from 'react';
+import { Suspense, lazy, useCallback, useState } from 'react';
 import type { JSX } from 'react';
 import AuroraBackground from '../components/AuroraBackground';
-import NicoleAvatar from '../avatar/NicoleAvatar';
+import { NicolePresence } from '../components/NicolePresence';
 import { Transcript } from '../components/Transcript';
+import { HistoryPanel } from '../components/HistoryPanel';
+
+// Same lazy 3D avatar used on the Talk screen.
+const SophiaAvatar = lazy(() => import('../avatar3d/SophiaAvatar'));
 import { Scorecard } from '../components/Scorecard';
 import { LESSONS } from '../training/lessons';
 import type { ClientLessonSpec } from '../training/lessonPrompts';
@@ -48,6 +52,7 @@ const PHASE_SUBTITLE: Record<Phase, string> = {
  */
 export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
   const [lesson, setLesson] = useState<ClientLessonSpec | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const exitSession = useCallback(() => {
     setLesson(null);
@@ -70,30 +75,57 @@ export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
       <AuroraBackground />
       <main className="training__picker">
         <header className="training__picker-head">
-          <p className="training__eyebrow">Training mode</p>
-          <h1 className="training__title">Pick one skill to drill</h1>
+          <div className="training__picker-eyebrow">
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="hud-label">Training&nbsp;·&nbsp;Drill Room</span>
+          </div>
+          <div className="training__picker-headrow">
+            <h1 className="training__title">Pick one skill to drill</h1>
+            <button
+              type="button"
+              className="ghost-btn training__history-btn"
+              data-testid="history-button"
+              onClick={() => setShowHistory(true)}
+            >
+              History
+              <span className="ghost-btn-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
           <p className="training__lede">
             Nicole coaches a single skill end to end — teach, model, practice,
-            roleplay, debrief.
+            roleplay, debrief. One framework, one room, one rep at a time.
           </p>
         </header>
 
         <ul className="training__lessons">
-          {LESSONS.map((l) => (
+          {LESSONS.map((l, i) => (
             <li key={l.skillId}>
               <button
                 type="button"
-                className="lesson-card"
+                className="lesson-card hud-panel"
                 data-testid="lesson-card"
                 onClick={() => setLesson(l)}
               >
+                <span className="lesson-card__index hud-label">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
                 <span className="lesson-card__framework">
                   {l.coreFramework.name}
                 </span>
                 <span className="lesson-card__title">{l.title}</span>
                 <span className="lesson-card__objective">{l.objective}</span>
-                <span className="lesson-card__moves">
-                  {l.coreFramework.moves.map((m) => m.step).join(' · ')}
+
+                <span className="lesson-card__moves" aria-hidden="true">
+                  {l.coreFramework.moves.map((m, mi) => (
+                    <span className="lesson-card__move" key={m.step}>
+                      <span className="lesson-card__move-num">{mi + 1}</span>
+                      {m.step}
+                    </span>
+                  ))}
+                </span>
+
+                <span className="lesson-card__cta hud-label">
+                  Enter room <span aria-hidden="true">→</span>
                 </span>
               </button>
             </li>
@@ -107,10 +139,13 @@ export function TrainingScreen({ onExit }: TrainingScreenProps): JSX.Element {
             data-testid="picker-exit-button"
             onClick={onExit}
           >
-            Back
+            ← Back to talk
           </button>
         )}
       </main>
+
+      {/* Training History lives INSIDE Training (not on the main page). */}
+      {showHistory && <HistoryPanel onClose={() => setShowHistory(false)} />}
     </div>
   );
 }
@@ -121,8 +156,13 @@ interface TrainingSessionProps {
 }
 
 /**
- * The live session view. Mounted only when a lesson is chosen, so
+ * The live training room. Mounted only when a lesson is chosen, so
  * useCoachingSession (which owns the audio/WS engine) never runs on the picker.
+ *
+ * Layout is a mission deck: a left rail with the phase timeline + the framework
+ * playbook (every move with its intent and key line), Nicole's presence and the
+ * live transcript console in the center, and the live scorecard + run controls
+ * on the right.
  */
 function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element {
   const session = useCoachingSession({ lesson });
@@ -130,6 +170,8 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
   const currentIndex = PHASE_ORDER.indexOf(phase);
   const atEnd = phase === 'debrief';
+  const moves = lesson.coreFramework.moves;
+  const speaking = session.coachAmplitude > 0.02;
 
   const handleExit = useCallback(() => {
     session.stop();
@@ -142,34 +184,40 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
       <header className="training__topbar">
         <div className="training__topbar-left">
-          <p className="training__eyebrow">{lesson.coreFramework.name}</p>
-          <h1 className="training__session-title">{lesson.title}</h1>
+          <span className="brand-mark" aria-hidden="true" />
+          <div>
+            <p className="hud-label training__topbar-eyebrow">
+              {lesson.coreFramework.name} · {lesson.mnemonic}
+            </p>
+            <h1 className="training__session-title">{lesson.title}</h1>
+          </div>
         </div>
-        <button
-          type="button"
-          className="training__exit"
-          data-testid="exit-button"
-          onClick={handleExit}
-        >
-          Exit
-        </button>
+        <div className="training__topbar-right">
+          <span className="training__phasechip hud-label" data-testid="phase-indicator-chip">
+            Phase {currentIndex + 1}/{PHASE_ORDER.length} · {PHASE_LABELS[phase]}
+          </span>
+          <button
+            type="button"
+            className="training__exit"
+            data-testid="exit-button"
+            onClick={handleExit}
+          >
+            Exit room
+          </button>
+        </div>
       </header>
 
       <div className="training__layout">
-        <section className="training__stage">
-          <div className="training__avatar">
-            <NicoleAvatar
-              amplitude={session.coachAmplitude}
-              speaking={session.coachAmplitude > 0.02}
-            />
-          </div>
-
-          {/* Signature: the phase rail — the lesson IS an ordered sequence. */}
+        {/* LEFT — mission timeline + framework playbook. */}
+        <aside className="training__rail">
           <nav
-            className="phase-rail"
+            className="phase-rail hud-panel"
             data-testid="phase-indicator"
             aria-label="Lesson progress"
           >
+            <div className="phase-rail__head">
+              <span className="hud-label">Session timeline</span>
+            </div>
             <ol className="phase-rail__track">
               {PHASE_ORDER.map((p, i) => {
                 const state =
@@ -182,30 +230,91 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
                     data-state={state}
                     aria-current={state === 'current' ? 'step' : undefined}
                   >
-                    <span className="phase-rail__dot" aria-hidden="true" />
-                    <span className="phase-rail__label">{PHASE_LABELS[p]}</span>
+                    <span className="phase-rail__marker" aria-hidden="true">
+                      <span className="phase-rail__dot" />
+                    </span>
+                    <span className="phase-rail__step-body">
+                      <span className="phase-rail__label">{PHASE_LABELS[p]}</span>
+                      {state === 'current' && (
+                        <span className="phase-rail__subtitle">{PHASE_SUBTITLE[p]}</span>
+                      )}
+                    </span>
                   </li>
                 );
               })}
             </ol>
-            <p className="phase-rail__subtitle">{PHASE_SUBTITLE[phase]}</p>
           </nav>
 
-          <div className="training__transcript">
-            <Transcript lines={session.coachTranscript} maxRendered={60} />
+          {/* The framework playbook — the substance of the room. */}
+          <section className="playbook hud-panel" aria-label="Framework playbook">
+            <div className="playbook__head">
+              <span className="hud-label">Playbook</span>
+              <span className="playbook__badge">{lesson.coreFramework.name}</span>
+            </div>
+            <ol className="playbook__moves">
+              {moves.map((m, i) => (
+                <li className="playbook__move" key={m.step}>
+                  <div className="playbook__move-head">
+                    <span className="playbook__move-num">{i + 1}</span>
+                    <span className="playbook__move-step">{m.step}</span>
+                  </div>
+                  <p className="playbook__move-intent">{m.intent}</p>
+                  {m.keyLine && (
+                    <p className="playbook__move-line">“{m.keyLine}”</p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
+        </aside>
+
+        {/* CENTER — Nicole + live transcript console. */}
+        <section className="training__stage">
+          <div className="training__avatar-wrap">
+            <div className="stage-corner stage-corner--tl" aria-hidden="true" />
+            <div className="stage-corner stage-corner--tr" aria-hidden="true" />
+            <div className="stage-corner stage-corner--bl" aria-hidden="true" />
+            <div className="stage-corner stage-corner--br" aria-hidden="true" />
+            <div className={`training__avatar${speaking ? ' is-speaking' : ''}`}>
+              <Suspense
+                fallback={
+                  <NicolePresence amplitude={session.coachAmplitude} speaking={speaking} />
+                }
+              >
+                <SophiaAvatar amplitude={session.coachAmplitude} speaking={speaking} />
+              </Suspense>
+            </div>
+            <p className="training__coach-state hud-label">
+              {speaking ? 'Coach speaking' : 'Coach ready'}
+            </p>
+          </div>
+
+          <div className="training__transcript hud-panel">
+            <div className="rail-head">
+              <span className="hud-label">Live transcript</span>
+              <span className="hud-label rail-count">
+                {session.coachTranscript.length} lines
+              </span>
+            </div>
+            <div className="training__transcript-body">
+              <Transcript lines={session.coachTranscript} maxRendered={80} />
+            </div>
           </div>
         </section>
 
+        {/* RIGHT — scorecard + run controls. */}
         <aside className="training__panel">
           <Scorecard entries={session.scorecard} />
 
-          <div className="training__controls">
+          <div className="training__controls hud-panel">
+            <span className="hud-label training__controls-head">Run control</span>
             <button
               type="button"
               className="training__start"
               data-testid="start-button"
               onClick={() => void session.start()}
             >
+              <span className="training__start-dot" aria-hidden="true" />
               Start session
             </button>
             <button
@@ -215,7 +324,9 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
               onClick={session.advance}
               disabled={atEnd}
             >
-              {atEnd ? 'Lesson complete' : `Advance to ${PHASE_LABELS[PHASE_ORDER[currentIndex + 1] ?? phase]}`}
+              {atEnd
+                ? 'Lesson complete'
+                : `Advance → ${PHASE_LABELS[PHASE_ORDER[currentIndex + 1] ?? phase]}`}
             </button>
           </div>
         </aside>

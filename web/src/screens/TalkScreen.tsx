@@ -21,8 +21,6 @@ export interface TalkScreenProps {
   onTrain?: () => void;
   /** Switch to roleplay mode. */
   onRoleplay?: () => void;
-  /** Open the session history / artifacts overlay. */
-  onHistory?: () => void;
 }
 
 /** Status copy + glyph for each console state. */
@@ -39,7 +37,7 @@ const STATUS_META: Record<AuraState, { label: string; code: string }> = {
  * center stage, and voice selection + the connection state sit on the right.
  * Everything reacts to her real voice amplitude.
  */
-export function TalkScreen({ onTrain, onRoleplay, onHistory }: TalkScreenProps): JSX.Element {
+export function TalkScreen({ onTrain, onRoleplay }: TalkScreenProps): JSX.Element {
   const [voice, setVoice] = useState<string>(DEFAULT_VOICE);
   const stylePrompt = useMemo(
     () => VOICES.find((v) => v.name === voice)?.stylePrompt,
@@ -86,12 +84,6 @@ export function TalkScreen({ onTrain, onRoleplay, onHistory }: TalkScreenProps):
           {onRoleplay && (
             <button type="button" className="ghost-btn" onClick={onRoleplay}>
               Roleplay
-              <span className="ghost-btn-arrow" aria-hidden="true">→</span>
-            </button>
-          )}
-          {onHistory && (
-            <button type="button" className="ghost-btn" onClick={onHistory}>
-              History
               <span className="ghost-btn-arrow" aria-hidden="true">→</span>
             </button>
           )}
