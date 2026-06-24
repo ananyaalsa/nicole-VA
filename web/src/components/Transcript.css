@@ -1,0 +1,48 @@
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 100%;
+  padding: 12px 14px;
+  scroll-behavior: smooth;
+}
+
+.transcript-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 78%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  line-height: 1.4;
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+
+.transcript-line--you {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #6d5efc 0%, #8b7bff 100%);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.transcript-line--nicole {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e9e9f2;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom-left-radius: 4px;
+}
+
+.transcript-speaker {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.transcript-text {
+  white-space: pre-wrap;
+}
