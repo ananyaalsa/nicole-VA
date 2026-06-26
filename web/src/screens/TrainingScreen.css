@@ -578,6 +578,9 @@
   .debrief__grid { grid-template-columns: 1fr; }
   .phase-stepper__label { display: none; }
   .phase-stepper__step:not(:last-child)::after { margin: 0 4px; }
+  /* But in the LiveRoom rail the stepper is VERTICAL with room for labels —
+     keep them visible there (the hide-on-mobile rule was for the old top bar). */
+  .live-rail .phase-stepper__label { display: inline; }
 
   /* When the Custom builder is open, collapse the preset lessons so the phone
      shows ONLY the custom card + its builder (keeps the screen clean). */
