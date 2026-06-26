@@ -63,12 +63,23 @@ export async function ensureTrainingSchema(): Promise<void> {
       persona_id text,
       scenario_id text,
       title text NOT NULL,
-      score int,
+      score real,
       scorecard jsonb,
       transcript text,
       created_at timestamptz DEFAULT now()
     )
   `);
+  // Migration: the score column was originally `int`, which rejected the decimal
+  // scores the LLM judge now produces (e.g. 4.7) — every save silently failed.
+  // Widen any existing integer column to `real`. Idempotent + safe.
+  try {
+    await pool.query(`
+      ALTER TABLE nicole2_training_history
+        ALTER COLUMN score TYPE real USING score::real
+    `);
+  } catch {
+    /* already real, or table absent — ignore */
+  }
 }
 
 /** Persist one completed roleplay/training run. Returns the new row's id. */

@@ -229,9 +229,25 @@ export class LiveSession {
     } catch {
       memoryBlock = '';
     }
-    // Integration tools are only exposed for providers whose server keys are
-    // present (key-gated) — so an unconfigured deployment shows none of them.
-    const integrationDecls = allConfiguredToolDecls();
+    // Tools are GATED BY MODE so a practice session can never take real-world
+    // actions on the user's accounts:
+    //   • talk     → everything (integrations, UI control, memory).
+    //   • coach    → training scoring + memory only. NO integrations (it must
+    //                never book a meeting / send mail mid-lesson) and NO UI
+    //                control (the screen drives training, not the model).
+    //   • prospect → NOTHING. It's a character in a roleplay — no integrations,
+    //                no UI control, no memory writes. Just conversation.
+    // This was a real bug: a roleplay created an actual calendar event.
+    const mode = cfg.mode ?? 'talk';
+    // Integration tools are key-gated (only providers with server keys appear),
+    // AND only ever exposed in Talk mode.
+    const integrationDecls = mode === 'talk' ? allConfiguredToolDecls() : [];
+    const functionDeclarations =
+      mode === 'talk'
+        ? [...MEMORY_TOOL_DECLS, ...UI_CONTROL_TOOL_DECLS, ...integrationDecls]
+        : mode === 'coach'
+          ? [...MEMORY_TOOL_DECLS, ...TRAINING_TOOL_DECLS]
+          : []; // prospect: no tools at all
     const systemPrompt = buildSystemPrompt({
       memoryBlock,
       summary: this.runningSummary,
@@ -243,16 +259,9 @@ export class LiveSession {
     return buildLiveConfig({
       systemPrompt,
       voiceName: cfg.voiceName,
-      tools: [
-        {
-          functionDeclarations: [
-            ...MEMORY_TOOL_DECLS,
-            ...UI_CONTROL_TOOL_DECLS,
-            ...TRAINING_TOOL_DECLS,
-            ...integrationDecls,
-          ],
-        },
-      ],
+      tools: functionDeclarations.length
+        ? [{ functionDeclarations }]
+        : [],
       // Real-time Google Search grounding so Nicole can answer news/weather/
       // flights/prices/latest-fact questions with current info.
       searchEnabled: true,
@@ -359,6 +368,18 @@ export class LiveSession {
         // SERVER-SIDE because the OAuth tokens live here. We return a short,
         // speakable summary as the function result so Nicole reads it back.
         else if (isIntegrationTool(name)) {
+          // HARD GATE: only Talk mode may take real-world actions on the user's
+          // accounts. A coach/prospect session that somehow emits an integration
+          // call (e.g. a resumed session with stale declarations) is refused —
+          // never let a roleplay book a meeting or send mail.
+          if ((this.sessionConfig?.mode ?? 'talk') !== 'talk') {
+            responses.push({
+              id: call?.id,
+              name,
+              response: { result: 'error', summary: 'Not available during a practice session.' },
+            });
+            continue;
+          }
           const result = await dispatchIntegrationTool(name, args, this.deps.userId);
           responses.push({
             id: call?.id,
