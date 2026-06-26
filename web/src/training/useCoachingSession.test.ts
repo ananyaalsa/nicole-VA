@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { UseNicoleSessionOptions } from '../engine/useNicoleSession';
+import type { TranscriptLine } from '../engine/types';
 
 /**
  * A fake useNicoleSession that records, per instance, the latest options it was
@@ -13,9 +14,16 @@ interface FakeInstance {
   startCalls: number;
   stopped: boolean;
   stopCalls: number;
+  /** Transcript lines fed by simulateUserTurn for auto-advance tests. */
+  transcript: TranscriptLine[];
 }
 
 const instances: FakeInstance[] = [];
+
+// The hook reads the auth token via useAuth; stub it so no AuthProvider is needed.
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ token: 'test-token', user: null }),
+}));
 
 vi.mock('../engine/useNicoleSession', () => {
   return {
@@ -30,6 +38,7 @@ vi.mock('../engine/useNicoleSession', () => {
           startCalls: 0,
           stopped: false,
           stopCalls: 0,
+          transcript: [],
         };
         instances.push(inst);
       }
@@ -37,7 +46,8 @@ vi.mock('../engine/useNicoleSession', () => {
       return {
         connected: inst.started,
         micOn: false,
-        transcript: [],
+        transcript: inst.transcript,
+        realtime: { you: '', nicole: '' },
         amplitude: 0,
         start: async () => {
           inst!.started = true;
@@ -49,6 +59,8 @@ vi.mock('../engine/useNicoleSession', () => {
         },
         toggleMic: () => {},
         setVoice: () => {},
+        sendText: () => {},
+        afterNextModelTurn: (cb: () => void) => { cb(); },
       };
     },
   };
@@ -60,6 +72,30 @@ import { LESSONS } from './lessons';
 
 const coach = () => instances.find((i) => i.options.mode === 'coach')!;
 const prospect = () => instances.find((i) => i.options.mode === 'prospect')!;
+
+/** Render the hook and return both the react-testing-library handle and a helper
+ *  that pushes a `{speaker:'you'}` committed line into the fake coach transcript
+ *  so the auto-advance evaluator can count it as a user turn. */
+function renderCoaching(lesson = LESSONS[0]) {
+  const { result, rerender, unmount } = renderHook(() =>
+    useCoachingSession({ lesson }),
+  );
+  return {
+    result,
+    rerender,
+    unmount,
+    simulateUserTurn(text = 'hi') {
+      const inst = instances.find((i) => i.options.mode === 'coach');
+      if (!inst) return;
+      inst.transcript = [
+        ...inst.transcript,
+        { id: `t${Date.now()}`, speaker: 'you' as const, text, streaming: false },
+      ];
+      // Re-render the hook so it picks up the transcript change.
+      rerender();
+    },
+  };
+}
 
 beforeEach(() => {
   instances.length = 0;
@@ -188,5 +224,27 @@ describe('useCoachingSession', () => {
     );
     expect(coach().options.voiceName).toBe('Kore');
     expect(prospect().options.voiceName).toBe('Charon');
+  });
+});
+
+describe('useCoachingSession — auto-advance', () => {
+  beforeEach(() => {
+    instances.length = 0;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('auto-advances intro after a turn + min dwell using fake timers', async () => {
+    vi.useFakeTimers();
+    const view = renderCoaching();
+    await act(async () => { await view.result.current.start(); });
+    // simulate one user turn in intro (triggers the transcript-change evaluator)
+    await act(async () => { view.simulateUserTurn('hello'); });
+    // advance fake time past intro minPhaseMs (6s) + the 2s evaluator tick
+    await act(async () => { vi.advanceTimersByTime(9000); });
+    expect(view.result.current.phase).toBe('teach');
   });
 });

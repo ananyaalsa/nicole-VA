@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNicoleSession } from '../engine/useNicoleSession';
+import { useAuth } from '../auth/AuthContext';
 import type { TranscriptLine } from '../engine/types';
 import { DEFAULT_VOICE } from '../audio/voices';
 import { buildPhasePrompt, type ClientLessonSpec } from './lessonPrompts';
 import { advancePhase, type Phase } from './phaseMachine';
+import { shouldAdvancePhase, AUTO_PHASES, type AdvanceSignals } from './phaseAdvance';
 
 /**
  * A single silent scoring entry produced by Nicole's `training_mark_progress`
@@ -36,6 +38,8 @@ export interface UseCoachingSessionResult {
   coachAmplitude: number;
   /** Coach conversation transcript. */
   coachTranscript: TranscriptLine[];
+  /** In-progress (realtime) coach speech — for live bubble display. */
+  coachRealtime: { you: string; nicole: string };
   /** Begin the session (starts the coach; prospect starts only in roleplay). */
   start: () => Promise<void>;
   /** End the session — stops BOTH the coach and the prospect. */
@@ -51,6 +55,11 @@ const ROLEPLAY_PHASE: Phase = 'roleplay_demo';
 
 /** Default voice for the roleplay other-party — a distinct, grounded male voice. */
 const DEFAULT_PROSPECT_VOICE = 'Charon';
+
+/** Silent opener so the COACH (Nicole) takes charge and speaks first, rather
+ *  than the learner having to break the ice. */
+const COACH_OPEN_DIRECTIVE =
+  '[OPEN] You are the coach and you lead. Open the session yourself in one warm, brief line, name the skill we are working on from your overlay, and tell the learner what we will do first, then invite them to begin. Do not wait for them to speak first.';
 
 /**
  * Orchestrates a two-voice coaching session.
@@ -72,6 +81,7 @@ export function useCoachingSession(
 
   const [phase, setPhase] = useState<Phase>('intro');
   const [scorecard, setScorecard] = useState<ScoreEntry[]>([]);
+  const { token } = useAuth();
 
   // The coach overlay is fully derived from lesson + phase.
   const coachOverlay = useMemo(
@@ -84,6 +94,7 @@ export function useCoachingSession(
     voiceName: coachVoice,
     mode: 'coach',
     systemOverlay: coachOverlay,
+    authToken: token,
   });
 
   // PROSPECT — only connected during the roleplay phase. The overlay is the
@@ -92,6 +103,7 @@ export function useCoachingSession(
     voiceName: prospectVoice,
     mode: 'prospect',
     systemOverlay: buildPhasePrompt(lesson, ROLEPLAY_PHASE, null),
+    authToken: token,
   });
 
   // Track whether the session has been started so phase-change effects only
@@ -105,10 +117,32 @@ export function useCoachingSession(
   const coachStopRef = useRef(coach.stop);
   const prospectStartRef = useRef(prospect.start);
   const prospectStopRef = useRef(prospect.stop);
+  const coachSendTextRef = useRef(coach.sendText);
   coachStartRef.current = coach.start;
   coachStopRef.current = coach.stop;
   prospectStartRef.current = prospect.start;
   prospectStopRef.current = prospect.stop;
+  coachSendTextRef.current = coach.sendText;
+  // Fire the coach opener once per connect so Nicole speaks first.
+  const sentCoachOpenRef = useRef(false);
+
+  // ── Auto-advance evaluator refs ─────────────────────────────────────────
+  // Mirror phase/scorecard so the stable evaluate callback reads fresh values.
+  const phaseRef = useRef<Phase>(phase);
+  phaseRef.current = phase;
+  const scorecardRef = useRef(scorecard);
+  scorecardRef.current = scorecard;
+
+  // Phase-entry tracking (reset on phase change).
+  const phaseEnteredAtRef = useRef<number>(Date.now());
+  const userTurnsThisPhaseRef = useRef(0);
+  const litAtPhaseStartRef = useRef(0);
+  const lastUserLineCountRef = useRef(0);
+
+  // Mirror afterNextModelTurn so the stable phase-change effect reads the
+  // latest version without re-subscribing.
+  const coachAfterTurnRef = useRef(coach.afterNextModelTurn);
+  coachAfterTurnRef.current = coach.afterNextModelTurn;
 
   const start = useCallback(async () => {
     startedRef.current = true;
@@ -137,12 +171,69 @@ export function useCoachingSession(
     setScorecard((prev) => [...prev, entry]);
   }, []);
 
+  // Reset phase-tracking counters whenever the phase changes.
+  useEffect(() => {
+    phaseEnteredAtRef.current = Date.now();
+    userTurnsThisPhaseRef.current = 0;
+    litAtPhaseStartRef.current = scorecardRef.current.length;
+    // lastUserLineCountRef intentionally NOT reset: it tracks total committed
+    // 'you' lines in the coach transcript across phases so the delta logic stays
+    // correct when the hook re-renders with a new phase.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // Count substantive user turns from the committed coach transcript.
+  useEffect(() => {
+    const youLines = coach.transcript.filter((l) => l.speaker === 'you').length;
+    const delta = youLines - lastUserLineCountRef.current;
+    if (delta > 0) {
+      userTurnsThisPhaseRef.current += delta;
+    }
+    lastUserLineCountRef.current = youLines;
+  }, [coach.transcript]);
+
+  // App-driven evaluator: advance the phase when engagement/time signals are met.
+  const evaluate = useCallback(() => {
+    if (!startedRef.current) return;
+    const ph = phaseRef.current;
+    if (!AUTO_PHASES.includes(ph)) return;
+    const signals: AdvanceSignals = {
+      turns: userTurnsThisPhaseRef.current,
+      litDelta: scorecardRef.current.length - litAtPhaseStartRef.current,
+      timeInPhaseMs: Date.now() - phaseEnteredAtRef.current,
+    };
+    if (shouldAdvancePhase(ph, signals)) {
+      // Force advance by signalling more than enough learner turns.
+      setPhase((cur) => {
+        const next = advancePhase(cur, { learnerTurns: 99 });
+        // Eagerly update the ref so subsequent evaluator ticks (within the same
+        // fake-timer sweep or batch) see the new phase and don't double-advance.
+        phaseRef.current = next;
+        // Reset the phase-entry tracking now (mirrors the [phase] effect) so
+        // the next phase's clock starts clean even before React re-renders.
+        phaseEnteredAtRef.current = Date.now();
+        userTurnsThisPhaseRef.current = 0;
+        litAtPhaseStartRef.current = scorecardRef.current.length;
+        return next;
+      });
+    }
+  }, []);
+
+  // Run evaluate on a 2s interval (catches time-ceiling advances when idle).
+  useEffect(() => {
+    const id = setInterval(evaluate, 2000);
+    return () => clearInterval(id);
+  }, [evaluate]);
+
+  // Also run evaluate immediately when transcript or scorecard changes.
+  useEffect(() => { evaluate(); }, [coach.transcript, scorecard, evaluate]);
+
   // When the phase changes (after start), reconnect the coach so the backend
-  // receives the new phase overlay. useNicoleSession reads systemOverlay from a
-  // ref on each connect, so a fresh start() picks up the updated overlay.
+  // receives the new phase overlay. Deferred via afterNextModelTurn so Nicole
+  // isn't cut off mid-sentence when the phase boundary fires.
   useEffect(() => {
     if (!startedRef.current) return;
-    void coachStartRef.current();
+    coachAfterTurnRef.current(() => { void coachStartRef.current(); });
     // coachOverlay is the meaningful trigger; re-run when it changes.
   }, [coachOverlay]);
 
@@ -161,6 +252,17 @@ export function useCoachingSession(
     }
   }, [phase]);
 
+  // Nicole-first: once the coach session connects, fire a silent opener so she
+  // takes charge and greets/sets up the drill, instead of waiting for the user.
+  useEffect(() => {
+    if (coach.connected && startedRef.current && !sentCoachOpenRef.current) {
+      sentCoachOpenRef.current = true;
+      const t = setTimeout(() => coachSendTextRef.current(COACH_OPEN_DIRECTIVE), 500);
+      return () => clearTimeout(t);
+    }
+    if (!coach.connected) sentCoachOpenRef.current = false;
+  }, [coach.connected]);
+
   // Unmount safety: stop both sessions if still active.
   useEffect(() => {
     return () => {
@@ -174,6 +276,7 @@ export function useCoachingSession(
     scorecard,
     coachAmplitude: coach.amplitude,
     coachTranscript: coach.transcript,
+    coachRealtime: coach.realtime,
     start,
     stop,
     advance,
