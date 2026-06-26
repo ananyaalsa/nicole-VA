@@ -219,9 +219,9 @@ describe('TrainingScreen', () => {
     expect(fake.advance).toHaveBeenCalled();
   });
 
-  it('shows practice-done button at roleplay_demo phase', () => {
+  it('shows the practice-done action at roleplay_demo phase (in the footer bar)', () => {
     renderTrainingAtPhase('roleplay_demo');
-    expect(screen.getByTestId('practice-done')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-done-footer')).toBeInTheDocument();
   });
 
   it('renders SessionResults at debrief', () => {

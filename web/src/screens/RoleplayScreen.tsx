@@ -17,6 +17,7 @@ import {
 } from '../training/trainingApi';
 import { useRoleplaySession } from '../training/useRoleplaySession';
 import { LiveRoom } from '../components/LiveRoom';
+import { CallPresence } from '../components/CallPresence';
 import { SessionResults } from '../components/SessionResults';
 import { requestScore, postLiveStatus, type ResultLine, type Scorecard } from '../training/scoreApi';
 import '../components/ProfilePanel.css';
@@ -615,34 +616,27 @@ function RoleplayRoom({
             </div>
           </div>
         }
-        right={
-          <>
-            <button
-              type="button"
-              className={`ctrl-btn${micOn ? '' : ' is-muted'}`}
-              data-testid="mic-toggle"
-              onClick={toggleMic}
-              aria-pressed={micOn ? 'false' : 'true'}
-            >
-              {micOn ? 'Mute' : 'Unmute'}
-            </button>
-            <button
-              type="button"
-              className="ctrl-btn ctrl-btn--end"
-              data-testid="end-score-button"
-              disabled={saving}
-              onClick={() => void endAndScore()}
-            >
-              End &amp; score
-            </button>
-          </>
-        }
       />
 
       <LiveRoom
         lines={transcript}
         realtime={realtime}
         labels={{ nicole: alias }}
+        presence={
+          <CallPresence
+            name={alias}
+            status={turnState === 'connecting' ? 'Connecting…' : scenario.name}
+            speaking={speaking}
+            live={connected}
+          />
+        }
+        emptyState={
+          <span>
+            {turnState === 'connecting'
+              ? `Connecting you to ${alias}…`
+              : `You're live with ${alias}. Say hello to start the call.`}
+          </span>
+        }
         rail={
           <div className="live-rail">
             <div className={`turn-indicator turn-indicator--${turnState}`} aria-live="polite" data-testid="turn-indicator">
@@ -658,6 +652,31 @@ function RoleplayRoom({
               Restart scene
             </button>
           </div>
+        }
+        footer={
+          <>
+            <span className={`room-footer__turn room-footer__turn--${turnState}`}>{turnLabel}</span>
+            <div className="room-footer__actions">
+              <button
+                type="button"
+                className={`ctrl-btn${micOn ? '' : ' is-muted'}`}
+                data-testid="mic-toggle"
+                onClick={toggleMic}
+                aria-pressed={micOn ? 'false' : 'true'}
+              >
+                {micOn ? 'Mute' : 'Unmute'}
+              </button>
+              <button
+                type="button"
+                className="ctrl-btn ctrl-btn--end"
+                data-testid="end-score-button"
+                disabled={saving}
+                onClick={() => void endAndScore()}
+              >
+                End &amp; score
+              </button>
+            </div>
+          </>
         }
       />
 

@@ -13,6 +13,7 @@ import type { ClientLessonSpec } from '../training/lessonPrompts';
 import { PHASE_ORDER, type Phase } from '../training/phaseMachine';
 import { useCoachingSession } from '../training/useCoachingSession';
 import { LiveRoom } from '../components/LiveRoom';
+import { CallPresence } from '../components/CallPresence';
 import { SessionResults } from '../components/SessionResults';
 import '../components/ProfilePanel.css';
 import './TrainingScreen.css';
@@ -430,17 +431,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
           I'm ready — go live <span aria-hidden="true">→</span>
         </button>
       )}
-      {phase === 'roleplay_demo' && (
-        <button
-          type="button"
-          className="picker-cta-bar__btn"
-          data-testid="practice-done"
-          disabled={scoring}
-          onClick={() => void handleFinishPractice()}
-        >
-          {scoring ? 'Scoring…' : 'I\'m done'}
-        </button>
-      )}
+      {/* The live "I'm done" action lives in the footer bar (room-footer). */}
     </div>
   );
 
@@ -478,8 +469,42 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
       <LiveRoom
         lines={session.coachTranscript}
         realtime={session.coachRealtime}
-        labels={{ nicole: 'Nicole' }}
+        labels={{ nicole: phase === 'roleplay_demo' ? 'Prospect' : 'Nicole' }}
+        presence={
+          <CallPresence
+            name={phase === 'roleplay_demo' ? 'Prospect' : 'Nicole'}
+            status={PHASE_GOAL[phase]}
+            avatarSrc={phase === 'roleplay_demo' ? undefined : '/nicole-avatar.png'}
+            speaking={speaking}
+            live={started}
+          />
+        }
+        emptyState={
+          <span>
+            {phase === 'roleplay_demo'
+              ? 'Your live rep is starting. Take the call.'
+              : 'Nicole is getting your lesson ready…'}
+          </span>
+        }
         rail={rail}
+        footer={
+          <>
+            <span className="room-footer__turn">{speaking ? 'Speaking…' : started ? 'Live' : 'Ready'}</span>
+            <div className="room-footer__actions">
+              {phase === 'roleplay_demo' && (
+                <button
+                  type="button"
+                  className="picker-cta-bar__btn"
+                  data-testid="practice-done-footer"
+                  disabled={scoring}
+                  onClick={() => void handleFinishPractice()}
+                >
+                  {scoring ? 'Scoring…' : "I'm done"}
+                </button>
+              )}
+            </div>
+          </>
+        }
       />
     </div>
   );

@@ -1,10 +1,149 @@
-.live-room { display: grid; grid-template-columns: 1fr 300px; gap: 16px; flex: 1; min-height: 0; padding: 16px; }
-.live-room__feed { overflow-y: auto; min-height: 0; padding-right: 6px; }
-.live-room__rail { display: flex; flex-direction: column; gap: 14px; }
-/* Named grid areas place feed left, rail right on desktop (DOM order independent). */
-.live-room { grid-template-areas: 'feed rail'; }
-.live-room__feed { grid-area: feed; }
-.live-room__rail { grid-area: rail; }
-@media (max-width: 860px) {
-  .live-room { grid-template-columns: 1fr; grid-template-areas: 'rail' 'feed'; }
+/* LiveRoom — the shared "you're on a live call" shell for Training + Roleplay. */
+.live-room {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    'main rail'
+    'footer footer';
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
 }
+
+/* Main column: presence panel pinned on top, transcript feed scrolls below. */
+.live-room__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 14px;
+}
+.live-room__presence { flex-shrink: 0; }
+.live-room__feed { flex: 1; overflow-y: auto; min-height: 0; padding-right: 6px; }
+
+/* Empty state — an invitation, not a void. */
+.live-room__empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 0.9rem;
+  padding: 24px;
+}
+
+.live-room__rail { grid-area: rail; display: flex; flex-direction: column; gap: 14px; }
+
+.live-room__footer {
+  grid-area: footer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 860px) {
+  .live-room {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'rail'
+      'main'
+      'footer';
+    gap: 12px;
+    padding: 12px;
+  }
+}
+
+/* ── Call-presence panel (signature element) ─────────────────────────────── */
+.call-presence {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, var(--accent-light), var(--surface));
+  border: 1px solid var(--border);
+}
+.call-presence__avatar {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  overflow: hidden;
+}
+.call-presence__avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Speaking → an expanding pulse ring so you can SEE who's talking. */
+.call-presence__avatar::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+}
+.call-presence.is-speaking .call-presence__avatar::after {
+  animation: call-pulse 1.4s ease-out infinite;
+}
+@keyframes call-pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.call-presence__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.call-presence__name { font-size: 1rem; font-weight: 700; color: var(--text); }
+.call-presence__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.call-presence__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+.call-presence--live .call-presence__dot { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.call-presence--speaking .call-presence__dot { background: var(--accent); }
+
+/* A live waveform that animates only while the other party speaks. */
+.call-presence__wave { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.call-presence__wave span {
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  height: 30%;
+}
+.call-presence.is-speaking .call-presence__wave span { animation: wave-bounce 0.9s ease-in-out infinite; }
+.call-presence__wave span:nth-child(2) { animation-delay: 0.15s; }
+.call-presence__wave span:nth-child(3) { animation-delay: 0.3s; }
+.call-presence__wave span:nth-child(4) { animation-delay: 0.45s; }
+@keyframes wave-bounce {
+  0%, 100% { height: 30%; }
+  50% { height: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-presence.is-speaking .call-presence__avatar::after,
+  .call-presence.is-speaking .call-presence__wave span { animation: none; }
+}
+
+/* ── Footer bar contents (shared by Training + Roleplay) ─────────────────── */
+.room-footer__turn { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
+.room-footer__turn--speaking { color: var(--accent); }
+.room-footer__actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }

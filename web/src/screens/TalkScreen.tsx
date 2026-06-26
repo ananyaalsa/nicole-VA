@@ -359,7 +359,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   const activeVoice = VOICES.find((v) => v.name === voice);
   const femaleVoices = VOICES.filter((v) => v.gender === 'female');
   const maleVoices   = VOICES.filter((v) => v.gender === 'male');
-  const avatarSrc = activeVoice?.gender === 'male' ? '/nicole-avatar-male.png' : '/nicole-avatar.png';
+  // Always Nicole's avatar regardless of the chosen voice — she's Nicole whether
+  // she speaks in a female or male voice (no separate "male voice" avatar).
+  const avatarSrc = '/nicole-avatar.png';
   const userInitial = user?.displayName?.trim().charAt(0).toUpperCase() ?? '?';
 
   return (
@@ -387,7 +389,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       <div className="talk-body">
         <aside className="talk-presence">
           <div className={`presence-avatar presence-avatar--state-${auraState}`} data-testid="nicole-aura">
-            <img src={avatarSrc} alt={activeVoice?.gender === 'male' ? 'Male voice avatar' : 'Nicole'} className="presence-img" />
+            <img src={avatarSrc} alt="Nicole" className="presence-img" />
           </div>
           <p className="presence-state">{connected ? 'Live' : 'Your Personal VA'}</p>
 
