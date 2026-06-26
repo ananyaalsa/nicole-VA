@@ -216,9 +216,25 @@ export function useCoachingSession(
   markProgressRef.current = markProgress;
 
   const buildPracticeTranscript = useCallback((): ResultLine[] => {
-    const youLines: ResultLine[] = coach.transcript.filter((l) => l.speaker === 'you').map((l) => ({ speaker: 'you' as const, text: l.text }));
-    const repLines: ResultLine[] = prospect.transcript.filter((l) => l.speaker === 'nicole').map((l) => ({ speaker: 'rep' as const, text: l.text }));
-    return [...repLines, ...youLines];
+    // The user (from the COACH session) and the rep (from the PROSPECT session)
+    // live in two separate transcript arrays, but every line id is
+    // `l<base36-time>_<N>` where N is a MODULE-GLOBAL monotonic counter shared by
+    // both sessions. So sorting the merged lines by that trailing sequence number
+    // restores the true chronological back-and-forth — block-concatenating would
+    // destroy it and both the debrief view and the judge score would suffer.
+    const seq = (id: string): number => {
+      const n = Number(id.slice(id.lastIndexOf('_') + 1));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const merged = [
+      ...coach.transcript
+        .filter((l) => l.speaker === 'you')
+        .map((l) => ({ id: l.id, speaker: 'you' as const, text: l.text })),
+      ...prospect.transcript
+        .filter((l) => l.speaker === 'nicole')
+        .map((l) => ({ id: l.id, speaker: 'rep' as const, text: l.text })),
+    ].sort((a, b) => seq(a.id) - seq(b.id));
+    return merged.map(({ speaker, text }) => ({ speaker, text }));
   }, [coach.transcript, prospect.transcript]);
 
   const finishPractice = useCallback(async () => {

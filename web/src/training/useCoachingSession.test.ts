@@ -110,6 +110,19 @@ function renderCoaching(lesson = LESSONS[0]) {
       ];
       rerender();
     },
+    /** Push a line into the coach (you) or prospect (rep) transcript with an
+     *  EXPLICIT sequenced id (`l..._<seq>`) so ordering tests are deterministic. */
+    pushLine(who: 'you' | 'rep', seq: number, text: string) {
+      const mode = who === 'you' ? 'coach' : 'prospect';
+      const speaker = who === 'you' ? 'you' : 'nicole';
+      const inst = instances.find((i) => i.options.mode === mode);
+      if (!inst) return;
+      inst.transcript = [
+        ...inst.transcript,
+        { id: `lx_${seq}`, speaker: speaker as 'you' | 'nicole', text, streaming: false },
+      ];
+      rerender();
+    },
     /** Directly set the phase on the hook (bypasses phaseMachine gates). */
     setPhase(phase: string) {
       // Access the exposed setPhase from the hook result if available.
@@ -280,6 +293,35 @@ describe('useCoachingSession — finishPractice', () => {
     await act(async () => { await view.result.current.finishPractice(); });
     expect(view.result.current.phase).toBe('debrief');
     expect(view.result.current.scorecardResult?.overallScore).toBe(7);
+  });
+
+  it('merges the rep + user transcripts in CHRONOLOGICAL order (by line sequence)', async () => {
+    const fakeSc = { overallScore: 6, band: 'developing', scores: [], signals: { talkRatioPct: 50, questionCount: 1, longestMonologueWords: 5 }, headline: 'h', worked: { note: 'w', quote: null }, fix: { note: 'f', quote: null, why: '' }, nextTime: 'n', spoken: 's' };
+    let sentTranscript: Array<{ speaker: string; text: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      sentTranscript = JSON.parse(init.body).transcript;
+      return { ok: true, json: async () => ({ scorecard: fakeSc }) };
+    }) as any);
+    const view = renderCoaching();
+    await act(async () => { await view.result.current.start(); });
+    // Interleaved exchange: rep(1) → you(2) → rep(3) → you(4), pushed out of block order.
+    act(() => {
+      view.setPhase?.('roleplay_demo');
+      view.pushLine?.('rep', 1, 'Who is this?');
+      view.pushLine?.('you', 2, 'Hi, it is Gaurav.');
+      view.pushLine?.('rep', 3, 'What do you want?');
+      view.pushLine?.('you', 4, 'Two minutes of your time.');
+    });
+    await act(async () => { await view.result.current.finishPractice(); });
+    // The transcript the judge received must be in true conversation order.
+    expect(sentTranscript.map((l) => `${l.speaker}:${l.text}`)).toEqual([
+      'rep:Who is this?',
+      'you:Hi, it is Gaurav.',
+      'rep:What do you want?',
+      'you:Two minutes of your time.',
+    ]);
+    // And the frozen practiceTranscript the debrief renders is the same order.
+    expect(view.result.current.practiceTranscript.map((l) => l.speaker)).toEqual(['rep', 'you', 'rep', 'you']);
   });
 });
 
