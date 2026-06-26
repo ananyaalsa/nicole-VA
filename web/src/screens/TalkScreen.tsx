@@ -342,6 +342,16 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   const changeVoice = (name: string) => {
     setVoice(name);
     if (connected) session.setVoice(name);
+    // Persist the choice so it survives a reload (was reverting to the old
+    // preferredVoice on refresh). Best-effort — the live switch already happened.
+    updateUser({ preferredVoice: name });
+    if (token) {
+      void fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ preferredVoice: name }),
+      }).catch(() => { /* best-effort; local state already updated */ });
+    }
   };
 
   const speaking = amplitude > SPEAKING_AMP;
@@ -498,6 +508,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
           {/* Live2D companion (Aria/Noah) — bottom-right, toggleable. Lip-syncs
               to the live Nicole voice. Avatar + wardrobe colors from prefs. */}
           <Live2DCompanion
+            // Remount when the avatar OR its wardrobe colors change so a Save in
+            // the Avatar panel reflects on screen immediately — no page refresh.
+            key={`${avatarPrefs.avatar}:${JSON.stringify(avatarPrefs.colors[avatarPrefs.avatar === 'noah' ? 'noah' : 'aria'] ?? {})}`}
             amplitude={amplitude}
             speaking={speaking}
             shown={companionShown && avatarPrefs.avatar !== 'off'}

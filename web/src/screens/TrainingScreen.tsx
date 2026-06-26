@@ -474,7 +474,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
           <CallPresence
             name={phase === 'roleplay_demo' ? 'Prospect' : 'Nicole'}
             status={PHASE_GOAL[phase]}
-            avatarSrc={phase === 'roleplay_demo' ? undefined : '/nicole-avatar.png'}
+            avatarSrc={phase === 'roleplay_demo' ? '/nicole-avatar-male.png' : '/nicole-avatar.png'}
             speaking={speaking}
             live={started}
           />

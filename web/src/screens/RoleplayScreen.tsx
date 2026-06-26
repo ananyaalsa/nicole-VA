@@ -626,6 +626,7 @@ function RoleplayRoom({
           <CallPresence
             name={alias}
             status={turnState === 'connecting' ? 'Connecting…' : scenario.name}
+            avatarSrc="/nicole-avatar-male.png"
             speaking={speaking}
             live={connected}
           />

@@ -295,6 +295,13 @@ export function useNicoleSession(
   //    pauses stays one growing line, then becomes one committed bubble.
   const realtimeRef = useRef<Record<Speaker, string>>({ you: '', nicole: '' });
   const [realtime, setRealtime] = useState<{ you: string; nicole: string }>({ you: '', nicole: '' });
+  // The speaker who most recently received transcript text. Used to keep the
+  // committed transcript in true chronological order: when the OTHER speaker
+  // starts, we commit the previous speaker's line FIRST (a real turn boundary),
+  // rather than batching both on turnComplete in a fixed order — which reordered
+  // lines when input/output transcription arrived with timing skew (the rep
+  // appearing to answer before the user finished).
+  const lastSpeakerRef = useRef<Speaker | null>(null);
 
   // Keep the latest opts in a ref so the WS open handler always reads fresh
   // config without re-subscribing.
@@ -310,6 +317,12 @@ export function useNicoleSession(
     // Strip em/en-dashes from the displayed transcript (user never wants dashes).
     const chunk = raw.replace(/\s*[—–]\s*/g, ', ');
     if (!chunk) return;
+
+    // Track who is currently speaking so finalizeTurn can commit in true spoken
+    // order (most-recent speaker last). We do NOT commit on every switch —
+    // input + output transcription legitimately interleave at the chunk level
+    // during one exchange, and committing per chunk would shatter the bubbles.
+    lastSpeakerRef.current = speaker;
 
     const prev = realtimeRef.current[speaker];
     let next: string;
@@ -348,11 +361,21 @@ export function useNicoleSession(
     });
   }, []);
 
-  /** Finalize the whole turn (on turnComplete): commit USER first (so it sits
-   *  above Nicole's reply), then Nicole. Mirrors the chat project. */
+  /** Finalize the whole turn (on turnComplete): commit any pending lines in the
+   *  order they were actually spoken — the MOST-RECENT speaker commits LAST so it
+   *  sits at the bottom. (Most turns have only one pending line by now, since the
+   *  turn-boundary commit in appendPartial already flushed the previous speaker.) */
   const finalizeTurn = useCallback(() => {
-    commitSpeaker('you');
-    commitSpeaker('nicole');
+    const last = lastSpeakerRef.current;
+    if (last === 'nicole') {
+      commitSpeaker('you');
+      commitSpeaker('nicole');
+    } else {
+      // last === 'you' or null → user spoke most recently (or unknown): the rep's
+      // line, if any, came first.
+      commitSpeaker('nicole');
+      commitSpeaker('you');
+    }
   }, [commitSpeaker]);
 
   /** Hard finalize one speaker (barge-in / stop): commit just that speaker. */
