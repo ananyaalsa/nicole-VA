@@ -434,6 +434,9 @@ function RoleplayRoom({
 
   const [scResult, setScResult] = useState<Scorecard | null>(null);
   const [saving, setSaving] = useState(false);
+  // Guards against a double-click on "End & score" firing two judge+save calls
+  // during the async scoring gap (before scResult unmounts the button).
+  const scoringRef = useRef(false);
   const startedRef = useRef(false);
   const startedAtRef = useRef(Date.now());
 
@@ -452,6 +455,8 @@ function RoleplayRoom({
   const speaking = amplitude > SPEAKING_AMP;
 
   const endAndScore = useCallback(async () => {
+    if (scoringRef.current) return; // ignore double-clicks during scoring
+    scoringRef.current = true;
     const lines: ResultLine[] = transcript.map((l) => ({
       speaker: l.speaker === 'you' ? 'you' : 'rep',
       text: l.text,
@@ -574,6 +579,7 @@ function RoleplayRoom({
               type="button"
               className="ctrl-btn ctrl-btn--end"
               data-testid="end-score-button"
+              disabled={saving}
               onClick={() => void endAndScore()}
             >
               End &amp; score
