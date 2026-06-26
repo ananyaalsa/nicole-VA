@@ -290,12 +290,17 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   const startedAtRef = useRef(Date.now());
   const savedRef = useRef(false);
 
-  // Post 'entered' on mount (best-effort).
+  // Mounting this component IS the user's intent to begin (they tapped "Start
+  // drill" on the picker), so we AUTO-START the lesson — no extra "Begin lesson"
+  // click. Nicole opens the drill herself and drives it from here.
   useEffect(() => {
+    setStarted(true);
+    startedAtRef.current = Date.now();
     void postLiveStatus(
-      { mode: 'training', state: 'entered', skill: lesson.title, startedAt: Date.now() },
+      { mode: 'training', state: 'active', skill: lesson.title, startedAt: startedAtRef.current },
       token ?? undefined,
     );
+    void session.start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -339,16 +344,6 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
     session.stop();
     onExit();
   }, [session, onExit]);
-
-  const handleStart = useCallback(() => {
-    setStarted(true);
-    startedAtRef.current = Date.now();
-    void postLiveStatus(
-      { mode: 'training', state: 'active', skill: lesson.title, startedAt: startedAtRef.current },
-      token ?? undefined,
-    );
-    void session.start();
-  }, [session, lesson, token]);
 
   const handleFinishPractice = useCallback(async () => {
     if (scoring) return;
@@ -425,11 +420,6 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         })}
       </nav>
       <p className="session-goal" aria-live="polite">{PHASE_GOAL[phase]}</p>
-      {!started && (
-        <button type="button" className="picker-cta-bar__btn" data-testid="start-button" onClick={handleStart}>
-          Begin lesson <span aria-hidden="true">→</span>
-        </button>
-      )}
       {phase === 'readiness_check' && (
         <button
           type="button"

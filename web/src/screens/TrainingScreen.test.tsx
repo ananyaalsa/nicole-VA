@@ -199,17 +199,12 @@ describe('TrainingScreen', () => {
     expect(indicator.textContent?.toLowerCase()).toContain('intro');
   });
 
-  it('shows the start button before session begins', () => {
+  it('auto-starts the lesson on entering the room (no separate Begin button)', () => {
     const api = render(<TrainingScreen />);
     enterRoom(api);
-    expect(api.getByTestId('start-button')).toBeInTheDocument();
-  });
-
-  it('the start button calls start() and calls session.start', () => {
-    const api = render(<TrainingScreen />);
-    enterRoom(api);
-    fireEvent.click(api.getByTestId('start-button'));
+    // "Start drill" → straight into the lesson; Nicole opens it herself.
     expect(fake.start).toHaveBeenCalled();
+    expect(api.queryByTestId('start-button')).not.toBeInTheDocument();
   });
 
   it('shows the readiness confirm at readiness_check and a full-width live room', () => {
