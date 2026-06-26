@@ -252,6 +252,11 @@ export function useNicoleSession(
   // Count of consecutive over-threshold mic frames, for sustained barge-in.
   const sustainedSpeechRef = useRef(0);
   const voiceRef = useRef(voiceName);
+  // A silent directive to fire ONCE the next time the session reports `ready`.
+  // Used by setVoice: after the voice-change reconnect, nudge Nicole to confirm
+  // the switch out loud — otherwise the reconnect drops the turn and she stays
+  // silent until the user speaks again.
+  const pendingReadyDirectiveRef = useRef<string | null>(null);
   // Latest tool-call callback + AI-mute flag, kept in refs so the message
   // handler (a stable callback) always sees the current values.
   const onToolCallRef = useRef(onToolCall);
@@ -443,9 +448,24 @@ export function useNicoleSession(
     (msg: RelayMessage) => {
       switch (msg.type) {
         case 'open':
-        case 'ready':
+        case 'ready': {
           setConnected(true);
+          // Fire any one-shot directive queued for this connect (e.g. the
+          // voice-change confirmation), so Nicole speaks right after a reconnect
+          // instead of waiting silently for the user's next turn.
+          const directive = pendingReadyDirectiveRef.current;
+          if (directive) {
+            pendingReadyDirectiveRef.current = null;
+            const ws = wsRef.current;
+            // Small delay so the fresh Gemini session is ready to accept a turn.
+            setTimeout(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'client-text', text: directive }));
+              }
+            }, 400);
+          }
           return;
+        }
         case 'error':
           // Surface as a transient — keep the session alive; caller can stop.
           return;
@@ -956,6 +976,11 @@ export function useNicoleSession(
     (v: string) => {
       voiceRef.current = v;
       connectCfgRef.current = { ...connectCfgRef.current, voiceName: v };
+      // Queue a one-shot confirmation so Nicole speaks in the NEW voice as soon
+      // as the reconnect is ready — without this the turn is dropped and she
+      // stays silent until the user speaks again.
+      pendingReadyDirectiveRef.current =
+        '[VOICE CHANGED] Your voice has just been switched. In one short, warm line, confirm the change out loud now (e.g. "How does this voice sound?") so the user hears the new voice. Do not wait for them to speak first.';
 
       // Tear down socket + audio but keep mic stream and transcript so the
       // reconnect is seamless.
