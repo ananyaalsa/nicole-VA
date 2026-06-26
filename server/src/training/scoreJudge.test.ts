@@ -78,6 +78,18 @@ describe('parseJudge', () => {
   it('returns null on unparseable reply', () => {
     expect(parseJudge('not json at all', DIMS, SIG)).toBeNull();
   });
+
+  it('defaults an omitted dimension to score 0', () => {
+    const reply = JSON.stringify({
+      scores: [{ dimensionId: 'ack', score: 3, rationale: 'Good', evidenceQuote: null }],
+      headline: 'h', worked: { note: 'w', quote: null },
+      fix: { note: 'f', quote: null, why: '' }, nextTime: 'n', spoken: 's',
+    });
+    const sc = parseJudge(reply, DIMS, SIG)!;
+    expect(sc.scores[1].score).toBe(0);        // 'advance' was omitted by the judge
+    expect(sc.scores[1].band).toBe('missing');
+    expect(sc.overallScore).toBe(5.0);         // (3+0)/6*10 = 5.0
+  });
 });
 
 describe('fallbackScorecard', () => {

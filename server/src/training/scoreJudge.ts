@@ -75,6 +75,7 @@ export function overallBand(score: number): Scorecard['band'] {
 
 function clampScore(n: unknown): 0 | 1 | 2 | 3 {
   const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return 0;
   return (v < 0 ? 0 : v > 3 ? 3 : v) as 0 | 1 | 2 | 3;
 }
 
