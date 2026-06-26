@@ -10,6 +10,11 @@ describe('requestScore', () => {
     const out = await requestScore({ kind: 'training', dimensions: [], transcript: [] });
     expect(out.overallScore).toBe(7);
   });
+
+  it('throws on a non-OK server response (instead of returning undefined)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ error: 'boom' }) })) as any);
+    await expect(requestScore({ kind: 'training', dimensions: [], transcript: [] })).rejects.toThrow(/500/);
+  });
 });
 
 describe('postLiveStatus', () => {

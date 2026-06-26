@@ -32,6 +32,7 @@ export async function requestScore(
   const res = await fetch(`${HTTP_BASE}/api/training/score`, {
     method: 'POST', headers: authHeaders(token), body: JSON.stringify(args),
   });
+  if (!res.ok) throw new Error(`score request failed: ${res.status}`);
   const data = await res.json();
   return data.scorecard as Scorecard;
 }
