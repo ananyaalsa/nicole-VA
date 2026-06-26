@@ -2,10 +2,19 @@
 // Handles the /api/training* surface for the single local user. Returns JSON.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
+import { JWT_SECRET } from '../auth/middleware.js';
 import { listProfilesFull } from './profiles.js';
 import { generateCustomSpec, type SpecGenInput } from './specGenerator.js';
 import { saveTrainingRun, listTrainingHistory, getTrainingRun } from './historyDb.js';
+import { judgeScorecard, type DimensionInput, type ResultLine, type Scorecard } from './scoreJudge.js';
+
+// Test seam: allow tests to inject a fake judge so they don't hit the model.
+type JudgeFn = (args: { kind: 'training' | 'roleplay'; dimensions: DimensionInput[]; transcript: ResultLine[] }) => Promise<Scorecard>;
+let scoreJudge: JudgeFn = ({ kind, dimensions, transcript }) =>
+  judgeScorecard({ kind, dims: dimensions, transcript });
+export function setScoreJudge(fn: JudgeFn): void { scoreJudge = fn; }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
@@ -13,9 +22,22 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': config.frontendUrl,
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
   });
   res.end(text);
+}
+
+/** Resolve the user from the JWT so history is per-user; fall back to the
+ *  server default user when no/invalid token (local dev). */
+function resolveUserId(req: IncomingMessage): string {
+  const header = req.headers.authorization ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return config.userId;
+  try {
+    return (jwt.verify(token, JWT_SECRET) as { sub: string }).sub;
+  } catch {
+    return config.userId;
+  }
 }
 
 function readBody(req: IncomingMessage): Promise<any> {
@@ -64,7 +86,7 @@ export async function handleTrainingRoute(
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (!url.pathname.startsWith('/api/training')) return false;
 
-  const userId = config.userId;
+  const userId = resolveUserId(req);
 
   if (req.method === 'OPTIONS') {
     sendJson(res, 204, {});
@@ -95,6 +117,21 @@ export async function handleTrainingRoute(
     } else {
       sendJson(res, 200, { ok: false, error: result.error });
     }
+    return true;
+  }
+
+  // POST /api/training/score  — grade a finished practice/roleplay transcript.
+  if (url.pathname === '/api/training/score' && req.method === 'POST') {
+    const body = await readBody(req);
+    const dimensions = Array.isArray(body.dimensions) ? body.dimensions : null;
+    const transcript = Array.isArray(body.transcript) ? body.transcript : null;
+    if (!dimensions || !transcript) {
+      sendJson(res, 400, { error: 'dimensions and transcript are required' });
+      return true;
+    }
+    const kind = body.kind === 'roleplay' ? 'roleplay' : 'training';
+    const scorecard = await scoreJudge({ kind, dimensions, transcript });
+    sendJson(res, 200, { scorecard });
     return true;
   }
 
