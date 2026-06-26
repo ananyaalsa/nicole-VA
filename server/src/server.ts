@@ -6,16 +6,35 @@
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI } from '@google/genai';
+import jwt from 'jsonwebtoken';
 import { config } from './config.js';
+import { JWT_SECRET } from './auth/middleware.js';
 import { handleMemoryRoute } from './memory/routes.js';
 import { handleTrainingRoute } from './training/routes.js';
+import { handleAuthRoute } from './auth/routes.js';
+import { handleSessionRoute } from './session/routes.js';
+import { handleIntegrationsRoute } from './integrations/routes.js';
+import { handleBriefRoute } from './integrations/briefRoute.js';
+import { handleWeatherRoute } from './weather/routes.js';
 import { ensureSchema } from './memory/db.js';
 import { ensureTrainingSchema } from './training/historyDb.js';
+import { ensureAuthSchema } from './auth/migrate.js';
+import { ensureIntegrationsSchema } from './integrations/db.js';
 import { LiveSession, type ClientChannel, type GenAILike } from './gemini/relay.js';
 import { SignalingRooms } from './rtc/signalingRoom.js';
 import type { SessionConfig } from './types.js';
 
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey }) as unknown as GenAILike;
+
+/** Verify a client-supplied JWT and return its userId (sub), or null if invalid. */
+function userIdFromToken(token: unknown): string | null {
+  if (typeof token !== 'string' || !token) return null;
+  try {
+    return (jwt.verify(token, JWT_SECRET) as { sub: string }).sub;
+  } catch {
+    return null;
+  }
+}
 
 const httpServer = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
@@ -23,6 +42,14 @@ const httpServer = createServer((req, res) => {
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, model: config.liveModel }));
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/auth')) {
+    void handleAuthRoute(req, res).catch((err) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+    });
     return;
   }
 
@@ -36,6 +63,38 @@ const httpServer = createServer((req, res) => {
 
   if (url.pathname.startsWith('/api/training')) {
     void handleTrainingRoute(req, res).catch((err) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+    });
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/session')) {
+    void handleSessionRoute(req, res).catch((err) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+    });
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/integrations')) {
+    void handleIntegrationsRoute(req, res).catch((err) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/brief') {
+    void handleBriefRoute(req, res).catch((err) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/weather') {
+    void handleWeatherRoute(req, res).catch((err) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(err?.message ?? err) }));
     });
@@ -114,7 +173,11 @@ function handleAiLive(ws: WebSocket): void {
     },
   };
 
-  const session = new LiveSession({ ai, model: config.liveModel, userId: config.userId, client });
+  // The session is created on the connect message, once we know WHICH user this
+  // is (derived from the JWT they send) — so the live session runs as them:
+  // their memory and their connected integrations. Falls back to the server
+  // default user only when no/invalid token is sent (e.g. local dev).
+  let session: LiveSession | null = null;
   let connected = false;
 
   ws.on('message', (raw: Buffer) => {
@@ -127,6 +190,8 @@ function handleAiLive(ws: WebSocket): void {
 
     if (msg.type === 'connect' && !connected) {
       connected = true;
+      const userId = userIdFromToken(msg.authToken) ?? config.userId;
+      session = new LiveSession({ ai, model: config.liveModel, userId, client });
       const cfg: SessionConfig = {
         voiceName: msg.config?.voiceName ?? 'Aoede',
         mode: msg.config?.mode ?? 'talk',
@@ -139,6 +204,9 @@ function handleAiLive(ws: WebSocket): void {
       });
       return;
     }
+
+    // All other messages need an established session.
+    if (!session) return;
 
     if (msg.type === 'client-msg') {
       session.forwardClientMessage(msg.payload);
@@ -162,16 +230,18 @@ function handleAiLive(ws: WebSocket): void {
     }
   });
 
-  ws.on('close', () => session.close());
-  ws.on('error', () => session.close());
+  ws.on('close', () => session?.close());
+  ws.on('error', () => session?.close());
 }
 
 async function main(): Promise<void> {
-  // Make sure the nicole2_memory + nicole2_training_history tables exist before
-  // serving (best-effort).
+  // Make sure the nicole2_memory + nicole2_training_history + nicole2_users tables
+  // exist before serving (best-effort).
   try {
     await ensureSchema();
     await ensureTrainingSchema();
+    await ensureAuthSchema();
+    await ensureIntegrationsSchema();
   } catch (err) {
     console.warn('[server] ensureSchema failed (continuing):', (err as Error).message);
   }
