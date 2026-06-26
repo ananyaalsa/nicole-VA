@@ -1,10 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { JSX } from 'react';
 import type { AuraState } from '../components/NicoleAura';
 import { Transcript } from '../components/Transcript';
+import { ChatTranscript } from '../components/ChatTranscript';
 import { CameraPreview } from '../components/CameraPreview';
 import { Icon } from '../components/Icon';
+import { TopBar } from '../components/TopBar';
+import { HomePanel } from '../home/HomePanel';
 import { ProfilePanel } from '../components/ProfilePanel';
+import { useToast } from '../ui/toast';
+import { TOOL_TOASTS } from '../ui/toolToasts';
+import { WeatherWidget, type WeatherWidgetHandle } from '../weather/WeatherWidget';
+import { speakWeather } from '../weather/weatherApi';
+import { Live2DCompanion } from '../live2d/Live2DCompanion';
+import { loadAvatarPrefs, type AvatarPrefs } from '../live2d/avatars';
 import { useNicoleSession } from '../engine/useNicoleSession';
 import { useCamera } from '../engine/useCamera';
 import { useUiCommands } from '../engine/useUiCommands';
@@ -15,27 +25,44 @@ import './TalkScreen.css';
 
 const SPEAKING_AMP = 0.06;
 
+// Canvas fillStyle can't read CSS vars — use literal teal-family colors that
+// match the Deep Teal theme (deep teal, soft teal, sage).
 const WAVE_LAYERS = [
-  { color: 'rgba(80,70,229,0.10)',  speed: 0.003, amp: 38, freq: 0.018, offset: 0 },
-  { color: 'rgba(236,72,153,0.07)', speed: 0.002, amp: 28, freq: 0.024, offset: 2.1 },
-  { color: 'rgba(16,185,129,0.06)', speed: 0.0015, amp: 20, freq: 0.030, offset: 4.3 },
+  { color: 'rgba(15,118,110,0.10)',  speed: 0.003, amp: 38, freq: 0.018, offset: 0 },
+  { color: 'rgba(94,234,212,0.08)',  speed: 0.002, amp: 28, freq: 0.024, offset: 2.1 },
+  { color: 'rgba(132,169,140,0.07)', speed: 0.0015, amp: 20, freq: 0.030, offset: 4.3 },
 ];
 
-function WaveBackdrop({ state }: { state: AuraState }): JSX.Element {
+/**
+ * Wave backdrop. The animation loop is set up ONCE and reads the live "energy"
+ * target from a ref — it is NEVER torn down on state changes. Earlier this took
+ * `state` as a prop with `[state]` deps, so every ~60Hz amplitude update
+ * rebuilt the whole rAF loop while Nicole spoke → the glitch. Now the parent
+ * writes the target into `stateRef`, and an envelope follower eases the actual
+ * energy toward it each frame so the wave swells smoothly instead of jumping.
+ */
+function WaveBackdrop({ stateRef }: { stateRef: React.MutableRefObject<AuraState> }): JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const tRef = useRef(0);
+  const energyRef = useRef(1.0); // smoothed energy, eased toward the target
   useEffect(() => {
+    // Respect reduced-motion: skip the animation loop entirely (WCAG).
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const canvas = ref.current; if (!canvas) return;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
-    const resize = () => { canvas.width = canvas.offsetWidth * window.devicePixelRatio; canvas.height = canvas.offsetHeight * window.devicePixelRatio; ctx.scale(window.devicePixelRatio, window.devicePixelRatio); };
+    const resize = () => { canvas.width = canvas.offsetWidth * window.devicePixelRatio; canvas.height = canvas.offsetHeight * window.devicePixelRatio; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(window.devicePixelRatio, window.devicePixelRatio); };
     resize();
     const ro = new ResizeObserver(resize); ro.observe(canvas);
     const draw = () => {
       const W = canvas.offsetWidth; const H = canvas.offsetHeight;
       ctx.clearRect(0, 0, W, H);
       const t = tRef.current;
-      const e = state === 'speaking' ? 1.8 : state === 'listening' ? 1.3 : 1.0;
+      // Target energy from the live state ref; ease toward it (envelope follower)
+      // so transitions are a gentle swell, never a jump/glitch.
+      const target = stateRef.current === 'speaking' ? 1.8 : stateRef.current === 'listening' ? 1.3 : 1.0;
+      energyRef.current += (target - energyRef.current) * 0.06;
+      const e = energyRef.current;
       for (const layer of WAVE_LAYERS) {
         ctx.beginPath();
         const baseY = H * 0.38; ctx.moveTo(0, baseY);
@@ -51,7 +78,9 @@ function WaveBackdrop({ state }: { state: AuraState }): JSX.Element {
     };
     rafRef.current = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(rafRef.current); ro.disconnect(); };
-  }, [state]);
+    // Set up ONCE — the loop reads stateRef live; it must not depend on state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <canvas ref={ref} className="wave-canvas" aria-hidden="true" />;
 }
 
@@ -61,21 +90,52 @@ export interface TalkScreenProps {
   /** Nicole switches screens by voice (switch_mode tool). */
   onSwitchMode?: (mode: 'talk' | 'training' | 'roleplay') => void;
   defaultVoice?: string;
+  /** True while another mode (Training/Roleplay) is active and Talk is hidden.
+   *  The session stays alive (her sentence finishes); we just pause the mic. */
+  backgrounded?: boolean;
 }
 
-const STARTERS = [
-  'Practice a cold open with a tough prospect',
-  'Walk me through handling a pricing objection',
-  'Ask me anything about real estate sales',
-];
 
-export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: TalkScreenProps): JSX.Element {
+export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, backgrounded }: TalkScreenProps): JSX.Element {
   const { user, token, updateUser } = useAuth();
   const [voice, setVoice] = useState<string>(defaultVoice ?? DEFAULT_VOICE);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // Which gender's chips are shown in the compact voice picker.
+  const [voiceGender, setVoiceGender] = useState<'female' | 'male'>(
+    VOICES.find((v) => v.name === (defaultVoice ?? DEFAULT_VOICE))?.gender === 'male' ? 'male' : 'female',
+  );
   const [profileOpen, setProfileOpen] = useState(false);
   const [aiMuted, setAiMuted] = useState(false);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  // Live2D companion visibility (persisted), controlled here so the toggle can
+  // live inside the controls bar rather than as a floating button.
+  const [companionShown, setCompanionShown] = useState<boolean>(() => {
+    try { return localStorage.getItem('nicole_companion') !== 'off'; } catch { return true; }
+  });
+  const toggleCompanion = useCallback(() => {
+    setCompanionShown((s) => {
+      const next = !s;
+      try { localStorage.setItem('nicole_companion', next ? 'on' : 'off'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  // Which avatar (Aria/Noah/Off) + its wardrobe colors, from the user's prefs.
+  // Re-read on the 'nicole:avatar-updated' event the Profile panel fires so
+  // changes apply live without a reload.
+  const [avatarPrefs, setAvatarPrefs] = useState<AvatarPrefs>(() => loadAvatarPrefs());
+  useEffect(() => {
+    const reload = () => setAvatarPrefs(loadAvatarPrefs());
+    window.addEventListener('nicole:avatar-updated', reload);
+    return () => window.removeEventListener('nicole:avatar-updated', reload);
+  }, []);
   const [systemOverlay, setSystemOverlay] = useState<string | undefined>(undefined);
+
+  // Glass toasts: fire an in-progress toast when Nicole calls an action tool,
+  // then resolve it to success/error when the server echoes the tool-result.
+  const toast = useToast();
+  const toastIdsRef = useRef<Record<string, string>>({});
+  // Imperative handle to the weather widget so get_weather can open the dialog.
+  const weatherRef = useRef<WeatherWidgetHandle | null>(null);
 
   // Load user memory once on mount and build Nicole's system context.
   useEffect(() => {
@@ -96,7 +156,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
           phone  ? `Their phone number is ${phone}.` : '',
           about  ? `About them: ${about}` : '',
           goals.length ? `Their goals: ${goals.join(', ')}.` : '',
-          'Always address them by their first name. Use this context naturally in conversation — never recite it robotically.',
+          'Always address them by their first name. Use this context naturally in conversation, never recite it robotically.',
         ].filter(Boolean);
 
         setSystemOverlay(lines.join(' '));
@@ -119,19 +179,140 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
     set_voice: (a) => { if (typeof a.voiceName === 'string') changeVoice(a.voiceName); },
     mute_ai: (a) => setAiMuted(!!a.muted),
     mute_mic: (a) => { if (!!a.muted === micOn) toggleMic(); },
-    end_session: () => { camera.stop(); stop(); },
+    set_volume: (a) => { if (typeof a.level === 'number') session.setVolume(a.level); },
+    adjust_volume: (a) => { const amt = typeof a.amount === 'number' ? a.amount : 10; session.adjustVolume(a.direction === 'down' ? -amt : amt); },
+    set_mute: (a) => session.setMuted(!!a.muted),
+    get_weather: (a) => {
+      const loc = typeof a.location === 'string' ? a.location : undefined;
+      void weatherRef.current?.open(loc).then((w) => {
+        // Feed Nicole the actual reading so she speaks accurate numbers, not a guess.
+        if (w) session.sendText(`[WEATHER DATA — read this to the user warmly in one sentence] ${speakWeather(w)} High ${w.forecast[0]?.hiC}, low ${w.forecast[0]?.loC}.`);
+        else session.sendText('[WEATHER unavailable — tell the user you could not get their location or the weather right now.]');
+      });
+    },
+    end_session: () => { camera.stop(); stop(); session.clearTranscript(); },
     set_about: (a) => { if (typeof a.text === 'string') void profile.setAbout(a.text); },
     set_goal: (a) => { if ((a.action === 'add' || a.action === 'remove') && typeof a.goal === 'string') void profile.setGoal(a.action, a.goal); },
     set_display_name: (a) => { if (typeof a.name === 'string') void profile.setDisplayName(a.name); },
   });
 
-  const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall });
-  const { connected, micOn, transcript, amplitude, start, stop, toggleMic } = session;
+  // Wrap onToolCall so integration tool calls also raise an in-progress toast,
+  // then delegate to the UI-command dispatcher.
+  const handleToolCall = useCallback(
+    (calls: { name: string; args: Record<string, unknown> }[]) => {
+      for (const c of calls) {
+        const tt = TOOL_TOASTS[c.name];
+        if (tt && !toastIdsRef.current[c.name]) {
+          toastIdsRef.current[c.name] = toast.show({ kind: 'progress', text: tt.progress, icon: tt.icon });
+        }
+      }
+      onToolCall?.(calls);
+    },
+    [onToolCall, toast],
+  );
+
+  const handleToolResult = useCallback(
+    (r: { name: string; ok: boolean; summary: string }) => {
+      const id = toastIdsRef.current[r.name];
+      delete toastIdsRef.current[r.name];
+      if (id) {
+        toast.resolve(id, { kind: r.ok ? 'success' : 'error', text: r.summary, icon: undefined });
+      } else {
+        toast.show({ kind: r.ok ? 'success' : 'error', text: r.summary });
+      }
+    },
+    [toast],
+  );
+
+  const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
+  const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, volume, muted, setVolume, setMuted } = session;
+
+  // End a session: stop the live connection AND wipe the transcript so the idle
+  // home screen never shows stale chat. Durable facts persist in memory.
+  const endSession = useCallback(() => { camera.stop(); stop(); clearTranscript(); }, [stop, clearTranscript]);
 
   const camera = useCamera({ onFrame: session.sendVideoFrame });
   const teardownRef = useRef<() => void>(() => {});
   teardownRef.current = () => { camera.stop(); stop(); };
   useEffect(() => () => teardownRef.current(), []);
+
+  // Pause Talk in the background: when another mode takes over, mute the mic so
+  // Talk-Nicole stops listening — but keep the session + audio alive so her
+  // current sentence finishes. Restore the mic when Talk returns to foreground.
+  const micBeforeBgRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!connected) return;
+    if (backgrounded) {
+      if (micBeforeBgRef.current === null) {
+        micBeforeBgRef.current = micOn;
+        if (micOn) toggleMic(); // mute while backgrounded
+      }
+    } else if (micBeforeBgRef.current !== null) {
+      // Returned to foreground — restore prior mic state.
+      if (micBeforeBgRef.current && !micOn) toggleMic();
+      micBeforeBgRef.current = null;
+    }
+  }, [backgrounded, connected, micOn, toggleMic]);
+
+  // One-tap-to-send: when a home starter is tapped we stash its prompt and call
+  // start(); once the session connects, seed that prompt as the first turn.
+  const pendingPromptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (connected && pendingPromptRef.current) {
+      const text = pendingPromptRef.current;
+      pendingPromptRef.current = null;
+      // Small delay so the live session is fully ready to accept a turn.
+      const t = setTimeout(() => session.sendText(text), 500);
+      return () => clearTimeout(t);
+    }
+  }, [connected, session]);
+
+  // ── Auto-scroll with scroll-lock ──────────────────────────────────────────
+  // Stick to the bottom as the transcript streams; if the user scrolls up, stop
+  // auto-scrolling and show a "Jump to latest" pill; resume when they're back.
+  const feedRef = useRef<HTMLDivElement>(null);
+  const pinnedRef = useRef(true);
+  // True while WE are programmatically scrolling, so the resulting scroll event
+  // doesn't get mistaken for the user scrolling up and un-pin auto-follow.
+  const autoScrollingRef = useRef(false);
+  const [showJumpLatest, setShowJumpLatest] = useState(false);
+
+  const onFeedScroll = useCallback(() => {
+    const el = feedRef.current;
+    if (!el) return;
+    if (autoScrollingRef.current) return; // ignore our own programmatic scrolls
+    // "Pinned" if within 80px of the bottom (tolerant of sub-pixel + momentum).
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    pinnedRef.current = atBottom;
+    setShowJumpLatest(!atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = feedRef.current;
+    if (!el) return;
+    autoScrollingRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    // Release the guard after the scroll settles so real user scrolls register.
+    window.setTimeout(() => { autoScrollingRef.current = false; }, smooth ? 350 : 60);
+  }, []);
+
+  const jumpToLatest = useCallback(() => {
+    pinnedRef.current = true;
+    setShowJumpLatest(false);
+    scrollToBottom(true);
+  }, [scrollToBottom]);
+
+  // Auto-follow the newest content as it streams. useLayoutEffect runs AFTER the
+  // DOM is updated but BEFORE paint, so scrollHeight is current and we scroll to
+  // the true latest height with no flicker — only while pinned. We depend on the
+  // LAST bubble's text too: the streaming bubble's height grows without the array
+  // length changing, so depending on transcript alone would miss those growths.
+  const lastBubbleText = transcript.length ? transcript[transcript.length - 1].text : '';
+  useLayoutEffect(() => {
+    if (pinnedRef.current) scrollToBottom(false);
+    // Also re-pin as the live (realtime) lines grow, since those change height
+    // without the committed transcript array changing.
+  }, [transcript.length, lastBubbleText, realtime.you, realtime.nicole, scrollToBottom]);
 
   const changeVoice = (name: string) => {
     setVoice(name);
@@ -140,6 +321,15 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
 
   const speaking = amplitude > SPEAKING_AMP;
   const auraState: AuraState = speaking ? 'speaking' : connected && micOn ? 'listening' : 'idle';
+  // Feed the wave's energy via a ref (not a prop) so its rAF loop is never torn
+  // down on amplitude changes — the fix for the speaking glitch.
+  const auraStateRef = useRef<AuraState>(auraState);
+  auraStateRef.current = auraState;
+  // Stable status label: a single calm "Live" while connected — NOT a per-frame
+  // Speaking/Listening flip (that strobed and read as a glitch). The orb still
+  // reacts to amplitude via auraState; only the text chip is stabilized.
+  const liveLabel = connected ? 'Live' : 'Ready';
+  const liveClass = connected ? 'status-listening' : 'status-idle';
 
   const activeVoice = VOICES.find((v) => v.name === voice);
   const femaleVoices = VOICES.filter((v) => v.gender === 'female');
@@ -150,26 +340,22 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
   return (
     <div className="talk-screen" data-testid="talk-screen" data-state={auraState}>
 
-      <header className="talk-topbar">
-        <div className="topbar-brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="topbar-brand-name">Nicole</span>
-        </div>
-        <nav className="topbar-nav" aria-label="Mode navigation">
-          <button type="button" className="topbar-nav-item is-active" aria-current="page" data-tooltip="Free-form voice conversation with Nicole" data-tooltip-pos="bottom">Talk</button>
-          {onTrain    && <button type="button" className="topbar-nav-item" onClick={onTrain} data-tooltip="Structured sales training drills & lessons" data-tooltip-pos="bottom">Training</button>}
-          {onRoleplay && <button type="button" className="topbar-nav-item" onClick={onRoleplay} data-tooltip="Practice with AI roleplay scenarios" data-tooltip-pos="bottom">Roleplay</button>}
-        </nav>
-        <div className="topbar-right">
-          <span className={`status-chip status-${auraState}`} data-tooltip={connected ? (speaking ? 'Nicole is speaking' : micOn ? 'Nicole is listening to you' : 'Session active — say something') : 'Click Start talking to begin'} data-tooltip-pos="bottom">
-            <span className="status-dot" aria-hidden="true" />
-            <span className="status-text">{connected ? (speaking ? 'Speaking' : micOn ? 'Listening' : 'Ready') : 'Ready'}</span>
-          </span>
-          <button type="button" className="topbar-avatar-btn" onClick={() => setProfileOpen(true)} aria-label="Open profile">
-            {userInitial}
-          </button>
-        </div>
-      </header>
+      <TopBar
+        current="talk"
+        available={[...(onTrain ? ['training' as const] : []), ...(onRoleplay ? ['roleplay' as const] : [])]}
+        onNavigate={(m) => { if (m === 'training') onTrain?.(); else if (m === 'roleplay') onRoleplay?.(); }}
+        right={
+          <>
+            <span className={`status-chip ${liveClass}`} data-tooltip={connected ? 'Live session — just talk' : 'Click Start talking to begin'} data-tooltip-pos="bottom">
+              <span className="status-dot" aria-hidden="true" />
+              <span className="status-text">{liveLabel}</span>
+            </span>
+            <button type="button" className="topbar-avatar-btn" onClick={() => setProfileOpen(true)} aria-label="Open profile">
+              {userInitial}
+            </button>
+          </>
+        }
+      />
 
       {camera.error && <p className="camera-error" role="alert">{camera.error}</p>}
 
@@ -178,7 +364,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
           <div className={`presence-avatar presence-avatar--state-${auraState}`} data-testid="nicole-aura">
             <img src={avatarSrc} alt={activeVoice?.gender === 'male' ? 'Male voice avatar' : 'Nicole'} className="presence-img" />
           </div>
-          <p className="presence-state">{connected ? (auraState === 'idle' ? 'Your Personal VA' : auraState === 'listening' ? 'Listening...' : 'Speaking') : 'Your Personal VA'}</p>
+          <p className="presence-state">{connected ? 'Live' : 'Your Personal VA'}</p>
 
           <div className="voice-selector">
             <button type="button" className="voice-current-btn" data-testid="voice-switcher" onClick={() => setVoiceOpen((o) => !o)} aria-expanded={voiceOpen} data-tooltip="Change Nicole's voice" data-tooltip-pos="top">
@@ -187,52 +373,56 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             {voiceOpen && (
-              <div className="voice-dropdown" role="listbox" aria-label="Select voice">
-                <div className="voice-dropdown-group">
-                  <span className="voice-dropdown-gender">Female</span>
-                  {femaleVoices.map((v) => (
-                    <button key={v.name} role="option" aria-selected={v.name === voice} className={`voice-option${v.name === voice ? ' is-active' : ''}`} data-testid="voice-option" onClick={() => { setVoice(v.name); setVoiceOpen(false); if (connected) session.setVoice(v.name); }} type="button">
-                      <span className="voice-option-name">{v.name}</span>
-                      <span className="voice-option-label">{v.label}</span>
-                    </button>
-                  ))}
+              <div className="voice-pop" role="dialog" aria-label="Select voice">
+                {/* Gender segmented toggle */}
+                <div className="voice-seg" role="tablist" aria-label="Voice gender">
+                  <button type="button" role="tab" aria-selected={voiceGender === 'female' ? 'true' : 'false'}
+                    className={`voice-seg__btn${voiceGender === 'female' ? ' is-on' : ''}`}
+                    onClick={() => setVoiceGender('female')}>Female</button>
+                  <button type="button" role="tab" aria-selected={voiceGender === 'male' ? 'true' : 'false'}
+                    className={`voice-seg__btn${voiceGender === 'male' ? ' is-on' : ''}`}
+                    onClick={() => setVoiceGender('male')}>Male</button>
                 </div>
-                <div className="voice-dropdown-group">
-                  <span className="voice-dropdown-gender">Male</span>
-                  {maleVoices.map((v) => (
-                    <button key={v.name} role="option" aria-selected={v.name === voice} className={`voice-option${v.name === voice ? ' is-active' : ''}`} data-testid="voice-option" onClick={() => { setVoice(v.name); setVoiceOpen(false); if (connected) session.setVoice(v.name); }} type="button">
-                      <span className="voice-option-name">{v.name}</span>
-                      <span className="voice-option-label">{v.label}</span>
+                {/* Chip grid for the selected gender */}
+                <div className="voice-chips" role="listbox" aria-label={`${voiceGender} voices`}>
+                  {(voiceGender === 'female' ? femaleVoices : maleVoices).map((v) => (
+                    <button key={v.name} type="button" role="option"
+                      aria-selected={v.name === voice ? 'true' : 'false'}
+                      className={`voice-chip${v.name === voice ? ' is-active' : ''}`}
+                      data-testid="voice-option"
+                      onClick={() => { setVoice(v.name); setVoiceOpen(false); if (connected) session.setVoice(v.name); }}>
+                      <span className="voice-chip__name">{v.name}</span>
+                      <span className="voice-chip__label">{v.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
           </div>
+
+          {/* Ambient weather inside the panel (beside the avatar); Nicole can
+              also open the full card by voice. */}
+          <WeatherWidget inline handleRef={(h) => { weatherRef.current = h; }} />
         </aside>
 
         <section className="talk-conversation">
-          <WaveBackdrop state={auraState} />
-          {transcript.length === 0 ? (
+          <WaveBackdrop stateRef={auraStateRef} />
+          {transcript.length === 0 && !realtime.you && !realtime.nicole ? (
             <div className="talk-empty">
-              <h2 className="talk-empty__heading">Ready when you are</h2>
-              <p className="talk-empty__sub">Start a session or pick one of these to get going</p>
-              <div className="talk-empty__starters">
-                {STARTERS.map((s) => (
-                  <button key={s} type="button" className="starter-card" onClick={() => void start()}>{s}</button>
-                ))}
-              </div>
+              <HomePanel
+                onStarter={(prompt) => { pendingPromptRef.current = prompt; void start(); }}
+                onResume={(item) => { if (item.kind === 'training') onTrain?.(); else onRoleplay?.(); }}
+                onDrill={() => onTrain?.()}
+              />
             </div>
           ) : (
-            <div className="conversation-feed">
-              <div className="chat-messages">
-                {transcript.map((line) => (
-                  <div key={line.id} className={`chat-bubble chat-bubble--${line.speaker === 'you' ? 'user' : 'nicole'}`}>
-                    <span className="chat-who">{line.speaker === 'you' ? 'You' : 'Nicole'}</span>
-                    <p className="chat-text">{line.text}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="conversation-feed" ref={feedRef} onScroll={onFeedScroll}>
+              <ChatTranscript lines={transcript} realtime={realtime} />
+              {showJumpLatest && (
+                <button type="button" className="jump-latest" onClick={jumpToLatest} aria-label="Jump to latest message">
+                  ↓ Latest
+                </button>
+              )}
             </div>
           )}
           <div className="talk-controls">
@@ -242,26 +432,51 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
                 Start talking
               </button>
             ) : (
-              <div className="live-controls">
-                <button type="button" className={`ctrl-btn ctrl-btn--mic${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? false : true} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
-                  <Icon name={micOn ? 'mic' : 'mic-off'} size={18} />
-                  <span className="control-btn__label">{micOn ? 'Mute' : 'Unmute'}</span>
+              <div className="live-controls live-controls--icons">
+                <button type="button" className={`ctrl-icon${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? 'false' : 'true'} aria-label={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
+                  <Icon name={micOn ? 'mic' : 'mic-off'} size={20} />
                 </button>
-                <button type="button" className={`ctrl-btn ctrl-btn--cam${camera.on ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on ? camera.stop() : void camera.start())} data-tooltip={camera.on ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
-                  <Icon name="camera" size={18} />
-                  <span className="control-btn__label">{camera.on ? 'Camera on' : 'Camera'}</span>
+                <button type="button" className={`ctrl-icon${camera.on ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on ? camera.stop() : void camera.start())} aria-label={camera.on ? 'Turn off camera' : 'Turn on camera'} data-tooltip={camera.on ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
+                  <Icon name="camera" size={20} />
                 </button>
-                <button type="button" className={`ctrl-btn ctrl-btn--ai${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
-                  <Icon name={aiMuted ? 'mic-off' : 'mic'} size={18} />
-                  <span className="control-btn__label">{aiMuted ? 'Unmute Nicole' : 'Mute Nicole'}</span>
+                <button type="button" className={`ctrl-icon${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} aria-pressed={aiMuted ? 'true' : 'false'} aria-label={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
+                  <Icon name={aiMuted ? 'speaker-off' : 'speaker'} size={20} />
                 </button>
-                <button type="button" className="ctrl-btn ctrl-btn--end" onClick={() => { camera.stop(); stop(); }} data-tooltip="End this session" data-tooltip-pos="top">
-                  <Icon name="end" size={18} />
-                  <span className="control-btn__label">End</span>
+                <div className="ctrl-volume">
+                  <button type="button" className={`ctrl-icon${muted ? ' is-muted' : ''}`} data-testid="volume-button" onClick={() => setVolumeOpen((o) => !o)} aria-expanded={volumeOpen ? 'true' : 'false'} aria-label={`Volume ${volume}`} data-tooltip="Volume" data-tooltip-pos="top">
+                    <Icon name={muted || volume === 0 ? 'volume-off' : volume < 45 ? 'volume-low' : 'volume'} size={20} />
+                  </button>
+                  {volumeOpen && (
+                    <div className="volume-pop" role="group" aria-label="Volume">
+                      <button type="button" className="volume-pop__mute" onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute' : 'Mute'}>
+                        <Icon name={muted || volume === 0 ? 'volume-off' : 'volume'} size={16} />
+                      </button>
+                      <input
+                        type="range" min={0} max={100} step={1} value={volume}
+                        onChange={(e) => setVolume(Number(e.target.value))}
+                        className="volume-pop__slider" aria-label="Volume"
+                        style={{ ['--vol' as string]: `${volume}%` }}
+                      />
+                      <span className="volume-pop__val">{volume}</span>
+                    </div>
+                  )}
+                </div>
+                <button type="button" className="ctrl-icon ctrl-icon--end" onClick={endSession} aria-label="End this session" data-tooltip="End this session" data-tooltip-pos="top">
+                  <Icon name="end" size={20} />
                 </button>
               </div>
             )}
           </div>
+
+          {/* Live2D companion (Aria/Noah) — bottom-right, toggleable. Lip-syncs
+              to the live Nicole voice. Avatar + wardrobe colors from prefs. */}
+          <Live2DCompanion
+            amplitude={amplitude}
+            speaking={speaking}
+            shown={companionShown && avatarPrefs.avatar !== 'off'}
+            avatarId={avatarPrefs.avatar === 'noah' ? 'noah' : 'aria'}
+            colors={avatarPrefs.colors[avatarPrefs.avatar === 'noah' ? 'noah' : 'aria']}
+          />
         </section>
       </div>
 
@@ -272,6 +487,29 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice }: 
       )}
 
       <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+
+      {/* Show/hide-avatar toggle. Only on the ACTIVE Talk screen — TalkScreen
+          stays mounted (hidden) when Training/Roleplay are open, but this portal
+          renders to document.body and would escape that display:none, so gate it
+          on !backgrounded. Also only when an avatar is selected (not 'Off'). */}
+      {!backgrounded && avatarPrefs.avatar !== 'off' && createPortal(
+        <button
+          type="button"
+          className={`l2d-toggle-btn${companionShown ? ' is-on' : ''}`}
+          onClick={toggleCompanion}
+          aria-pressed={companionShown ? 'true' : 'false'}
+          aria-label={companionShown ? 'Hide the avatar' : 'Show the avatar'}
+          data-tooltip={companionShown ? 'Hide avatar' : 'Show avatar'}
+          data-tooltip-pos="left"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="8" r="3.2" />
+            <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+            {!companionShown && <path d="M3 3l18 18" />}
+          </svg>
+        </button>,
+        document.body,
+      )}
     </div>
   );
 }
