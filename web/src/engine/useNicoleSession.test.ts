@@ -152,9 +152,9 @@ class FakeAudioContext {
   createScriptProcessor(): FakeAudioNode {
     return new FakeAudioNode();
   }
-  createGain(): FakeAudioNode & { gain: { value: number } } {
-    const n = new FakeAudioNode() as FakeAudioNode & { gain: { value: number } };
-    n.gain = { value: 1 };
+  createGain(): FakeAudioNode & { gain: { value: number; setValueAtTime: () => void; setTargetAtTime: () => void } } {
+    const n = new FakeAudioNode() as FakeAudioNode & { gain: { value: number; setValueAtTime: () => void; setTargetAtTime: () => void } };
+    n.gain = { value: 1, setValueAtTime() {}, setTargetAtTime() {} };
     return n;
   }
   createAnalyser(): FakeAudioNode & {
@@ -273,34 +273,93 @@ describe('useNicoleSession', () => {
     expect(view.result.current.connected).toBe(true);
   });
 
-  it('appends a nicole line from outputTranscription and a you line from inputTranscription', async () => {
-    const view = await startSession({
-      voiceName: 'Aoede',
-      serverWs: 'ws://test/ai-live',
-    });
+  // Helper: emit one Gemini serverContent message.
+  const emit = (sc: Record<string, unknown>) =>
+    FakeWebSocket.last().emit({ type: 'message', payload: { serverContent: sc } });
 
+  it('streams into realtime lines, then commits one bubble per speaker on turnComplete', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
     act(() => {
-      FakeWebSocket.last().emit({
-        type: 'message',
-        payload: {
-          serverContent: { inputTranscription: { text: 'hello nicole' } },
-        },
-      });
+      emit({ inputTranscription: { text: 'hello nicole' } });
+      emit({ outputTranscription: { text: 'hi there' } });
     });
-    act(() => {
-      FakeWebSocket.last().emit({
-        type: 'message',
-        payload: {
-          serverContent: { outputTranscription: { text: 'hi there' } },
-        },
-      });
-    });
-
+    // Before turnComplete: text lives in the live (realtime) lines, NOT committed.
+    expect(view.result.current.realtime.you).toContain('hello nicole');
+    expect(view.result.current.realtime.nicole).toContain('hi there');
+    expect(view.result.current.transcript).toHaveLength(0);
+    // turnComplete commits both as one bubble each, clearing realtime.
+    act(() => { emit({ turnComplete: true }); });
     const t = view.result.current.transcript;
-    const you = t.find((l) => l.speaker === 'you');
-    const nicole = t.find((l) => l.speaker === 'nicole');
-    expect(you?.text).toContain('hello nicole');
-    expect(nicole?.text).toContain('hi there');
+    expect(t.find((l) => l.speaker === 'you')?.text).toContain('hello nicole');
+    expect(t.find((l) => l.speaker === 'nicole')?.text).toContain('hi there');
+    expect(view.result.current.realtime.you).toBe('');
+    expect(view.result.current.realtime.nicole).toBe('');
+  });
+
+  it('keeps ONE bubble per speaker even when input/output transcription interleave', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    const youFrags = ['It', "'s ", 'go', 'ing ', 'good'];
+    const nicoleFrags = ['That', "'s ", 'great ', 'to ', 'hear'];
+    act(() => {
+      for (let i = 0; i < youFrags.length; i++) {
+        emit({ inputTranscription: { text: youFrags[i] } });
+        emit({ outputTranscription: { text: nicoleFrags[i] } });
+      }
+      emit({ turnComplete: true });
+    });
+    const t = view.result.current.transcript;
+    const you = t.filter((l) => l.speaker === 'you');
+    const nicole = t.filter((l) => l.speaker === 'nicole');
+    expect(you).toHaveLength(1);
+    expect(nicole).toHaveLength(1);
+    expect(you[0].text.replace(/\s+/g, '')).toBe("It'sgoinggood");
+    expect(nicole[0].text.replace(/\s+/g, '')).toBe("That'sgreattohear");
+  });
+
+  it('keeps the user in ONE bubble when speaking SLOWLY (real-time gaps between words)', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    const frags = ['No, I', "'m also ", 'ready ', 'to ', 'dive in'];
+    for (const f of frags) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
+        emit({ inputTranscription: { text: f } });
+        await new Promise((r) => setTimeout(r, 80)); // a real pause between words
+      });
+    }
+    // Mid-utterance: still ONE growing realtime line, nothing committed yet.
+    expect(view.result.current.transcript).toHaveLength(0);
+    expect(view.result.current.realtime.you.replace(/\s+/g, '')).toBe("No,I'malsoreadytodivein");
+    // Turn ends → exactly one committed bubble.
+    act(() => { emit({ turnComplete: true }); });
+    const you = view.result.current.transcript.filter((l) => l.speaker === 'you');
+    expect(you).toHaveLength(1);
+    expect(you[0].text.replace(/\s+/g, '')).toBe("No,I'malsoreadytodivein");
+  });
+
+  it('commits Nicole’s bubble on turnComplete (one bubble, caret cleared)', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    act(() => { emit({ outputTranscription: { text: 'All done here.' } }); });
+    expect(view.result.current.realtime.nicole).toContain('All done here.');
+    act(() => { emit({ turnComplete: true }); });
+    const nicole = view.result.current.transcript.filter((l) => l.speaker === 'nicole');
+    expect(nicole).toHaveLength(1);
+    expect(nicole[0].text).toContain('All done here.');
+    expect(nicole[0].streaming).toBe(false);
+    expect(view.result.current.realtime.nicole).toBe('');
+  });
+
+  it('handles a CUMULATIVE transcription snapshot without double-printing', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    // Gemini 3.1 sends input transcription as a growing FULL string, not deltas.
+    act(() => {
+      emit({ inputTranscription: { text: 'Hi' } });
+      emit({ inputTranscription: { text: 'Hi there' } });
+      emit({ inputTranscription: { text: 'Hi there friend' } });
+      emit({ turnComplete: true });
+    });
+    const you = view.result.current.transcript.filter((l) => l.speaker === 'you');
+    expect(you).toHaveLength(1);
+    expect(you[0].text).toBe('Hi there friend'); // replaced, not concatenated
   });
 
   it('setVoice reconnects with the new voiceName in the connect config', async () => {
@@ -404,5 +463,18 @@ describe('useNicoleSession', () => {
     });
     expect(view.result.current.micOn).toBe(false);
     expect(stream.getTracks()[0].enabled).toBe(false);
+  });
+
+  it('afterNextModelTurn fires on the next turnComplete', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    let fired = false;
+    act(() => {
+      // mid-utterance: nicole has streamed text but no turnComplete yet
+      emit({ outputTranscription: { text: 'thinking...' } });
+      view.result.current.afterNextModelTurn(() => { fired = true; });
+    });
+    expect(fired).toBe(false);
+    act(() => { emit({ turnComplete: true }); });
+    expect(fired).toBe(true);
   });
 });
