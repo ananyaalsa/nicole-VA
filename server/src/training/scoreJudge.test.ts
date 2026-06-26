@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { computeSignals, type ResultLine } from './scoreJudge.js';
+import {
+  computeSignals,
+  dimBand,
+  overallBand,
+  parseJudge,
+  fallbackScorecard,
+  type ResultLine,
+  type DimensionInput,
+  type Signals,
+} from './scoreJudge.js';
 
 describe('computeSignals', () => {
   it('computes talk ratio, question count, and longest monologue', () => {
@@ -19,5 +28,63 @@ describe('computeSignals', () => {
   it('is safe on empty input', () => {
     const s = computeSignals([]);
     expect(s).toEqual({ talkRatioPct: 0, questionCount: 0, longestMonologueWords: 0 });
+  });
+});
+
+const DIMS: DimensionInput[] = [
+  { id: 'ack', label: 'Acknowledge', rubric: 'Did they acknowledge the concern?' },
+  { id: 'advance', label: 'Advance', rubric: 'Did they secure a next step?' },
+];
+const SIG: Signals = { talkRatioPct: 55, questionCount: 3, longestMonologueWords: 18 };
+
+describe('banding', () => {
+  it('maps dimension scores to bands', () => {
+    expect(dimBand(0)).toBe('missing');
+    expect(dimBand(1)).toBe('emerging');
+    expect(dimBand(2)).toBe('proficient');
+    expect(dimBand(3)).toBe('strong');
+  });
+  it('maps overall 0-10 to four bands', () => {
+    expect(overallBand(2)).toBe('needs_work');
+    expect(overallBand(5)).toBe('developing');
+    expect(overallBand(7.5)).toBe('proficient');
+    expect(overallBand(9)).toBe('strong');
+  });
+});
+
+describe('parseJudge', () => {
+  it('parses a well-formed judge reply and averages to 0-10', () => {
+    const reply = JSON.stringify({
+      scores: [
+        { dimensionId: 'ack', score: 3, rationale: 'Restated it well', evidenceQuote: 'I hear you on cost' },
+        { dimensionId: 'advance', score: 1, rationale: 'No clear next step', evidenceQuote: null },
+      ],
+      headline: 'Strong rapport, weak close.',
+      worked: { note: 'Good acknowledgement', quote: 'I hear you on cost' },
+      fix: { note: 'Ask for the next step', quote: null, why: 'Deals stall without an advance' },
+      nextTime: 'End with: can we book 20 minutes Thursday?',
+      spoken: 'Nice acknowledgement. Next time, lock a next step.',
+    });
+    const sc = parseJudge(reply, DIMS, SIG)!;
+    expect(sc).not.toBeNull();
+    // (3 + 1) of 6 -> 4/6*10 = 6.7
+    expect(sc.overallScore).toBe(6.7);
+    expect(sc.band).toBe('developing');
+    expect(sc.scores[0].band).toBe('strong');
+    expect(sc.scores[1].evidenceQuote).toBeNull();
+    expect(sc.signals).toEqual(SIG);
+  });
+
+  it('returns null on unparseable reply', () => {
+    expect(parseJudge('not json at all', DIMS, SIG)).toBeNull();
+  });
+});
+
+describe('fallbackScorecard', () => {
+  it('is honest and never crashes', () => {
+    const sc = fallbackScorecard(DIMS, SIG);
+    expect(sc.scores).toHaveLength(2);
+    expect(sc.signals).toEqual(SIG);
+    expect(sc.spoken.length).toBeGreaterThan(0);
   });
 });
