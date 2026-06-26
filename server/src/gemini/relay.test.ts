@@ -4,6 +4,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 process.env.GEMINI_API_KEY ??= 'test-key';
 process.env.DATABASE_URL ??= 'postgres://x';
 
+// The activity digest hits the training-history DB; stub it so relay reconnect
+// tests don't touch Postgres.
+vi.mock('../memory/activityDigest.js', () => ({ buildActivityDigest: async () => [] }));
+
 import { LiveSession, isTerminalClose, type GenAILike, type ClientChannel, type LiveCallbacks } from './relay.js';
 import type { SessionConfig } from '../types.js';
 
@@ -54,6 +58,12 @@ function makeClient() {
 }
 
 const CFG: SessionConfig = { voiceName: 'Aoede', mode: 'talk' };
+
+/** Pump several microtask ticks so async reconnect/buildConfig chains settle
+ *  regardless of how many awaits they contain. */
+async function flushMicrotasks(times = 6): Promise<void> {
+  for (let i = 0; i < times; i++) await Promise.resolve();
+}
 
 let clock = 0;
 const now = () => clock;
@@ -123,8 +133,7 @@ describe('LiveSession message relay + transcripts', () => {
     sessions[0].callbacks.onmessage?.({ sessionResumptionUpdate: { newHandle: 'H1', resumable: true } });
     // Drop → reconnect should reuse the handle.
     sessions[0].callbacks.onclose?.({ code: 1000, reason: 'rotation' });
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushMicrotasks();
     expect(sessions.length).toBeGreaterThanOrEqual(2);
     const reCfg: any = sessions[sessions.length - 1].config;
     expect(reCfg.sessionResumption).toEqual({ handle: 'H1' });
@@ -139,8 +148,7 @@ describe('LiveSession auto-reconnect', () => {
     const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
     await ls.connect(CFG);
     sessions[0].callbacks.onclose?.({ code: 1006, reason: 'network blip' });
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushMicrotasks();
     expect(sent).toContainEqual({ type: 'reconnecting' });
     expect(sessions.length).toBe(2);
     ls.close();
@@ -179,6 +187,7 @@ describe('LiveSession live summarization', () => {
     // allow the async summarize+reconnect to settle
     await new Promise((r) => setTimeout(r, 0));
     await new Promise((r) => setTimeout(r, 0));
+    await flushMicrotasks();
     expect(summarize).toHaveBeenCalled();
     // A reconnect happened and the new config carries the [SUMMARY] block.
     expect(sessions.length).toBeGreaterThanOrEqual(2);
@@ -267,5 +276,13 @@ describe('LiveSession.close', () => {
     sessions[0].callbacks.onclose?.({ code: 1006, reason: 'late' });
     await Promise.resolve();
     expect(sessions.length).toBe(1);
+  });
+});
+
+describe('tool declarations', () => {
+  it('declares training_mark_progress to Gemini', async () => {
+    // buildConfig is private; assert via the declarations export instead.
+    const { TRAINING_TOOL_DECLS } = await import('./uiControlTools.js');
+    expect(TRAINING_TOOL_DECLS.some((d) => d.name === 'training_mark_progress')).toBe(true);
   });
 });

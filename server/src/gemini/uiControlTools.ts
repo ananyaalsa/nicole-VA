@@ -37,6 +37,10 @@ export const UI_CONTROL_TOOL_NAMES = new Set([
   'set_voice',
   'mute_ai',
   'mute_mic',
+  'set_volume',
+  'adjust_volume',
+  'set_mute',
+  'get_weather',
   'end_session',
   'set_about',
   'set_goal',
@@ -115,6 +119,68 @@ export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
     },
   },
   {
+    name: 'set_volume',
+    description:
+      'Set how loud YOUR voice plays, on a 0-100 scale (like "set your volume to ' +
+      '70"). 0 is silent, 100 is loudest. Use when the user names a level: "turn ' +
+      'your volume to 50", "set volume to 80", "volume 20". After changing it, ' +
+      'briefly confirm the new level, e.g. "Okay, volume at 70."',
+    parameters: {
+      type: 'object',
+      properties: {
+        level: { type: 'number', description: 'Target volume, 0 (silent) to 100 (loudest).' },
+      },
+      required: ['level'],
+    },
+  },
+  {
+    name: 'adjust_volume',
+    description:
+      'Make your voice louder or quieter by a step, when the user does NOT name a ' +
+      'number: "louder", "turn it up", "quieter", "turn it down a bit". Confirm ' +
+      'the result briefly, e.g. "Turning it up, now at 80." If already at the max ' +
+      'or min, say so ("that\'s as loud as I go").',
+    parameters: {
+      type: 'object',
+      properties: {
+        direction: { type: 'string', enum: ['up', 'down'], description: 'Louder or quieter.' },
+        amount: { type: 'number', description: 'Optional step size on the 0-100 scale (default 10).' },
+      },
+      required: ['direction'],
+    },
+  },
+  {
+    name: 'set_mute',
+    description:
+      'Mute or unmute your output volume entirely (gain to zero), remembering the ' +
+      'previous level so unmuting restores it. Use for "mute", "silence", ' +
+      '"unmute", "sound back on". This is the volume mute; mute_ai is the ' +
+      '"stop talking" toggle.',
+    parameters: {
+      type: 'object',
+      properties: {
+        muted: { type: 'boolean', description: 'true to mute (volume 0), false to unmute.' },
+      },
+      required: ['muted'],
+    },
+  },
+  {
+    name: 'get_weather',
+    description:
+      'Show the weather in a dialog and tell the user. Use when they ask about ' +
+      'weather ("what\'s the weather?", "is it going to rain?", "weather in Tokyo?"). ' +
+      'Omit location for the user\'s current area (their device location is used); ' +
+      'pass location for a named place. The app fetches it, opens a weather card, ' +
+      'and gives you the reading to speak; report it warmly in a sentence.',
+    parameters: {
+      type: 'object',
+      properties: {
+        location: { type: 'string', description: 'Optional place name, e.g. "Tokyo". Omit for the user\'s current location.' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'end_session',
     description:
       'End the current voice session entirely. Use when the user says "end the ' +
@@ -161,6 +227,26 @@ export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
         name: { type: 'string', description: 'The new display name.' },
       },
       required: ['name'],
+    },
+  },
+];
+
+/** Training-only: Nicole silently marks a framework move hit/missed during
+ *  guided practice. Acked server-side; the BROWSER lights the live scorecard. */
+export const TRAINING_TOOL_DECLS: ToolDecl[] = [
+  {
+    name: 'training_mark_progress',
+    description:
+      'SILENTLY record how the learner did on a framework move during guided ' +
+      'practice. Call it once per attempt. Never say out loud that you are scoring.',
+    parameters: {
+      type: 'object',
+      properties: {
+        dimension: { type: 'string', description: 'The framework move being attempted, e.g. "Acknowledge".' },
+        hit: { type: 'boolean', description: 'true if they performed the move well.' },
+        tip: { type: 'string', description: 'A short, specific tip for this attempt.' },
+      },
+      required: ['dimension', 'hit', 'tip'],
     },
   },
 ];

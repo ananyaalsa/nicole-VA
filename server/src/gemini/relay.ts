@@ -22,7 +22,7 @@ import { buildSystemPrompt } from '../prompt/nicolePrompt.js';
 import { formatMemoryBlock } from '../memory/memoryBlock.js';
 import { buildActivityDigest } from '../memory/activityDigest.js';
 import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
-import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES } from './uiControlTools.js';
+import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES, TRAINING_TOOL_DECLS } from './uiControlTools.js';
 import { allConfiguredToolDecls } from '../integrations/registry.js';
 import { isIntegrationTool, dispatchIntegrationTool } from '../integrations/toolDispatch.js';
 import { loadFacts } from '../memory/db.js';
@@ -248,6 +248,7 @@ export class LiveSession {
           functionDeclarations: [
             ...MEMORY_TOOL_DECLS,
             ...UI_CONTROL_TOOL_DECLS,
+            ...TRAINING_TOOL_DECLS,
             ...integrationDecls,
           ],
         },
