@@ -76,9 +76,9 @@ import { LESSONS } from './lessons';
 const coach = () => instances.find((i) => i.options.mode === 'coach')!;
 const prospect = () => instances.find((i) => i.options.mode === 'prospect')!;
 
-/** Render the hook and return both the react-testing-library handle and a helper
- *  that pushes a `{speaker:'you'}` committed line into the fake coach transcript
- *  so the auto-advance evaluator can count it as a user turn. */
+/** Render the hook and return both the react-testing-library handle and helpers
+ *  that push committed lines into the fake transcripts and allow setting phase
+ *  directly (for finishPractice and other debrief-flow tests). */
 function renderCoaching(lesson = LESSONS[0]) {
   const { result, rerender, unmount } = renderHook(() =>
     useCoachingSession({ lesson }),
@@ -96,6 +96,21 @@ function renderCoaching(lesson = LESSONS[0]) {
       ];
       // Re-render the hook so it picks up the transcript change.
       rerender();
+    },
+    /** Push a rep (prospect) line into the fake prospect transcript. */
+    pushRepLine(text: string) {
+      const inst = instances.find((i) => i.options.mode === 'prospect');
+      if (!inst) return;
+      inst.transcript = [
+        ...inst.transcript,
+        { id: `t${Date.now()}`, speaker: 'nicole' as const, text, streaming: false },
+      ];
+      rerender();
+    },
+    /** Directly set the phase on the hook (bypasses phaseMachine gates). */
+    setPhase(phase: string) {
+      // Access the exposed setPhase from the hook result if available.
+      (result.current as any)._setPhase?.(phase);
     },
   };
 }
@@ -227,6 +242,29 @@ describe('useCoachingSession', () => {
     );
     expect(coach().options.voiceName).toBe('Kore');
     expect(prospect().options.voiceName).toBe('Charon');
+  });
+});
+
+describe('useCoachingSession — finishPractice', () => {
+  beforeEach(() => {
+    instances.length = 0;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it('finishPractice freezes the rep transcript, scores it, and moves to debrief', async () => {
+    const fakeSc = { overallScore: 7, band: 'proficient', scores: [], signals: { talkRatioPct: 50, questionCount: 1, longestMonologueWords: 9 }, headline: 'h', worked: { note: 'w', quote: null }, fix: { note: 'f', quote: null, why: '' }, nextTime: 'n', spoken: 's' };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ scorecard: fakeSc }) })) as any);
+    const view = renderCoaching();
+    await act(async () => { await view.result.current.start(); });
+    // pretend we're in roleplay_demo with some rep+user lines captured
+    act(() => { view.setPhase?.('roleplay_demo'); view.pushRepLine?.('Why now?'); view.simulateUserTurn?.('Because budgets reset.'); });
+    await act(async () => { await view.result.current.finishPractice(); });
+    expect(view.result.current.phase).toBe('debrief');
+    expect(view.result.current.scorecardResult?.overallScore).toBe(7);
   });
 });
 

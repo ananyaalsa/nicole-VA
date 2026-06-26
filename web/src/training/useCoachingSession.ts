@@ -6,6 +6,7 @@ import { DEFAULT_VOICE } from '../audio/voices';
 import { buildPhasePrompt, type ClientLessonSpec } from './lessonPrompts';
 import { advancePhase, type Phase } from './phaseMachine';
 import { shouldAdvancePhase, AUTO_PHASES, type AdvanceSignals } from './phaseAdvance';
+import { requestScore, type Scorecard, type ResultLine, type DimensionInput } from './scoreApi';
 
 /**
  * A single silent scoring entry produced by Nicole's `training_mark_progress`
@@ -34,6 +35,10 @@ export interface UseCoachingSessionResult {
   phase: Phase;
   /** Silent scoring entries accumulated this session. */
   scorecard: ScoreEntry[];
+  /** Full judge scorecard produced after finishPractice; null until then. */
+  scorecardResult: Scorecard | null;
+  /** Frozen transcript of the practice run (rep + user lines). */
+  practiceTranscript: ResultLine[];
   /** Coach (Nicole) audio amplitude — drives the avatar lip-sync. */
   coachAmplitude: number;
   /** Coach conversation transcript. */
@@ -48,10 +53,25 @@ export interface UseCoachingSessionResult {
   advance: () => void;
   /** Append a silent scoring entry (what training_mark_progress would call). */
   markProgress: (entry: ScoreEntry) => void;
+  /** Freeze the practice transcript, score it via the judge, and move to debrief. */
+  finishPractice: () => Promise<void>;
+  /** Return to roleplay_demo for another practice attempt. */
+  replayPractice: () => void;
+  /** Return to the model phase to re-teach the skill before practising again. */
+  reteach: () => void;
+  /** @internal escape hatch used by tests to set phase directly. */
+  _setPhase?: (phase: Phase) => void;
 }
 
 /** The phase whose roleplay needs the second (prospect) voice. */
 const ROLEPLAY_PHASE: Phase = 'roleplay_demo';
+
+// ── Scoring helpers ─────────────────────────────────────────────────────────
+const slugify = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'move';
+
+const lessonDimensions = (lesson: ClientLessonSpec): DimensionInput[] =>
+  lesson.coreFramework.moves.map((m) => ({ id: slugify(m.step), label: m.step, rubric: m.intent || m.step }));
 
 /** Default voice for the roleplay other-party — a distinct, grounded male voice. */
 const DEFAULT_PROSPECT_VOICE = 'Charon';
@@ -81,6 +101,8 @@ export function useCoachingSession(
 
   const [phase, setPhase] = useState<Phase>('intro');
   const [scorecard, setScorecard] = useState<ScoreEntry[]>([]);
+  const [scorecardResult, setScorecardResult] = useState<Scorecard | null>(null);
+  const [practiceTranscript, setPracticeTranscript] = useState<ResultLine[]>([]);
   const { token } = useAuth();
 
   // The coach overlay is fully derived from lesson + phase.
@@ -172,6 +194,43 @@ export function useCoachingSession(
   const markProgress = useCallback((entry: ScoreEntry) => {
     setScorecard((prev) => [...prev, entry]);
   }, []);
+
+  const buildPracticeTranscript = useCallback((): ResultLine[] => {
+    const youLines: ResultLine[] = coach.transcript.filter((l) => l.speaker === 'you').map((l) => ({ speaker: 'you' as const, text: l.text }));
+    const repLines: ResultLine[] = prospect.transcript.filter((l) => l.speaker === 'nicole').map((l) => ({ speaker: 'rep' as const, text: l.text }));
+    return [...repLines, ...youLines];
+  }, [coach.transcript, prospect.transcript]);
+
+  const finishPractice = useCallback(async () => {
+    const transcript = buildPracticeTranscript();
+    const dims = lessonDimensions(lesson);
+    let sc: Scorecard;
+    try {
+      sc = await requestScore({ kind: 'training', dimensions: dims, transcript }, token ?? undefined);
+    } catch {
+      sc = {
+        overallScore: 0,
+        band: 'needs_work',
+        scores: dims.map((d) => ({ dimensionId: d.id, label: d.label, score: 0 as const, band: 'missing' as const, rationale: 'Could not grade.', evidenceQuote: null })),
+        signals: { talkRatioPct: 0, questionCount: 0, longestMonologueWords: 0 },
+        headline: 'Could not grade that run.',
+        worked: { note: '', quote: null },
+        fix: { note: 'Try again.', quote: null, why: '' },
+        nextTime: 'Run it again.',
+        spoken: 'Let us run that again.',
+      };
+    }
+    setPracticeTranscript(transcript);
+    setScorecardResult(sc);
+    if (prospectActiveRef.current) {
+      prospectStopRef.current();
+      prospectActiveRef.current = false;
+    }
+    setPhase('debrief');
+  }, [buildPracticeTranscript, lesson, token]);
+
+  const replayPractice = useCallback(() => { setPhase('roleplay_demo'); }, []);
+  const reteach = useCallback(() => { setPhase('model'); }, []);
 
   // Reset phase-tracking counters whenever the phase changes.
   useEffect(() => {
@@ -278,6 +337,8 @@ export function useCoachingSession(
   return {
     phase,
     scorecard,
+    scorecardResult,
+    practiceTranscript,
     coachAmplitude: coach.amplitude,
     coachTranscript: coach.transcript,
     coachRealtime: coach.realtime,
@@ -285,5 +346,9 @@ export function useCoachingSession(
     stop,
     advance,
     markProgress,
+    finishPractice,
+    replayPractice,
+    reteach,
+    _setPhase: setPhase as (phase: Phase) => void,
   };
 }
