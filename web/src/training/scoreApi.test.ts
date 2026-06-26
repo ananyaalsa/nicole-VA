@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { requestScore, postLiveStatus } from './scoreApi';
+import { requestScore, postLiveStatus, fetchLiveStatus } from './scoreApi';
 
 beforeEach(() => { vi.restoreAllMocks(); });
 
@@ -21,5 +21,23 @@ describe('postLiveStatus', () => {
   it('never throws on network error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('down'); }) as any);
     await expect(postLiveStatus({ mode: 'training', state: 'entered', startedAt: 1 })).resolves.toBeUndefined();
+  });
+});
+
+describe('fetchLiveStatus', () => {
+  it('returns null on fetch error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('x'); }) as any);
+    expect(await fetchLiveStatus()).toBeNull();
+  });
+
+  it('returns data.status from a successful response', async () => {
+    const status = { mode: 'training', state: 'finished', skill: 'Discovery', score: 8 };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ status }) })) as any);
+    expect(await fetchLiveStatus('tok')).toEqual(status);
+  });
+
+  it('returns null when data.status is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({}) })) as any);
+    expect(await fetchLiveStatus()).toBeNull();
   });
 });

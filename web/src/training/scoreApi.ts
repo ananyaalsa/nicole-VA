@@ -42,6 +42,15 @@ export interface LiveStatusInput {
   skill?: string; startedAt: number; finishedAt?: number; score?: number;
 }
 
+/** Read the current cross-mode live status. Returns null on any error. */
+export async function fetchLiveStatus(token?: string): Promise<{ mode: string; state: string; skill?: string; score?: number } | null> {
+  try {
+    const res = await fetch(`${HTTP_BASE}/api/session/status`, { headers: authHeaders(token) });
+    const data = await res.json();
+    return data.status ?? null;
+  } catch { return null; }
+}
+
 /** Best-effort live-status ping. Swallows all errors (it must never block UX). */
 export async function postLiveStatus(s: LiveStatusInput, token?: string): Promise<void> {
   try {

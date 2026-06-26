@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 
 // WaveBackdrop draws on a <canvas>; jsdom has no 2D context. Stub it so the
 // screen renders without the "getContext not implemented" noise/crash.
@@ -18,6 +18,7 @@ let sessionState = {
   connected: false,
   micOn: true,
   transcript: [] as any[],
+  realtime: { you: '', nicole: '' },
   amplitude: 0,
   start,
   stop,
@@ -64,6 +65,13 @@ vi.mock('../auth/AuthContext', () => ({
 vi.mock('../components/ProfilePanel', () => ({
   ProfilePanel: () => null,
 }));
+// scoreApi — stub fetchLiveStatus so TalkScreen [STATUS] tests stay deterministic.
+const mockFetchLiveStatus = vi.fn(async (_token?: string) => null as any);
+vi.mock('../training/scoreApi', () => ({
+  fetchLiveStatus: (token?: string) => mockFetchLiveStatus(token),
+  postLiveStatus: vi.fn(async () => {}),
+  requestScore: vi.fn(async () => ({})),
+}));
 
 import { TalkScreen } from './TalkScreen';
 
@@ -72,9 +80,10 @@ beforeEach(() => {
   stop.mockClear();
   toggleMic.mockClear();
   setVoice.mockClear();
-  cameraStart.mockClear();
-  cameraStop.mockClear();
-  sessionState = { connected: false, micOn: true, transcript: [], amplitude: 0, start, stop, toggleMic, setVoice, sendText, sendVideoFrame };
+  sendText.mockClear();
+  mockFetchLiveStatus.mockClear();
+  mockFetchLiveStatus.mockResolvedValue(null);
+  sessionState = { connected: false, micOn: true, transcript: [], realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setVoice, sendText, sendVideoFrame };
   cameraState = { on: false, stream: null, facing: 'user', start: cameraStart, stop: cameraStop, flip: vi.fn(), error: null };
 });
 
@@ -130,5 +139,22 @@ describe('TalkScreen', () => {
     render(<TalkScreen onTrain={onTrain} />);
     fireEvent.click(screen.getByRole('button', { name: /training/i }));
     expect(onTrain).toHaveBeenCalled();
+  });
+
+  it('sends a [STATUS] directive when returning from backgrounded=true to false while connected', async () => {
+    // Session must be connected so the effect fires.
+    sessionState = { ...sessionState, connected: true };
+    // fetchLiveStatus returns a finished training status.
+    mockFetchLiveStatus.mockResolvedValue({ mode: 'training', state: 'finished', skill: 'Discovery', score: 8 });
+
+    const { rerender } = render(<TalkScreen backgrounded={true} />);
+    // Transition: backgrounded false = user returned to Talk.
+    await act(async () => {
+      rerender(<TalkScreen backgrounded={false} />);
+    });
+
+    // sendText should have been called once with a [STATUS] string.
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText.mock.calls[0][0]).toMatch(/^\[STATUS\]/);
   });
 });

@@ -20,6 +20,7 @@ import { useCamera } from '../engine/useCamera';
 import { useUiCommands } from '../engine/useUiCommands';
 import { makeProfileActions } from '../engine/profileActions';
 import { useAuth } from '../auth/AuthContext';
+import { fetchLiveStatus } from '../training/scoreApi';
 import { VOICES, DEFAULT_VOICE } from '../audio/voices';
 import './TalkScreen.css';
 
@@ -226,6 +227,30 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
   const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, volume, muted, setVolume, setMuted } = session;
+
+  // Mirror sendText in a ref so the [STATUS] effect below never re-fires due to
+  // sendText changing reference — the effect deps stay primitive.
+  const sendTextRef = useRef(session.sendText);
+  sendTextRef.current = session.sendText;
+
+  // When Talk returns to the foreground after Training/Roleplay, send Nicole a
+  // silent [STATUS] directive so she knows what the user just did.
+  const wasBg = useRef(backgrounded);
+  useEffect(() => {
+    const cameBack = wasBg.current && !backgrounded;
+    wasBg.current = backgrounded;
+    if (!cameBack || !connected) return;
+    void (async () => {
+      const st = await fetchLiveStatus(token ?? undefined);
+      if (!st) return;
+      const line = st.state === 'finished'
+        ? `[STATUS] The user just finished a ${st.mode} ${st.skill ? `(${st.skill})` : ''}${typeof st.score === 'number' ? `, scored ${st.score}/10` : ''}. If relevant, ask how it went; do not offer to start it again.`
+        : st.state === 'active'
+          ? `[STATUS] The user is mid-${st.mode}${st.skill ? ` (${st.skill})` : ''}.`
+          : `[STATUS] The user opened ${st.mode} but did not start.`;
+      sendTextRef.current(line);
+    })();
+  }, [backgrounded, connected, token]);
 
   // End a session: stop the live connection AND wipe the transcript so the idle
   // home screen never shows stale chat. Durable facts persist in memory.
