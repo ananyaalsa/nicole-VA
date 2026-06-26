@@ -97,7 +97,20 @@ vi.mock('../auth/AuthContext', () => ({
 }));
 
 import type { TranscriptLine } from '../engine/types';
-import { RoleplayScreen } from './RoleplayScreen';
+import { RoleplayScreen, isClosingLine } from './RoleplayScreen';
+
+describe('isClosingLine', () => {
+  it('detects goodbye / sign-off phrases', () => {
+    for (const s of ['Okay, bye!', 'Alright, talk later', 'I gotta go now', 'Thanks for your time', 'Take care, see you', 'Catch you later']) {
+      expect(isClosingLine(s)).toBe(true);
+    }
+  });
+  it('does not trip on normal mid-call talk', () => {
+    for (const s of ['So what do you do later in the process?', 'Tell me about your pricing', 'I can see the data here']) {
+      expect(isClosingLine(s)).toBe(false);
+    }
+  });
+});
 
 beforeEach(() => {
   fetchProfiles.mockClear();

@@ -45,6 +45,25 @@ const DIFFICULTY_META: Record<Difficulty, { label: string; overlay: string }> = 
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 
+/**
+ * Does this line sound like the END of the call — a goodbye / sign-off from
+ * either side? Used to auto-surface the "End & score / Replay" prompt the moment
+ * the conversation naturally wraps, so the user doesn't hunt for a button.
+ * Deterministic + conservative: matches clear closing phrases, not mid-call uses.
+ */
+export function isClosingLine(text: string): boolean {
+  const t = ` ${text.toLowerCase().replace(/[^a-z0-9'\s]/g, ' ')} `;
+  const PHRASES = [
+    'bye', 'goodbye', 'good bye', 'see you', 'see ya', 'talk later', 'talk soon',
+    'gotta go', 'got to go', 'have to go', 'i should go', 'take care',
+    'thanks for your time', 'thank you for your time', 'have a good day',
+    'have a good one', 'have a great day', 'speak soon', 'catch you later',
+    'see you later', 'we ll be in touch', 'we will be in touch',
+    'i ll let you go', 'let you go', 'i ll talk to you later',
+  ];
+  return PHRASES.some((ph) => t.includes(` ${ph} `));
+}
+
 export interface RoleplayScreenProps {
   /** Leave the roleplay flow entirely (back to the talk console). */
   onExit?: () => void;
@@ -451,6 +470,10 @@ function RoleplayRoom({
 
   const [scResult, setScResult] = useState<Scorecard | null>(null);
   const [saving, setSaving] = useState(false);
+  // Auto end-of-call prompt: appears when either side says goodbye, offering
+  // End & score / Replay (dismissible so a false 'later' mid-call doesn't trap).
+  const [endPromptOpen, setEndPromptOpen] = useState(false);
+  const endPromptDismissedRef = useRef(false);
   // Guards against a double-click on "End & score" firing two judge+save calls
   // during the async scoring gap (before scResult unmounts the button).
   const scoringRef = useRef(false);
@@ -467,6 +490,17 @@ function RoleplayRoom({
       });
     }
   }, [start, persona, scenario, token]);
+
+  // Watch the conversation for a natural close (either side says bye/later/etc.)
+  // and surface the End-or-Replay prompt once. A few real turns must have
+  // happened first (so the opening line can't trip it), and once dismissed it
+  // won't nag again.
+  const lastLine = transcript[transcript.length - 1];
+  useEffect(() => {
+    if (endPromptDismissedRef.current || endPromptOpen) return;
+    if (transcript.length < 3) return; // need a real exchange first
+    if (lastLine && isClosingLine(lastLine.text)) setEndPromptOpen(true);
+  }, [lastLine, transcript.length, endPromptOpen]);
 
   const alias = persona.characterAlias || persona.name;
   const speaking = amplitude > SPEAKING_AMP;
@@ -626,6 +660,48 @@ function RoleplayRoom({
           </div>
         }
       />
+
+      {/* Auto end-of-call prompt — appears when the conversation wraps up. */}
+      {endPromptOpen && !scResult && (
+        <div className="endcall" role="dialog" aria-modal="true" aria-label="End of call" data-testid="endcall-dialog">
+          <button
+            type="button"
+            className="endcall__scrim"
+            aria-label="Keep talking"
+            data-testid="endcall-dismiss"
+            onClick={() => { endPromptDismissedRef.current = true; setEndPromptOpen(false); }}
+          />
+          <div className="endcall__card">
+            <p className="endcall__title">Sounds like you're wrapping up.</p>
+            <div className="endcall__actions">
+              <button
+                type="button"
+                className="endcall__replay"
+                data-testid="endcall-replay"
+                onClick={() => { setEndPromptOpen(false); void start(); }}
+              >
+                Replay
+              </button>
+              <button
+                type="button"
+                className="endcall__score picker-cta-bar__btn"
+                data-testid="endcall-score"
+                onClick={() => { setEndPromptOpen(false); void endAndScore(); }}
+              >
+                End &amp; score <span aria-hidden="true">→</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              className="endcall__keep"
+              data-testid="endcall-keep"
+              onClick={() => { endPromptDismissedRef.current = true; setEndPromptOpen(false); }}
+            >
+              Keep talking
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
