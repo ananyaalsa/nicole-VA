@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 
 /**
  * Mock useCoachingSession so the screen test never touches the real audio/WS
@@ -58,8 +58,26 @@ vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ user: { displayName: 'Gaurav', preferredVoice: 'Aoede', onboardingDone: true } }),
 }));
 
+// Module-level no-op mocks so the real fetch is never called in tests.
+vi.mock('../training/trainingApi', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../training/trainingApi')>();
+  return {
+    ...orig,
+    saveRun: vi.fn(async () => ({ id: 0 })),
+  };
+});
+vi.mock('../training/scoreApi', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../training/scoreApi')>();
+  return {
+    ...orig,
+    postLiveStatus: vi.fn(async () => {}),
+  };
+});
+
 import { TrainingScreen } from './TrainingScreen';
 import { LESSONS } from '../training/lessons';
+import * as trainingApi from '../training/trainingApi';
+import * as scoreApi from '../training/scoreApi';
 
 /** A sample scorecard for debrief tests. */
 const SAMPLE_SCORECARD = {
@@ -98,6 +116,9 @@ beforeEach(() => {
   fake.practiceTranscript = [];
   // Reset phase to intro
   (fake as { phase: string }).phase = 'intro';
+  // Reset module-level API mocks
+  vi.mocked(trainingApi.saveRun).mockClear();
+  vi.mocked(scoreApi.postLiveStatus).mockClear();
 });
 
 afterEach(() => {
@@ -118,14 +139,21 @@ const enterRoom = (
 
 /**
  * Helper: render TrainingScreen already in a live session at the given phase,
- * with optional overrides on the fake session object.
+ * with optional overrides on the fake session object and optional API mock overrides.
  */
 const renderTrainingAtPhase = (
   phase: string,
   overrides: Partial<typeof fake> = {},
+  apiMocks: {
+    saveRun?: ReturnType<typeof vi.fn>;
+    postLiveStatus?: ReturnType<typeof vi.fn>;
+  } = {},
 ) => {
-  // Apply overrides
+  // Apply session overrides
   Object.assign(fake, { phase, ...overrides });
+  // Inject API mocks if provided
+  if (apiMocks.saveRun) vi.mocked(trainingApi.saveRun).mockImplementation(apiMocks.saveRun);
+  if (apiMocks.postLiveStatus) vi.mocked(scoreApi.postLiveStatus).mockImplementation(apiMocks.postLiveStatus);
   const api = render(<TrainingScreen />);
   enterRoom(api);
   return api;
@@ -216,5 +244,25 @@ describe('TrainingScreen', () => {
     expect(api.queryByTestId('lesson-card')).toBeNull();
     fireEvent.click(api.getByTestId('exit-button'));
     expect(onExit).toHaveBeenCalled();
+  });
+
+  it('saves a training run and posts finished status when results appear', async () => {
+    const saveRunMock = vi.fn(async () => ({ id: 1 }));
+    const postLiveStatusMock = vi.fn(async () => {});
+    renderTrainingAtPhase(
+      'debrief',
+      { scorecardResult: SAMPLE_SCORECARD, practiceTranscript: [{ speaker: 'you', text: 'hi' }] },
+      { saveRun: saveRunMock, postLiveStatus: postLiveStatusMock },
+    );
+    await waitFor(() => expect(saveRunMock).toHaveBeenCalled());
+    expect(saveRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'training', score: SAMPLE_SCORECARD.overallScore }),
+      // token is undefined in test env (useAuth mock has no token field)
+      undefined,
+    );
+    expect(postLiveStatusMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'training', state: 'finished' }),
+      undefined,
+    );
   });
 });

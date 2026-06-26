@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { HistoryPanel } from '../components/HistoryPanel';
 import { DictationField } from '../components/DictationField';
-import { generateCustomSpec } from '../training/trainingApi';
+import { generateCustomSpec, saveRun } from '../training/trainingApi';
+import { postLiveStatus } from '../training/scoreApi';
 import { Icon } from '../components/Icon';
 import { TopBar } from '../components/TopBar';
 import { ProfilePanel } from '../components/ProfilePanel';
@@ -285,6 +286,50 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   const { phase } = session;
   const [started, setStarted] = useState(false);
   const [scoring, setScoring] = useState(false);
+  const { token } = (useAuth() as { token?: string | null });
+  const startedAtRef = useRef(Date.now());
+  const savedRef = useRef(false);
+
+  // Post 'entered' on mount (best-effort).
+  useEffect(() => {
+    void postLiveStatus(
+      { mode: 'training', state: 'entered', skill: lesson.title, startedAt: Date.now() },
+      token ?? undefined,
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save run + post 'finished' once scorecardResult first becomes non-null.
+  useEffect(() => {
+    if (!session.scorecardResult || savedRef.current) return;
+    savedRef.current = true;
+    const sc = session.scorecardResult;
+    const transcriptText = session.practiceTranscript
+      .map((l) => `${l.speaker === 'you' ? 'You' : l.speaker === 'rep' ? 'Rep' : 'Nicole'}: ${l.text}`)
+      .join('\n');
+    void saveRun(
+      {
+        kind: 'training',
+        profileId: lesson.skillId,
+        title: lesson.title,
+        score: sc.overallScore,
+        scorecard: sc.scores,
+        transcript: transcriptText,
+      },
+      token,
+    ).catch(() => {});
+    void postLiveStatus(
+      {
+        mode: 'training',
+        state: 'finished',
+        skill: lesson.title,
+        startedAt: startedAtRef.current,
+        finishedAt: Date.now(),
+        score: sc.overallScore,
+      },
+      token ?? undefined,
+    );
+  }, [session.scorecardResult, session.practiceTranscript, lesson, token]);
 
   const currentIndex = PHASE_ORDER.indexOf(phase);
   const atEnd = phase === 'debrief';
@@ -297,8 +342,13 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
   const handleStart = useCallback(() => {
     setStarted(true);
+    startedAtRef.current = Date.now();
+    void postLiveStatus(
+      { mode: 'training', state: 'active', skill: lesson.title, startedAt: startedAtRef.current },
+      token ?? undefined,
+    );
     void session.start();
-  }, [session]);
+  }, [session, lesson, token]);
 
   const handleFinishPractice = useCallback(async () => {
     if (scoring) return;
