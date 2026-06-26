@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useNicoleSession } from '../engine/useNicoleSession';
+import { useAuth } from '../auth/AuthContext';
 import type { TranscriptLine } from '../engine/types';
 import type { PersonaOption, ScenarioOption } from './trainingApi';
 
@@ -33,6 +34,8 @@ export interface UseRoleplayResult {
   transcript: TranscriptLine[];
   /** Other-party audio amplitude (for the avatar/aura). */
   amplitude: number;
+  /** In-progress (realtime) text per speaker — passed straight through to LiveRoom. */
+  realtime: { you: string; nicole: string };
   start: () => Promise<void>;
   stop: () => void;
   toggleMic: () => void;
@@ -67,11 +70,13 @@ const OPEN_DIRECTIVE =
 export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult {
   const overlay = buildRoleplayOverlay(opts.persona, opts.scenario, opts.extraOverlay);
   const voice = opts.persona.voiceName || 'Charon';
+  const { token } = useAuth();
 
   const session = useNicoleSession({
     voiceName: voice,
     mode: 'prospect',
     systemOverlay: overlay,
+    authToken: token,
   });
 
   const sentOpenRef = useRef(false);
@@ -115,6 +120,7 @@ export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult 
     micOn: session.micOn,
     transcript: session.transcript,
     amplitude: session.amplitude,
+    realtime: session.realtime,
     start,
     stop: session.stop,
     toggleMic: session.toggleMic,

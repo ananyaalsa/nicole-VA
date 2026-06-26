@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 
+const DEFAULT_SCORECARD = {
+  overallScore: 5.0,
+  band: 'proficient' as const,
+  scores: [{ dimensionId: 'engagement', label: 'Engagement', score: 2 as const, band: 'proficient' as const, rationale: 'Good', evidenceQuote: null }],
+  signals: { talkRatioPct: 50, questionCount: 1, longestMonologueWords: 10 },
+  headline: 'Decent run',
+  worked: { note: 'Kept going', quote: null },
+  fix: { note: 'Push harder', quote: null, why: '' },
+  nextTime: 'Ask more',
+  spoken: 'some text',
+};
+
 // --- Mock the training API ------------------------------------------------
 const SALES_PROFILE = {
   id: 'sales',
@@ -39,6 +51,7 @@ vi.mock('../training/trainingApi', () => ({
   fetchProfiles: () => fetchProfiles(),
   saveRun: (run: unknown) => saveRun(run as never),
   generateCustomSpec: (input: unknown) => generateCustomSpec(input as never),
+  HTTP_BASE: 'http://localhost:4000',
 }));
 
 // --- Mock the live roleplay session ---------------------------------------
@@ -53,6 +66,7 @@ let sessionState = {
     { id: 'b', speaker: 'you' as const, text: 'Hi Grant, quick question for you.' },
   ],
   amplitude: 0,
+  realtime: { you: '', nicole: '' },
   start: sessionStart,
   stop: sessionStop,
   toggleMic,
@@ -82,6 +96,7 @@ vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ user: { displayName: 'Gaurav', preferredVoice: 'Aoede', onboardingDone: true } }),
 }));
 
+import type { TranscriptLine } from '../engine/types';
 import { RoleplayScreen } from './RoleplayScreen';
 
 beforeEach(() => {
@@ -91,6 +106,12 @@ beforeEach(() => {
   sessionStart.mockClear();
   sessionStop.mockClear();
   toggleMic.mockClear();
+  // Default fetch stub for judge scoring — tests that need a different scorecard
+  // can call vi.stubGlobal('fetch', …) AFTER beforeEach to override it.
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true,
+    json: async () => ({ scorecard: DEFAULT_SCORECARD }),
+  })) as unknown as typeof fetch);
   sessionState = {
     connected: true,
     micOn: true,
@@ -99,6 +120,7 @@ beforeEach(() => {
       { id: 'b', speaker: 'you', text: 'Hi Grant, quick question for you.' },
     ],
     amplitude: 0,
+    realtime: { you: '', nicole: '' },
     start: sessionStart,
     stop: sessionStop,
     toggleMic,
@@ -148,32 +170,36 @@ describe('RoleplayScreen', () => {
     expect(screen.queryByText('Nicole')).toBeNull();
   });
 
-  it('relabels the character lines with the alias in the transcript', async () => {
+  it('relabels the character lines with the alias in the LiveRoom transcript', async () => {
     render(<RoleplayScreen />);
     await pickThrough();
     fireEvent.click(screen.getByTestId('start-roleplay-button'));
 
-    const lines = screen.getAllByTestId('roleplay-line');
-    // First line is the character speaking — shown as "Grant", not "Nicole".
-    expect(lines[0].textContent).toContain('Grant');
-    expect(lines[0]).toHaveAttribute('data-speaker', 'character');
-    expect(lines[1]).toHaveAttribute('data-speaker', 'you');
+    // LiveRoom renders via ChatTranscript: .chat-who spans carry the speaker label.
+    // The character's lines should show the alias "Grant", not the raw "nicole".
+    const liveRoom = screen.getByTestId('live-room');
+    expect(liveRoom.textContent).toContain('Grant');
+    expect(liveRoom.textContent).not.toContain('Nicole');
+    // User lines are labelled "You".
+    expect(liveRoom.textContent).toContain('You');
   });
 
-  it('End & score stops the session, shows a score, and saves the run', async () => {
+  it('End & score stops the session, shows SessionResults, and saves the run', async () => {
     render(<RoleplayScreen />);
     await pickThrough();
     fireEvent.click(screen.getByTestId('start-roleplay-button'));
     fireEvent.click(screen.getByTestId('end-score-button'));
 
     expect(sessionStop).toHaveBeenCalled();
-    expect(screen.getByTestId('roleplay-result')).toBeInTheDocument();
-    expect(screen.getByTestId('roleplay-score')).toBeInTheDocument();
-    // The scorecard derives from the profile dimension.
-    expect(screen.getByText('Strong open')).toBeInTheDocument();
+    expect(await screen.findByTestId('roleplay-result')).toBeInTheDocument();
+    expect(await screen.findByTestId('session-results')).toBeInTheDocument();
 
     await waitFor(() => expect(saveRun).toHaveBeenCalled());
-    const savedArg = saveRun.mock.calls[0][0] as { kind: string; title: string; score: number };
+    const savedArg = saveRun.mock.calls[0][0] as {
+      kind: string;
+      title: string;
+      score: number;
+    };
     expect(savedArg.kind).toBe('roleplay');
     expect(savedArg.title).toBe('Grant · Cold call');
     expect(typeof savedArg.score).toBe('number');
@@ -185,9 +211,38 @@ describe('RoleplayScreen', () => {
     await pickThrough();
     fireEvent.click(screen.getByTestId('start-roleplay-button'));
     fireEvent.click(screen.getByTestId('end-score-button'));
-    await screen.findByTestId('roleplay-result');
-    fireEvent.click(screen.getByTestId('result-done-button'));
+    await screen.findByTestId('session-results');
+    fireEvent.click(screen.getByTestId('results-done'));
     expect(await screen.findByTestId('profile-card')).toBeInTheDocument();
+  });
+
+  it('scores via the judge and renders SessionResults on end', async () => {
+    const fakeSc = {
+      overallScore: 7.2,
+      band: 'proficient' as const,
+      scores: [],
+      signals: { talkRatioPct: 52, questionCount: 2, longestMonologueWords: 11 },
+      headline: 'h',
+      worked: { note: 'w', quote: null },
+      fix: { note: 'f', quote: null, why: '' },
+      nextTime: 'n',
+      spoken: 's',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ scorecard: fakeSc }) })) as unknown as typeof fetch);
+    // Set up session with transcript lines matching the brief's helper shape.
+    sessionState = {
+      ...sessionState,
+      transcript: [
+        { id: '1', speaker: 'you' as const, text: 'hi' },
+        { id: '2', speaker: 'nicole' as const, text: 'who is this?' },
+      ],
+    };
+    render(<RoleplayScreen />);
+    await pickThrough();
+    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    fireEvent.click(screen.getByTestId('end-score-button'));
+    await screen.findByTestId('session-results');
+    expect(screen.getByText('7.2')).toBeInTheDocument();
   });
 
   it('offers a custom builder for the custom profile', async () => {
