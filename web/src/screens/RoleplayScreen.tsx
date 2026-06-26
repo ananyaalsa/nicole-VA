@@ -3,6 +3,8 @@ import type { JSX } from 'react';
 import { DictationField } from '../components/DictationField';
 import { TopBar } from '../components/TopBar';
 import { ProfilePanel } from '../components/ProfilePanel';
+import { HistoryPanel } from '../components/HistoryPanel';
+import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthContext';
 import {
   fetchProfiles,
@@ -63,6 +65,7 @@ export interface RoleplayScreenProps {
 export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.Element {
   const { user } = useAuth();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [profiles, setProfiles] = useState<ProfileDef[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -182,11 +185,24 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
         available={[...(onExit ? ['talk' as const] : []), ...(onTrain ? ['training' as const] : [])]}
         onNavigate={(m) => { if (m === 'talk') onExit?.(); else if (m === 'training') onTrain?.(); }}
         right={
-          user && (
-            <button type="button" className="topbar-avatar-btn" onClick={() => setPanelOpen(true)} aria-label="Open profile">
-              {user.displayName.trim().charAt(0).toUpperCase()}
+          <>
+            <button
+              type="button"
+              className="icon-btn"
+              data-testid="history-button"
+              onClick={() => setShowHistory(true)}
+              aria-label="History"
+              data-tooltip="Session history" data-tooltip-pos="bottom"
+            >
+              <Icon name="history" size={15} />
+              <span className="icon-btn__label">History</span>
             </button>
-          )
+            {user && (
+              <button type="button" className="topbar-avatar-btn" onClick={() => setPanelOpen(true)} aria-label="Open profile">
+                {user.displayName.trim().charAt(0).toUpperCase()}
+              </button>
+            )}
+          </>
         }
       />
 
@@ -392,6 +408,7 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
         </div>
       </main>
 
+      {showHistory && <HistoryPanel onClose={() => setShowHistory(false)} />}
       <ProfilePanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>
   );

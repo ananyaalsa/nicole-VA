@@ -1,0 +1,181 @@
+/* Personalized Talk home — greeting, brief card, coach strip, starter chips,
+   recent-session tiles. Lives inside .talk-empty (centered). Deep-teal theme. */
+
+.home {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  text-align: center;
+  padding: 8px 4px;
+}
+
+/* ── Daily brief card ─────────────────────────────────────────────────────── */
+.home-brief {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 6px; /* extra breathing room before the greeting */
+}
+.home-brief__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.home-brief__close {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: transparent; color: var(--text-3);
+  font-size: 1.1rem; line-height: 1; cursor: pointer;
+}
+.home-brief__close:hover { background: var(--surface-2); color: var(--text); }
+.home-brief__title {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent);
+}
+
+/* Separate cards per source, each with its brand icon. */
+.home-brief__cards { display: flex; flex-direction: column; gap: 12px; }
+.brief-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 16px;
+}
+.brief-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.brief-card__ic { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
+.brief-card__ic svg { width: 18px; height: 18px; }
+.brief-card__label { font-size: 0.74rem; font-weight: 700; color: var(--text-2); letter-spacing: 0.02em; }
+.brief-card__text { margin: 0; font-size: 0.84rem; color: var(--text); line-height: 1.45; }
+
+/* Clean calendar list — one event per row: title on the left, day/time on the
+   right with a clear gap (so "Meeting" and "Sat, Jul 4" never run together). */
+.brief-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.brief-list__row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+}
+.brief-list__title {
+  font-size: 0.84rem; color: var(--text); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.brief-list__meta { font-size: 0.78rem; color: var(--text-3); white-space: nowrap; flex-shrink: 0; }
+.brief-list__more { font-size: 0.76rem; color: var(--text-3); padding-top: 1px; }
+/* ── Greeting ─────────────────────────────────────────────────────────────── */
+.home-greeting {
+  font-size: clamp(1.5rem, 3.2vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+}
+.home-sub { font-size: 0.92rem; color: var(--text-2); margin: 0; max-width: 40ch; }
+
+/* ── Coach strip ──────────────────────────────────────────────────────────── */
+.home-coach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.home-coach__pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-pill); padding: 5px 12px;
+}
+.home-coach__pill svg { color: var(--accent); }
+.home-coach__trend.up { color: var(--success); font-weight: 700; }
+.home-coach__trend.down { color: var(--danger); font-weight: 700; }
+.home-coach__drill {
+  font-size: 0.78rem; font-weight: 600;
+  color: var(--accent); background: var(--accent-light);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  border-radius: var(--radius-pill); padding: 5px 14px;
+  cursor: pointer; font-family: inherit;
+  transition: background 130ms ease;
+}
+.home-coach__drill:hover { background: rgba(var(--accent-rgb), 0.14); }
+
+/* ── Starter chips ────────────────────────────────────────────────────────── */
+.home-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.home-chip {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 9px 16px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 130ms ease, transform 100ms ease, background 130ms ease;
+}
+.home-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+/* ── Recents ──────────────────────────────────────────────────────────────── */
+.home-recents { width: 100%; text-align: left; margin-top: 2px; }
+.home-recents__head {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; text-align: center;
+}
+.home-recents__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.home-recent {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); cursor: pointer; font-family: inherit;
+  transition: border-color 130ms ease, transform 100ms ease, box-shadow 130ms ease;
+}
+.home-recent:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.home-recent__kind {
+  flex-shrink: 0; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-pill);
+  background: var(--accent-light); color: var(--accent);
+}
+.home-recent__kind--roleplay { background: rgba(var(--accent-rgb), 0.12); }
+.home-recent__title { flex: 1; min-width: 0; font-size: 0.86rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-recent__meta { flex-shrink: 0; font-size: 0.74rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* ── Mobile (≤640px) ──────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Full-width, never overflowing the viewport; everything centered. */
+  .home {
+    gap: 14px;
+    padding: 4px 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  .home-greeting { font-size: 1.4rem; padding: 0 12px; }
+  .home-sub { font-size: 0.88rem; padding: 0 16px; }
+  /* Starter chips: a centered, horizontally-scrollable row. Edge padding so the
+     first/last chip never sits flush against (or cut off by) the screen edge. */
+  .home-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 2px 16px 4px;
+    margin: 0 -4px; /* let the row use full width inside the centered .home */
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  .home-chips::-webkit-scrollbar { display: none; }
+  .home-chip { flex: 0 0 auto; min-height: 40px; scroll-snap-align: start; }
+  /* Coach pills wrap + center; the drill chip can take a full row. */
+  .home-coach { padding: 0 12px; }
+  .home-coach__drill { flex-basis: 100%; text-align: center; }
+  /* Recents: comfortable tap height, full width. */
+  .home-recents { padding: 0 12px; }
+  .home-recent { min-height: 52px; }
+  /* Brief stays a contained card, never dominating the fold. */
+  .home-brief { margin: 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-chip, .home-recent, .home-coach__drill { transition: none; }
+}
