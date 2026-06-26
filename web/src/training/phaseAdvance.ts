@@ -30,9 +30,8 @@ export function shouldAdvancePhase(phase: Phase, s: AdvanceSignals): boolean {
   if (!cfg) return false; // gate phase
   if (s.timeInPhaseMs >= cfg.maxPhaseMs) return true;            // (c) ceiling
   if (s.litDelta >= cfg.minLitDelta && cfg.minLitDelta > 0) return true; // (a) scorer
-  if (s.turns >= cfg.minTurns && s.timeInPhaseMs >= cfg.minPhaseMs) return true; // (b) floor
-  // intro special-case: minLitDelta is 0, so (a) above is skipped; allow the
-  // floor with a single turn.
-  if (phase === 'intro' && s.turns >= cfg.minTurns && s.timeInPhaseMs >= cfg.minPhaseMs) return true;
+  // (b) engagement floor. Note intro's minLitDelta is 0, so (a) is skipped for
+  // it and it advances purely on this floor (1 turn past a 6s dwell).
+  if (s.turns >= cfg.minTurns && s.timeInPhaseMs >= cfg.minPhaseMs) return true;
   return false;
 }
