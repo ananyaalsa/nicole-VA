@@ -43,7 +43,7 @@ export function SessionResults({ scorecard, transcript, repLabel, saving, onAgai
         <ul className="results-dims">
           {sc.scores.map((d) => (
             <li key={d.dimensionId} className={`results-dim results-dim--${d.band}`}>
-              <span className="results-dim__icon" aria-hidden="true">{DIM_ICON[d.band]}</span>
+              <span className="results-dim__icon" aria-hidden="true">{DIM_ICON[d.band] ?? '•'}</span>
               <span className="results-dim__body">
                 <span className="results-dim__label">{d.label} <em>{d.score}/3</em></span>
                 <span className="results-dim__rationale">{d.rationale}</span>
