@@ -1,4 +1,6 @@
+import { GoogleGenAI } from '@google/genai';
 import { extractJson } from './specGenerator.js';
+import { config } from '../config.js';
 
 export type ResultSpeaker = 'you' | 'rep' | 'nicole';
 export interface ResultLine { speaker: ResultSpeaker; text: string }
@@ -169,4 +171,82 @@ export function fallbackScorecard(dims: DimensionInput[], signals: Signals): Sco
     nextTime: 'Run it again with a full back-and-forth.',
     spoken: 'I could not fully grade that one. Let us run it again.',
   };
+}
+
+const LABEL: Record<ResultSpeaker, string> = { you: 'TRAINEE', rep: 'PROSPECT', nicole: 'COACH' };
+
+export function buildJudgePrompt(args: {
+  kind: 'training' | 'roleplay';
+  dims: DimensionInput[];
+  transcript: ResultLine[];
+  signals: Signals;
+}): string {
+  const { dims, transcript, signals } = args;
+  const rubricLines = dims.map((d) => `- ${d.id} "${d.label}": ${d.rubric}`).join('\n');
+  const convo = transcript
+    .slice(-60)
+    .map((l) => `${LABEL[l.speaker]}: ${l.text}`)
+    .join('\n');
+  return [
+    'You are a strict but fair communication coach grading ONE practice conversation.',
+    'Score EACH dimension 0-3 using these bands:',
+    '0 = missing (move not attempted or done wrong), 1 = emerging (attempted, weak),',
+    '2 = proficient (done competently), 3 = strong (done excellently).',
+    '',
+    'DIMENSIONS TO SCORE (use these exact dimensionId values):',
+    rubricLines,
+    '',
+    'RULES:',
+    '- Reason briefly BEFORE scoring each dimension.',
+    '- For every dimension include a VERBATIM short quote from the trainee that justifies',
+    '  the score in "evidenceQuote"; if there is no evidence, set evidenceQuote to null.',
+    '- Do NOT reward mere length or talking a lot. Score the MOVES, not the word count.',
+    '- Be honest: a thin rep gets low scores.',
+    '',
+    'DETERMINISTIC SIGNALS (already computed — reference them, do not recompute):',
+    `talk ratio ${signals.talkRatioPct}% (ideal ~45-57%), questions asked ${signals.questionCount}, longest monologue ${signals.longestMonologueWords} words.`,
+    '',
+    'TRANSCRIPT (most recent 60 turns):',
+    convo || '(no conversation captured)',
+    '',
+    'Return ONLY a JSON object (optionally fenced in ```json) with EXACTLY:',
+    '{ "scores": [ { "dimensionId": string, "score": 0-3, "rationale": string, "evidenceQuote": string|null } ],',
+    '  "headline": string (one honest behavior-based line),',
+    '  "worked": { "note": string, "quote": string|null } (genuine process praise; if nothing worked, say so honestly),',
+    '  "fix": { "note": string, "quote": string|null, "why": string } (the ONE highest-leverage fix),',
+    '  "nextTime": string (one rehearsable line they can say next rep),',
+    '  "spoken": string (<= 3 short sentences the coach will SAY out loud: the headline + the one fix) }',
+    'No prose outside the JSON.',
+  ].join('\n');
+}
+
+/** Grade a transcript with the non-live text model. Always resolves to a
+ *  Scorecard (falls back safely on any error). */
+export async function judgeScorecard(args: {
+  kind: 'training' | 'roleplay';
+  dims: DimensionInput[];
+  transcript: ResultLine[];
+}): Promise<Scorecard> {
+  const signals = computeSignals(args.transcript);
+  const dims = args.dims;
+  if (dims.length === 0 || args.transcript.length === 0) {
+    return fallbackScorecard(dims, signals);
+  }
+  const prompt = buildJudgePrompt({ ...args, signals });
+  try {
+    const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+    const ask = async (p: string) => {
+      const r = await ai.models.generateContent({ model: config.summarizerModel, contents: p });
+      return r.text ?? '';
+    };
+    let reply = await ask(prompt);
+    let sc = parseJudge(reply, dims, signals);
+    if (sc) return sc;
+    // Retry once demanding valid JSON.
+    reply = await ask(prompt + '\n\nYour previous reply was not valid JSON. Return ONLY the JSON object.');
+    sc = parseJudge(reply, dims, signals);
+    return sc ?? fallbackScorecard(dims, signals);
+  } catch {
+    return fallbackScorecard(dims, signals);
+  }
 }

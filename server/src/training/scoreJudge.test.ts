@@ -5,6 +5,7 @@ import {
   overallBand,
   parseJudge,
   fallbackScorecard,
+  buildJudgePrompt,
   type ResultLine,
   type DimensionInput,
   type Signals,
@@ -98,5 +99,26 @@ describe('fallbackScorecard', () => {
     expect(sc.scores).toHaveLength(2);
     expect(sc.signals).toEqual(SIG);
     expect(sc.spoken.length).toBeGreaterThan(0);
+  });
+});
+
+describe('buildJudgePrompt', () => {
+  it('embeds the rubric, bands, signals and a labeled transcript', () => {
+    const p = buildJudgePrompt({
+      kind: 'training',
+      dims: DIMS,
+      transcript: [
+        { speaker: 'you', text: 'Hi there' },
+        { speaker: 'rep', text: 'What do you want?' },
+      ],
+      signals: SIG,
+    });
+    expect(p).toContain('Acknowledge'); // dimension label
+    expect(p).toContain('Did they acknowledge the concern?'); // rubric
+    expect(p).toContain('0-3'); // band scale instruction
+    expect(p).toContain('evidenceQuote'); // required field
+    expect(p).toContain('TRAINEE: Hi there'); // labeled user line
+    expect(p).toContain('PROSPECT: What do you want?'); // labeled rep line
+    expect(p).toContain('55%'); // talk ratio signal
   });
 });
