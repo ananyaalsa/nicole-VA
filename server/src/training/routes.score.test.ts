@@ -55,5 +55,6 @@ describe('POST /api/training/score', () => {
     const m = mockReqRes('POST', '/api/training/score', { kind: 'training' });
     await handleTrainingRoute(m.req, m.res);
     expect(m.status).toBe(400);
+    expect(JSON.parse(m.body).error).toContain('required');
   });
 });
