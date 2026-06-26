@@ -349,6 +349,11 @@ export function useCoachingSession(
     finishPractice,
     replayPractice,
     reteach,
-    _setPhase: setPhase as (phase: Phase) => void,
+    // Test-only escape hatch — stripped from production bundles so app code can't
+    // bypass the phase-machine gates through it.
+    _setPhase:
+      process.env.NODE_ENV !== 'production'
+        ? (setPhase as (phase: Phase) => void)
+        : undefined,
   };
 }
