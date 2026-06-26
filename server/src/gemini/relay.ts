@@ -25,7 +25,7 @@ import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
 import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES, TRAINING_TOOL_DECLS } from './uiControlTools.js';
 import { allConfiguredToolDecls } from '../integrations/registry.js';
 import { isIntegrationTool, dispatchIntegrationTool } from '../integrations/toolDispatch.js';
-import { loadFacts } from '../memory/db.js';
+import { loadFacts, loadDisplayName } from '../memory/db.js';
 import { summarizeTurns } from './summarizer.js';
 import { shouldSummarize, splitForSummary, estimateTokens } from '../session/summaryTrigger.js';
 import {
@@ -81,6 +81,8 @@ export interface LiveSessionDeps {
   summarize?: (turns: Turn[]) => Promise<string>;
   /** Override fact loader (tests inject a fake to avoid a real DB). */
   loadUserFacts?: (userId: string) => Promise<{ key: string; fact: string; factType: string; userId: string }[]>;
+  /** Override the display-name loader (tests inject a fake to avoid a real DB). */
+  loadDisplayName?: (userId: string) => Promise<string | null>;
   /** Override the recent-activity digest builder (tests / DI). */
   loadActivity?: (userId: string) => Promise<string[]>;
   /** Override memory tool handler (tests). */
@@ -214,6 +216,12 @@ export class LiveSession {
     let memoryBlock = '';
     try {
       const facts = await loader(this.deps.userId);
+      // The user's name (a users-table column, not a memory fact) so Nicole knows
+      // who she's talking to from the FIRST message — she was asking "what's your
+      // name?" because it was never in her context.
+      let displayName: string | undefined;
+      const nameLoader = this.deps.loadDisplayName ?? loadDisplayName;
+      try { displayName = (await nameLoader(this.deps.userId)) ?? undefined; } catch { /* ignore */ }
       // Only Talk mode gets the cross-mode activity digest (Training/Roleplay
       // sessions Nicole can truthfully reference). Coach/prospect sessions skip
       // it — they're inside an activity, not reflecting on past ones.
@@ -225,7 +233,7 @@ export class LiveSession {
         const ls = getLiveStatus(this.deps.userId);
         if (ls) liveStatusLine = formatLiveStatusLine(ls, this.now()) ?? undefined;
       }
-      memoryBlock = formatMemoryBlock(facts as any, { activityLines, liveStatusLine });
+      memoryBlock = formatMemoryBlock(facts as any, { displayName, activityLines, liveStatusLine });
     } catch {
       memoryBlock = '';
     }

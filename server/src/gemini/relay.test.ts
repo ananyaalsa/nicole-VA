@@ -92,7 +92,7 @@ describe('LiveSession.connect', () => {
     const { client, sent } = makeClient();
     const ls = new LiveSession({
       ai, model: 'm', userId: 'u', client, now,
-      loadUserFacts: async () => [],
+      loadUserFacts: async () => [], loadDisplayName: async () => null,
     });
     await ls.connect(CFG);
     expect(sessions).toHaveLength(1);
@@ -108,7 +108,7 @@ describe('LiveSession message relay + transcripts', () => {
   it('relays Gemini messages to the client and records turns on turnComplete', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client, sent } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     const cb = sessions[0].callbacks;
     cb.onmessage?.({ serverContent: { inputTranscription: { text: 'hello there' } } });
@@ -128,7 +128,7 @@ describe('LiveSession message relay + transcripts', () => {
   it('captures a session-resumption handle from updates', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     sessions[0].callbacks.onmessage?.({ sessionResumptionUpdate: { newHandle: 'H1', resumable: true } });
     // Drop → reconnect should reuse the handle.
@@ -145,7 +145,7 @@ describe('LiveSession auto-reconnect', () => {
   it('reconnects on a non-terminal close and tells the client it is reconnecting', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client, sent } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     sessions[0].callbacks.onclose?.({ code: 1006, reason: 'network blip' });
     await flushMicrotasks();
@@ -157,7 +157,7 @@ describe('LiveSession auto-reconnect', () => {
   it('does NOT reconnect on a terminal billing close; relays + closes client', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client, sent } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     sessions[0].callbacks.onclose?.({ code: 1011, reason: 'monthly spending cap exceeded' });
     await Promise.resolve();
@@ -174,7 +174,7 @@ describe('LiveSession live summarization', () => {
     const summarize = vi.fn(async () => 'they discussed launch plans');
     const ls = new LiveSession({
       ai, model: 'm', userId: 'u', client, now,
-      loadUserFacts: async () => [],
+      loadUserFacts: async () => [], loadDisplayName: async () => null,
       summarize,
     });
     await ls.connect(CFG);
@@ -206,7 +206,7 @@ describe('LiveSession memory tool dispatch', () => {
     const onMemoryTool = vi.fn(async () => ({ ok: true }));
     const ls = new LiveSession({
       ai, model: 'm', userId: 'u', client, now,
-      loadUserFacts: async () => [],
+      loadUserFacts: async () => [], loadDisplayName: async () => null,
       onMemoryTool,
     });
     await ls.connect(CFG);
@@ -226,7 +226,7 @@ describe('LiveSession.sendText (autostart directive)', () => {
     const { ai, sessions } = makeFakeAI();
     const { client } = makeClient();
     // augment the fake session with sendClientContent
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     const s: any = sessions[0];
     s.sendClientContent = vi.fn();
@@ -241,7 +241,7 @@ describe('LiveSession.sendText (autostart directive)', () => {
   it('is a no-op for empty text', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     const s: any = sessions[0];
     s.sendClientContent = vi.fn();
@@ -255,7 +255,7 @@ describe('LiveSession setVoice', () => {
   it('reconnects with the new voice', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     await ls.setVoice('Charon');
     const cfg: any = sessions[sessions.length - 1].config;
@@ -268,7 +268,7 @@ describe('LiveSession.close', () => {
   it('closes the Gemini session and is idempotent', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client } = makeClient();
-    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [] });
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null });
     await ls.connect(CFG);
     ls.close();
     expect(sessions[0].close).toHaveBeenCalled();
