@@ -1,675 +1,590 @@
+/* ── Training Screen ─────────────────────────────────────────────────────── */
+
 .training {
-  position: relative;
   height: 100vh;
   height: 100dvh;
   width: 100%;
-  color: var(--text);
-  font-family: var(--font-body);
-  overflow: hidden;
-}
-
-/* ------------------------------------------------------------------ picker */
-
-/* Title + History button on one row. */
-.training__picker-headrow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.training__history-btn {
-  flex: 0 0 auto;
-}
-
-/* Custom-training builder (mic + editable). */
-.lesson-card--custom { border-style: dashed; }
-.lesson-card--custom.is-open { border-color: var(--cyan); }
-
-.training__custom {
+  background: var(--bg);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-width: 720px;
-  padding: 18px;
-  border: 1px solid var(--edge-strong);
-  border-radius: var(--r-sharp, 2px);
-  background: rgba(6, 22, 28, 0.5);
+  overflow: hidden;
+  color: var(--text);
 }
-.training__custom-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.training__build-btn {
-  padding: 11px 22px;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #02141a;
-  background: var(--cyan);
-  border: none;
-  border-radius: var(--r-sharp, 2px);
-  cursor: pointer;
-  box-shadow: 0 0 16px rgba(62, 240, 255, 0.4);
-}
-.training__build-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
-.training__build-error { color: var(--bad, #ff5d6c); font-size: 0.85rem; }
+
+/* ── Picker ──────────────────────────────────────────────────────────────── */
 
 .training__picker {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  max-width: 1500px;
-  margin: 0 auto;
-  padding: clamp(24px, 5vh, 56px) clamp(24px, 5vw, 72px);
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: clamp(18px, 2.4vh, 28px);
   overflow: hidden;
 }
-
-.training__picker-head {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.training__picker-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 32px 32px 24px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
+.training__picker-head { margin-bottom: 22px; }
 .training__picker-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
 }
-.training__picker-eyebrow .brand-mark {
-  width: 9px; height: 9px;
-  background: var(--cyan);
-  box-shadow: 0 0 12px var(--cyan);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-}
-
 .training__title {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-size: 1.6rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.04;
-  text-transform: uppercase;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.training__subtitle {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-2);
+  max-width: 56ch;
 }
 
-.training__lede {
-  margin: 0;
-  max-width: 58ch;
-  font-size: 1.02rem;
-  line-height: 1.55;
-  color: var(--muted);
-}
-
+/* Lesson grid — capped + centered, never stretched */
 .training__lessons {
   list-style: none;
   margin: 0;
-  padding: 2px;
+  padding: 0;
   display: grid;
-  /* A balanced, even grid — no ragged orphan card. Equal-height rows. */
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
-  gap: clamp(14px, 1.6vw, 22px);
-  /* If the lessons can't fit the viewport, scroll the list — never the page. */
-  min-height: 0;
-  overflow-y: auto;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
 }
-.training__lessons > li { display: flex; min-width: 0; }
+.training__lessons > li { display: flex; }
 
+/* Radio-card: selection shown via border + tint + dot (not color alone) */
 .lesson-card {
-  --cut: 16px;
-  display: grid;
-  /* index/badge row · title · objective · moves (flex) · cta pinned bottom */
-  grid-template-rows: auto auto auto 1fr auto;
-  gap: 12px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   text-align: left;
-  padding: 22px 24px 18px;
-  color: inherit;
   cursor: pointer;
-  transition:
-    transform 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    background 0.16s ease;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 160ms ease, border-color 160ms ease, transform 120ms ease, background 160ms ease;
+  overflow: hidden;
+  font-family: inherit;
+  color: inherit;
 }
-
 .lesson-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--cyan);
-  background: rgba(8, 28, 34, 0.82);
-  box-shadow: 0 0 0 1px rgba(62, 240, 255, 0.3), 0 18px 50px -24px rgba(62, 240, 255, 0.7);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
-.lesson-card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.lesson-card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.lesson-card.is-selected {
+  border-color: var(--accent);
+  border-width: 2px;
+  background: linear-gradient(180deg, rgba(var(--accent-rgb),0.05), var(--surface) 60%);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-md);
+}
+.lesson-card.is-selected::after {
+  content: '✓';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 50%;
+}
 
-/* Top row: framework badge (left) + index (right) on one line. */
 .lesson-card__toprow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  padding: 14px 16px 0;
+}
+.lesson-card__framework {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+}
+.lesson-card__framework--ghost {
+  color: var(--accent);
+  background: var(--accent-light);
 }
 .lesson-card__index {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--edge-strong);
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
-
-.lesson-card__framework {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: #02141a;
-  background: var(--cyan);
-  box-shadow: 0 0 16px rgba(62, 240, 255, 0.5);
-}
-
 .lesson-card__title {
-  font-family: var(--font-display);
-  font-size: 1.36rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  padding: 10px 16px 4px;
 }
-
 .lesson-card__objective {
-  font-size: 0.94rem;
-  line-height: 1.5;
-  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-2);
+  padding: 0 16px 12px;
+  flex: 1;
 }
-
-/* The framework moves as a numbered sequence — order carries meaning. */
 .lesson-card__moves {
   display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 5px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
 }
 .lesson-card__move {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 10px 5px 6px;
-  border: 1px solid var(--edge);
-  font-family: var(--font-mono);
+  gap: 5px;
+  font-size: 0.68rem;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+}
+.lesson-card__move-num { font-weight: 700; color: var(--accent); font-size: 0.62rem; }
+
+.lesson-card--custom { border-style: dashed; background: transparent; }
+.lesson-card--custom.is-open { border-style: solid; border-color: var(--accent); }
+.lesson-card__custom-hint {
+  padding: 10px 16px 14px;
   font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  color: var(--text);
-}
-.lesson-card__move-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px; height: 16px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--cyan);
-  border: 1px solid var(--edge-strong);
-}
-
-.lesson-card__cta {
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px solid var(--edge);
-  color: var(--cyan);
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: space-between;
-}
-.lesson-card:hover .lesson-card__cta { color: var(--cyan-bright); }
-
-.training__back {
-  align-self: flex-start;
-  padding: 11px 18px;
-  border: 1px solid var(--edge-strong);
-  border-radius: var(--r-sharp);
-  background: rgba(6, 22, 28, 0.5);
-  color: var(--cyan);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
-}
-.training__back:hover {
-  border-color: var(--cyan);
-  color: var(--cyan-bright);
-  box-shadow: 0 0 16px rgba(62, 240, 255, 0.35);
-}
-.training__back:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-
-/* ----------------------------------------------------------------- session */
-
-.training--session {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100dvh;
-  min-height: 0;
 }
 
-.training__topbar {
-  position: relative;
-  z-index: 1;
+/* Custom builder */
+.training__custom {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.training__custom-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.training__build-btn {
+  padding: 9px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 140ms, transform 110ms;
+}
+.training__build-btn:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+.training__build-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.training__build-error { font-size: 0.82rem; color: var(--danger); }
+
+/* ── Sticky echoing CTA bar (shared picker pattern) ──────────────────────── */
+
+.picker-cta-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px clamp(20px, 4vw, 44px);
-  border-bottom: 1px solid var(--edge);
-  background: linear-gradient(180deg, rgba(3, 9, 13, 0.7), rgba(3, 9, 13, 0));
+  padding: 14px 32px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.04);
 }
-.training__topbar-left { display: flex; align-items: center; gap: 14px; }
-.training__topbar-left .brand-mark {
-  width: 12px; height: 12px;
-  background: var(--cyan);
-  box-shadow: 0 0 16px var(--cyan);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-}
-.training__topbar-eyebrow { margin: 0 0 3px; opacity: 0.85; }
-.training__session-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.15rem, 2.6vw, 1.7rem);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-transform: uppercase;
-}
-
-.training__topbar-right { display: flex; align-items: center; gap: 14px; }
-.training__phasechip {
-  padding: 7px 13px;
-  border: 1px solid var(--edge-strong);
-  background: rgba(6, 22, 28, 0.6);
-  color: var(--cyan);
-}
-.training__exit {
-  padding: 9px 18px;
-  border: 1px solid rgba(255, 93, 108, 0.45);
-  border-radius: var(--r-sharp);
-  background: rgba(255, 93, 108, 0.06);
-  color: var(--bad);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
-}
-.training__exit:hover {
-  border-color: var(--bad);
-  background: rgba(255, 93, 108, 0.14);
-  box-shadow: 0 0 16px rgba(255, 93, 108, 0.3);
-}
-
-.training__layout {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(280px, 340px);
-  gap: clamp(14px, 1.8vw, 26px);
-  padding: clamp(14px, 2vh, 22px) clamp(20px, 4vw, 44px);
-  align-items: stretch;
-  min-height: 0;
+.picker-cta-bar__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-/* shared rail head used by transcript panel */
-.rail-head {
-  display: flex;
+.picker-cta-bar__btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--edge);
+  gap: 8px;
+  padding: 11px 26px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(var(--accent-rgb),0.3);
+  transition: background 140ms, transform 110ms, box-shadow 140ms;
+  white-space: nowrap;
 }
-.rail-count { opacity: 0.7; }
-
-/* ------------------------------------------------------- LEFT: rail + playbook */
-
-.training__rail {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 14px;
-  min-width: 0;
-  min-height: 0;
+.picker-cta-bar__btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb),0.4);
 }
+.picker-cta-bar__btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
-.phase-rail { padding-bottom: 12px; }
-.phase-rail__head { padding: 12px 16px; border-bottom: 1px solid var(--edge); }
+/* ── Session: live-mode minimalism ───────────────────────────────────────── */
 
-.phase-rail__track {
-  list-style: none;
-  margin: 0;
-  padding: 14px 16px 4px;
+.training--session {
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
-/* Vertical mission timeline. */
-.phase-rail__step {
-  position: relative;
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 12px;
-  padding: 6px 0;
+/* Tiny coach avatar in topbar */
+.session-coach-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.phase-rail__marker {
-  position: relative;
+.session-coach-avatar.is-speaking { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+/* Frame on her FACE (top-biased) and scale up slightly to crop the baked-in
+   watermark/edge, matching the Talk-screen avatar treatment. */
+.session-coach-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; transform: scale(1.18); }
+.session-coach-info { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.session-coach-status { font-size: 0.65rem; color: var(--text-3); }
+
+/* Phase stepper */
+.phase-stepper {
+  flex-shrink: 0;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  overflow-x: auto;
 }
-/* Connector spine. */
-.phase-rail__step:not(:last-child) .phase-rail__marker::after {
+.phase-stepper__step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.phase-stepper__step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 1.5px;
+  background: var(--border);
+  margin: 0 8px;
+}
+.phase-stepper__step.is-done:not(:last-child)::after { background: var(--accent); }
+.phase-stepper__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  flex-shrink: 0;
+  transition: all 0.18s;
+}
+.phase-stepper__step.is-done .phase-stepper__dot { background: var(--accent); border-color: var(--accent); }
+.phase-stepper__step.is-current .phase-stepper__dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.phase-stepper__label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.phase-stepper__step.is-current .phase-stepper__label { color: var(--accent); font-weight: 700; }
+.phase-stepper__step.is-done .phase-stepper__label { color: var(--text-2); }
+
+/* In the LiveRoom rail the stepper is narrow (~300px), so stack the 7 steps
+   VERTICALLY with the connector running down between the dots — the original
+   horizontal bar crams the labels together. */
+.live-rail .phase-stepper {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: visible;
+  background: var(--surface);
+}
+.live-rail .phase-stepper__step {
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+/* Vertical connector: a short line dropping from each dot to the next. */
+.live-rail .phase-stepper__step:not(:last-child)::after {
   content: '';
   position: absolute;
-  top: 16px;
-  bottom: -14px;
+  left: 4px;            /* centered under the 10px dot */
+  top: 22px;
   width: 1.5px;
-  background: var(--edge);
-}
-.phase-rail__step--done .phase-rail__marker::after,
-.phase-rail__step--current .phase-rail__marker::after {
-  background: var(--cyan);
-}
-.phase-rail__dot {
-  width: 11px; height: 11px;
-  margin-top: 3px;
-  background: var(--panel-solid);
-  border: 1.5px solid var(--muted-dim);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-.phase-rail__step--done .phase-rail__dot {
-  background: var(--cyan); border-color: var(--cyan);
-}
-.phase-rail__step--current .phase-rail__dot {
-  background: var(--cyan-bright);
-  border-color: #fff;
-  box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.22), 0 0 14px var(--cyan);
-}
-.phase-rail__step-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.phase-rail__label {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-.phase-rail__step--done .phase-rail__label { color: var(--text); opacity: 0.8; }
-.phase-rail__step--current .phase-rail__label {
-  color: var(--cyan-bright);
-  font-weight: 700;
-}
-.phase-rail__subtitle {
+  height: calc(100% - 12px);
   margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.4;
-  color: var(--muted);
+  flex: none;
+  background: var(--border);
 }
+.live-rail .phase-stepper__step.is-done:not(:last-child)::after { background: var(--accent); }
+.live-rail .phase-stepper__label { font-size: 0.8rem; white-space: normal; }
 
-/* The framework playbook — substance of the room. Scrolls internally so the
-   rail never pushes the page past the viewport. */
-.playbook {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 0;
-  padding-bottom: 0;
-}
-.playbook__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--edge);
-}
-.playbook__badge {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: #02141a;
-  background: var(--cyan);
-  padding: 3px 9px;
-}
-.playbook__moves {
-  list-style: none;
-  margin: 0;
-  padding: 8px 0;
+/* Live body — aura is the stage */
+.session-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+.session-stage {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
-}
-.playbook__move {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(62, 240, 255, 0.08);
-}
-.playbook__move:last-child { border-bottom: 0; }
-.playbook__move-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-.playbook__move-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px; height: 22px;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--cyan);
-  border: 1px solid var(--edge-strong);
-}
-.playbook__move-step {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-.playbook__move-intent {
-  margin: 0 0 8px;
-  font-size: 0.86rem;
-  line-height: 1.5;
-  color: var(--muted);
-}
-.playbook__move-line {
-  margin: 0;
-  padding: 8px 12px;
-  font-size: 0.86rem;
-  line-height: 1.45;
-  color: var(--text);
-  border-left: 2px solid var(--cyan);
-  background: rgba(62, 240, 255, 0.05);
-  font-style: italic;
-}
-
-/* --------------------------------------------------------- CENTER: stage */
-
-.training__stage {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 14px;
-  min-width: 0;
-  min-height: 0;
-}
-
-.training__avatar-wrap {
-  position: relative;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
-  min-height: 0;
-  padding: 6px 12px;
-}
-.training__avatar {
-  width: clamp(140px, 20vh, 230px);
-  filter: drop-shadow(0 0 30px rgba(62, 240, 255, 0.35));
-  transition: filter 0.25s ease;
-}
-.training__avatar.is-speaking {
-  filter: drop-shadow(0 0 36px rgba(124, 92, 255, 0.6));
-}
-.training__coach-state { color: var(--muted); letter-spacing: 0.2em; }
-
-/* Reticle corners framing the coach. */
-.stage-corner {
-  position: absolute;
-  width: 24px; height: 24px;
-  border: 1.5px solid var(--edge-strong);
-  opacity: 0.7;
-  pointer-events: none;
-}
-.stage-corner--tl { top: 8%; left: 18%; border-right: 0; border-bottom: 0; }
-.stage-corner--tr { top: 8%; right: 18%; border-left: 0; border-bottom: 0; }
-.stage-corner--bl { bottom: 16%; left: 18%; border-right: 0; border-top: 0; }
-.stage-corner--br { bottom: 16%; right: 18%; border-left: 0; border-top: 0; }
-
-.training__transcript {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 0;
-  height: clamp(160px, 30vh, 320px);
-}
-.training__transcript-body { min-height: 0; overflow: hidden; }
-
-/* ---------------------------------------------------------- RIGHT: panel */
-
-.training__panel {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 14px;
-  min-width: 0;
-  min-height: 0;
-}
-/* Scorecard fills the upper cell and scrolls internally. */
-.training__panel > .scorecard { min-height: 0; overflow: hidden; }
-
-.training__controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-}
-.training__controls-head { margin-bottom: 2px; }
-
-.training__start,
-.training__advance {
-  padding: 13px 16px;
-  border-radius: var(--r-sharp);
-  font-family: var(--font-display);
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: transform 0.14s ease, box-shadow 0.14s ease,
-    opacity 0.14s ease, background 0.14s ease, border-color 0.14s ease;
-}
-
-/* Start session — amber pop. */
-.training__start {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 180, 60, 0.5);
-  background: rgba(255, 180, 60, 0.08);
-  color: var(--pop-amber);
-}
-.training__start:hover {
-  border-color: var(--pop-amber);
-  background: rgba(255, 180, 60, 0.16);
-  box-shadow: 0 0 18px var(--pop-amber-glow);
-  transform: translateY(-1px);
-}
-.training__start-dot {
-  width: 8px; height: 8px;
-  background: var(--pop-amber);
-  box-shadow: 0 0 10px var(--pop-amber);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
 }
 
-/* Advance is the hero action — bright lime "go". */
-.training__advance {
-  border: 1px solid transparent;
-  background: linear-gradient(180deg, #c9ff6e, var(--pop-lime));
-  color: #0c1a02;
-  box-shadow: 0 0 22px var(--pop-lime-glow), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+.session-aura {
+  width: clamp(120px, 22vh, 200px);
+  height: clamp(120px, 22vh, 200px);
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid var(--border);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+  flex-shrink: 0;
 }
-.training__advance:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: linear-gradient(180deg, #ddff96, #c9ff6e);
-  box-shadow: 0 0 32px rgba(182, 255, 60, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+.session-aura.is-speaking {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 6px var(--accent-light), 0 0 40px rgba(var(--accent-rgb),0.25);
+  transform: scale(1.02);
 }
-.training__advance:disabled {
-  opacity: 0.5;
-  cursor: default;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--muted);
-  box-shadow: none;
+.session-aura__img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; transform: scale(1.18); }
+
+.session-reference {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.session-reference__framework { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.session-reference__mnemonic { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.session-reference--notice { border-left: 3px solid var(--accent); background: var(--accent-light); }
+.session-reference__label { font-size: 0.62rem; color: var(--accent); }
+.session-reference__note { font-size: 0.88rem; color: var(--text); line-height: 1.45; max-width: 46ch; }
+
+.session-goal {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-2);
+  max-width: 48ch;
 }
 
-.training__start:focus-visible,
-.training__advance:focus-visible,
-.training__exit:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 3px;
+.session-captions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 560px;
+}
+.session-caption {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-align: left;
+}
+.session-caption__who { display: block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; color: var(--text-3); }
+.session-caption--coach { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.session-caption--you { background: var(--accent-light); color: var(--text); align-self: flex-end; }
+.session-caption--you .session-caption__who { color: var(--accent); }
+
+.session-hint { min-height: 36px; }
+.session-hint__btn {
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 140ms;
+}
+.session-hint__btn:hover { background: var(--accent-light); }
+.session-hint__text {
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-size: 0.88rem;
+  font-style: italic;
+  color: var(--text);
+  max-width: 46ch;
 }
 
-/* ---------------------------------------------------------------- responsive
-   The room must NEVER scroll, so we hold the 3-column grid and just tighten it
-   on smaller viewports rather than stacking (stacking would add height). */
+/* Live action bar */
+.session-actionbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.session-replay {
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 130ms, color 130ms;
+}
+.session-replay:hover { border-color: var(--accent); color: var(--accent); }
 
-@media (max-width: 1100px) {
-  .training__layout {
-    grid-template-columns: minmax(220px, 290px) minmax(0, 1fr) minmax(220px, 280px);
-    gap: 12px;
-    padding: 12px 16px;
+/* Exit */
+.training__exit {
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: border-color 130ms, color 130ms;
+}
+.training__exit:hover { border-color: var(--danger); color: var(--danger); }
+
+.session-lesson-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 360px;
+}
+
+/* ── Debrief: the one rich screen ────────────────────────────────────────── */
+
+.session-body--debrief { overflow-y: auto; }
+.debrief {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.debrief__head { display: flex; flex-direction: column; gap: 4px; }
+.debrief__eyebrow { font-size: 0.7rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; }
+.debrief__title { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--text); }
+.debrief__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.debrief__col { display: flex; flex-direction: column; gap: 10px; }
+.debrief__col-title { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--text); }
+.debrief__mnemonic {
+  padding: 12px 16px;
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.debrief__expect { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.debrief__expect li { font-size: 0.85rem; line-height: 1.45; color: var(--text-2); }
+.debrief__transcript { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.debrief__transcript summary { padding: 12px 16px; font-size: 0.85rem; font-weight: 600; color: var(--accent); cursor: pointer; }
+.debrief__transcript-body { max-height: 320px; overflow-y: auto; border-top: 1px solid var(--border); }
+.debrief__actions { display: flex; justify-content: flex-end; }
+
+/* Shared topbar action button (History) */
+.topbar-action-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 130ms, color 130ms;
+}
+.topbar-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 700px) {
+  .training__picker-scroll { padding: 20px 16px; }
+  .picker-cta-bar { padding: 12px 16px; }
+  .debrief__grid { grid-template-columns: 1fr; }
+  .phase-stepper__label { display: none; }
+  .phase-stepper__step:not(:last-child)::after { margin: 0 4px; }
+
+  /* When the Custom builder is open, collapse the preset lessons so the phone
+     shows ONLY the custom card + its builder (keeps the screen clean). */
+  .training__lessons.is-custom-open .training__lesson-li:not(.training__lesson-li--custom) {
+    display: none;
   }
 }
-
-@media (max-width: 820px) {
-  /* Drop the left rail to reclaim width; timeline collapses into the topbar
-     chip and the playbook is still reachable from the picker. Stage + panel
-     stay side by side so the page height is unchanged. */
-  .training__layout {
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
-  }
-  .training__rail { display: none; }
-  .training__topbar-eyebrow { display: none; }
-}
-
-@media (max-width: 560px) {
-  .training__layout { grid-template-columns: minmax(0, 1fr); }
-  .training__panel { display: none; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .lesson-card,
-  .training__start,
-  .training__advance,
-  .phase-rail__dot,
-  .training__back,
-  .training__exit,
-  .training__avatar {
-    transition: none;
-  }
+  .lesson-card, .picker-cta-bar__btn, .session-aura, .session-coach-avatar { transition: none; }
 }
