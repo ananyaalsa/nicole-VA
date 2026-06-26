@@ -264,7 +264,19 @@ export function useNicoleSession(
   // Callbacks waiting for the next completed model turn (used by coaching to
   // avoid cutting Nicole off when pushing the next phase overlay).
   const afterTurnCbsRef = useRef<Array<() => void>>([]);
+  const afterTurnTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const nicoleSpeakingRef = useRef(false);
+
+  /** Nicole's turn ended (turnComplete OR barge-in): mark her not-speaking, cancel
+   *  the pending safety timeouts, and fire every queued afterNextModelTurn cb. */
+  const drainAfterTurnCbs = useCallback(() => {
+    nicoleSpeakingRef.current = false;
+    for (const t of afterTurnTimersRef.current) clearTimeout(t);
+    afterTurnTimersRef.current = [];
+    const cbs = afterTurnCbsRef.current;
+    afterTurnCbsRef.current = [];
+    for (const cb of cbs) { try { cb(); } catch { /* ignore */ } }
+  }, []);
 
   // ── Transcript model — mirrors the proven CHAT-PROJECT pattern, which is the
   //    real fix for fragmentation. Two stores:
@@ -492,15 +504,15 @@ export function useNicoleSession(
       if (sc.interrupted) {
         stopPlayback();
         hardFinalizeRef.current('nicole');
+        // Barge-in also ends her turn → release any deferred callbacks (else
+        // they'd wait out the full 6s safety timeout).
+        drainAfterTurnCbs();
       } else if (sc.turnComplete) {
         finalizeTurnRef.current();
-        nicoleSpeakingRef.current = false;
-        const cbs = afterTurnCbsRef.current;
-        afterTurnCbsRef.current = [];
-        for (const cb of cbs) { try { cb(); } catch { /* ignore */ } }
+        drainAfterTurnCbs();
       }
     },
-    [appendPartial, drainQueue, stopPlayback],
+    [appendPartial, drainQueue, stopPlayback, drainAfterTurnCbs],
   );
 
   // ------------------------------------------------------------------------
@@ -998,6 +1010,11 @@ export function useNicoleSession(
   useEffect(() => {
     return () => {
       teardown({ keepTranscript: true });
+      // Cancel any pending afterNextModelTurn safety timers so they never fire
+      // into a torn-down session.
+      for (const t of afterTurnTimersRef.current) clearTimeout(t);
+      afterTurnTimersRef.current = [];
+      afterTurnCbsRef.current = [];
     };
     // teardown is stable (useCallback) — run cleanup only on unmount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1029,11 +1046,15 @@ export function useNicoleSession(
   const afterNextModelTurn = useCallback((cb: () => void) => {
     if (!nicoleSpeakingRef.current) { cb(); return; }
     afterTurnCbsRef.current.push(cb);
-    // Safety cap: never wait more than 6s.
-    setTimeout(() => {
+    // Safety cap: never wait more than 6s. The timer id is tracked so the
+    // turn-end drain (or unmount) can cancel it — preventing a stale fire.
+    const timer = setTimeout(() => {
+      const ti = afterTurnTimersRef.current.indexOf(timer);
+      if (ti >= 0) afterTurnTimersRef.current.splice(ti, 1);
       const i = afterTurnCbsRef.current.indexOf(cb);
       if (i >= 0) { afterTurnCbsRef.current.splice(i, 1); try { cb(); } catch { /* ignore */ } }
     }, 6000);
+    afterTurnTimersRef.current.push(timer);
   }, []);
 
   return {

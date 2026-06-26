@@ -477,4 +477,18 @@ describe('useNicoleSession', () => {
     act(() => { emit({ turnComplete: true }); });
     expect(fired).toBe(true);
   });
+
+  it('afterNextModelTurn also fires on barge-in (interrupted), not just turnComplete', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    let fired = false;
+    act(() => {
+      emit({ outputTranscription: { text: 'mid sentence' } });
+      view.result.current.afterNextModelTurn(() => { fired = true; });
+    });
+    expect(fired).toBe(false);
+    // Barge-in ends her turn → the deferred callback should fire immediately,
+    // not wait out the 6s safety timeout.
+    act(() => { emit({ interrupted: true }); });
+    expect(fired).toBe(true);
+  });
 });
