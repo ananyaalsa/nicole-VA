@@ -1,0 +1,11 @@
+.live-room { display: grid; grid-template-columns: 1fr 300px; gap: 16px; flex: 1; min-height: 0; padding: 16px; }
+.live-room__feed { overflow-y: auto; min-height: 0; padding-right: 6px; }
+.live-room__rail { order: 2; display: flex; flex-direction: column; gap: 14px; }
+/* feed before rail on desktop */
+.live-room { grid-template-areas: 'feed rail'; }
+.live-room__feed { grid-area: feed; }
+.live-room__rail { grid-area: rail; }
+@media (max-width: 860px) {
+  .live-room { grid-template-columns: 1fr; grid-template-areas: 'rail' 'feed'; }
+  .live-room__rail { order: 0; }
+}
