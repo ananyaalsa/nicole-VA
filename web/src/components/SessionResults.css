@@ -1,0 +1,32 @@
+/* web/src/components/SessionResults.css */
+.session-results { display: flex; flex-direction: column; gap: 18px; max-width: 920px; margin: 0 auto; padding: 16px; }
+.results-verdict { border-radius: var(--radius-lg); padding: 18px 20px; border: 1px solid var(--border); }
+.results-verdict--strong { background: var(--accent-light); }
+.results-verdict--proficient { background: #EAF6F3; }
+.results-verdict--developing { background: #FBF4E6; }
+.results-verdict--needs_work { background: #FBEDE9; }
+.results-score { display: flex; align-items: baseline; gap: 6px; }
+.results-score__value { font-size: 2.6rem; font-weight: 800; line-height: 1; }
+.results-score__max { color: var(--text-3); }
+.results-score__band { margin-left: auto; font-weight: 700; }
+.results-headline { margin: 8px 0 12px; font-size: 1.05rem; }
+.results-fix { background: var(--surface); border-radius: var(--radius-md); padding: 10px 12px; }
+.results-fix__label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); font-weight: 700; }
+.results-fix__note { margin: 4px 0; font-weight: 600; }
+.results-fix__next { margin: 0; color: var(--text-2); }
+.results-h { font-size: 0.95rem; margin: 0 0 8px; }
+.results-dims { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.results-dim { display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface); border: 1px solid var(--border); }
+.results-dim__icon { font-weight: 800; }
+.results-dim--strong .results-dim__icon, .results-dim--proficient .results-dim__icon { color: var(--accent); }
+.results-dim--emerging .results-dim__icon { color: #B45309; }
+.results-dim--missing .results-dim__icon { color: #B91C1C; }
+.results-dim__body { display: flex; flex-direction: column; gap: 2px; }
+.results-dim__label em { color: var(--text-3); font-style: normal; }
+.results-dim__rationale { color: var(--text-2); font-size: 0.9rem; }
+.results-dim__quote { color: var(--text-3); font-style: italic; font-size: 0.85rem; }
+.results-signals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 0.82rem; color: var(--text-2); }
+.results-signals em { color: var(--text-3); font-style: normal; }
+.results-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.results-secondary { padding: 9px 18px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+@media (max-width: 640px) { .session-results { padding: 12px; } }
