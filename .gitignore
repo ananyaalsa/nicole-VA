@@ -3,3 +3,6 @@ dist
 .env
 *.log
 .DS_Store
+
+# SDD scratch (subagent-driven development ledger)
+.superpowers/

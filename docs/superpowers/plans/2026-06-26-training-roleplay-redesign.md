@@ -281,16 +281,10 @@ function clampScore(n: unknown): 0 | 1 | 2 | 3 {
 function str(v: unknown, d = ''): string { return typeof v === 'string' ? v : d; }
 function quote(v: unknown): string | null { return typeof v === 'string' && v.trim() ? v : null; }
 
-// extractJson is shared with specGenerator's logic; re-declared locally to keep
-// this module self-contained (same behavior: fenced block, else first..last brace).
-function extractJsonLocal(s: string): string | null {
-  const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  const first = s.indexOf('{');
-  const last = s.lastIndexOf('}');
-  if (first >= 0 && last > first) return s.slice(first, last + 1);
-  return null;
-}
+// Reuse the JSON extractor from the spec generator (DRY — one source of truth).
+// FIRST export it there: in server/src/training/specGenerator.ts change
+// `export function extractJson` is ALREADY exported, so just import it here.
+import { extractJson } from './specGenerator.js';
 
 /** Parse a judge reply into a full Scorecard, or null if it cannot be parsed.
  *  Aligns returned dimension scores to the REQUESTED dims (order + labels),
@@ -300,7 +294,7 @@ export function parseJudge(
   dims: DimensionInput[],
   signals: Signals,
 ): Scorecard | null {
-  const json = extractJsonLocal(reply);
+  const json = extractJson(reply);
   if (!json) return null;
   let obj: any;
   try { obj = JSON.parse(json); } catch { return null; }
