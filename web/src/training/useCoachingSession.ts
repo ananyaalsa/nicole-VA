@@ -146,6 +146,8 @@ export function useCoachingSession(
 
   const start = useCallback(async () => {
     startedRef.current = true;
+    // Fresh session → allow the one-shot opener to fire on this connect.
+    sentCoachOpenRef.current = false;
     await coachStartRef.current();
   }, []);
 
@@ -252,15 +254,17 @@ export function useCoachingSession(
     }
   }, [phase]);
 
-  // Nicole-first: once the coach session connects, fire a silent opener so she
-  // takes charge and greets/sets up the drill, instead of waiting for the user.
+  // Nicole-first: fire the silent opener ONCE per session, on the first connect,
+  // so she takes charge and greets/sets up the drill. It must NOT re-fire on the
+  // disconnect→reconnect cycles that happen on every phase change (else she would
+  // re-introduce herself at each phase boundary). `sentCoachOpenRef` is reset only
+  // in start() (a genuine new session), never on a transient disconnect.
   useEffect(() => {
     if (coach.connected && startedRef.current && !sentCoachOpenRef.current) {
       sentCoachOpenRef.current = true;
       const t = setTimeout(() => coachSendTextRef.current(COACH_OPEN_DIRECTIVE), 500);
       return () => clearTimeout(t);
     }
-    if (!coach.connected) sentCoachOpenRef.current = false;
   }, [coach.connected]);
 
   // Unmount safety: stop both sessions if still active.

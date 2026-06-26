@@ -16,6 +16,8 @@ interface FakeInstance {
   stopCalls: number;
   /** Transcript lines fed by simulateUserTurn for auto-advance tests. */
   transcript: TranscriptLine[];
+  /** Every text sent via sendText (used to assert the one-shot opener). */
+  sentTexts: string[];
 }
 
 const instances: FakeInstance[] = [];
@@ -39,6 +41,7 @@ vi.mock('../engine/useNicoleSession', () => {
           stopped: false,
           stopCalls: 0,
           transcript: [],
+          sentTexts: [],
         };
         instances.push(inst);
       }
@@ -59,7 +62,7 @@ vi.mock('../engine/useNicoleSession', () => {
         },
         toggleMic: () => {},
         setVoice: () => {},
-        sendText: () => {},
+        sendText: (text: string) => { inst!.sentTexts.push(text); },
         afterNextModelTurn: (cb: () => void) => { cb(); },
       };
     },
@@ -246,5 +249,24 @@ describe('useCoachingSession — auto-advance', () => {
     // advance fake time past intro minPhaseMs (6s) + the 2s evaluator tick
     await act(async () => { vi.advanceTimersByTime(9000); });
     expect(view.result.current.phase).toBe('teach');
+  });
+
+  it('fires the coach opener ONCE per session, not on every phase reconnect', async () => {
+    vi.useFakeTimers();
+    const view = renderCoaching();
+    await act(async () => { await view.result.current.start(); });
+    // Re-render so the hook observes coach.connected=true (the fake flips a flag
+    // inside start(); the effect that fires the opener runs on the next render).
+    await act(async () => { view.rerender(); });
+    // Let the 500ms opener timeout fire on the first connect.
+    await act(async () => { vi.advanceTimersByTime(600); });
+    const openCount = () => coach().sentTexts.filter((t) => t.startsWith('[OPEN]')).length;
+    expect(openCount()).toBe(1);
+    // A manual phase advance reconnects the coach to push the new overlay; the
+    // opener must NOT fire again (else she re-introduces herself mid-lesson).
+    await act(async () => { view.result.current.advance(); });
+    await act(async () => { view.rerender(); });
+    await act(async () => { vi.advanceTimersByTime(600); });
+    expect(openCount()).toBe(1);
   });
 });
