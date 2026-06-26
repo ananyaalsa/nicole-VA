@@ -20,8 +20,11 @@
 import { buildLiveConfig } from './liveConfig.js';
 import { buildSystemPrompt } from '../prompt/nicolePrompt.js';
 import { formatMemoryBlock } from '../memory/memoryBlock.js';
+import { buildActivityDigest } from '../memory/activityDigest.js';
 import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
 import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES } from './uiControlTools.js';
+import { allConfiguredToolDecls } from '../integrations/registry.js';
+import { isIntegrationTool, dispatchIntegrationTool } from '../integrations/toolDispatch.js';
 import { loadFacts } from '../memory/db.js';
 import { summarizeTurns } from './summarizer.js';
 import { shouldSummarize, splitForSummary, estimateTokens } from '../session/summaryTrigger.js';
@@ -29,6 +32,7 @@ import {
   shouldProactiveReconnect,
   RESUME_HANDLE_MAX_AGE_MS,
 } from '../session/sessionTiming.js';
+import { getLiveStatus, formatLiveStatusLine } from '../session/liveStatus.js';
 import type { Turn, SessionConfig } from '../types.js';
 
 /** Minimal shape of a Gemini Live session we depend on. */
@@ -77,6 +81,8 @@ export interface LiveSessionDeps {
   summarize?: (turns: Turn[]) => Promise<string>;
   /** Override fact loader (tests inject a fake to avoid a real DB). */
   loadUserFacts?: (userId: string) => Promise<{ key: string; fact: string; factType: string; userId: string }[]>;
+  /** Override the recent-activity digest builder (tests / DI). */
+  loadActivity?: (userId: string) => Promise<string[]>;
   /** Override memory tool handler (tests). */
   onMemoryTool?: (name: string, args: any, userId: string) => Promise<{ ok: boolean }>;
   /** Called when a training_mark_progress tool fires (frontend relays it). */
@@ -208,21 +214,43 @@ export class LiveSession {
     let memoryBlock = '';
     try {
       const facts = await loader(this.deps.userId);
-      memoryBlock = formatMemoryBlock(facts as any);
+      // Only Talk mode gets the cross-mode activity digest (Training/Roleplay
+      // sessions Nicole can truthfully reference). Coach/prospect sessions skip
+      // it — they're inside an activity, not reflecting on past ones.
+      let activityLines: string[] | undefined;
+      let liveStatusLine: string | undefined;
+      if (cfg.mode === 'talk') {
+        const digest = this.deps.loadActivity ?? buildActivityDigest;
+        try { activityLines = await digest(this.deps.userId); } catch { /* ignore */ }
+        const ls = getLiveStatus(this.deps.userId);
+        if (ls) liveStatusLine = formatLiveStatusLine(ls, this.now()) ?? undefined;
+      }
+      memoryBlock = formatMemoryBlock(facts as any, { activityLines, liveStatusLine });
     } catch {
       memoryBlock = '';
     }
+    // Integration tools are only exposed for providers whose server keys are
+    // present (key-gated) — so an unconfigured deployment shows none of them.
+    const integrationDecls = allConfiguredToolDecls();
     const systemPrompt = buildSystemPrompt({
       memoryBlock,
       summary: this.runningSummary,
       overlay: cfg.systemOverlay,
       stylePrompt: cfg.stylePrompt,
+      // Only teach Nicole about integrations when she actually has the tools.
+      integrationsEnabled: integrationDecls.length > 0,
     });
     return buildLiveConfig({
       systemPrompt,
       voiceName: cfg.voiceName,
       tools: [
-        { functionDeclarations: [...MEMORY_TOOL_DECLS, ...UI_CONTROL_TOOL_DECLS] },
+        {
+          functionDeclarations: [
+            ...MEMORY_TOOL_DECLS,
+            ...UI_CONTROL_TOOL_DECLS,
+            ...integrationDecls,
+          ],
+        },
       ],
       // Real-time Google Search grounding so Nicole can answer news/weather/
       // flights/prices/latest-fact questions with current info.
@@ -325,6 +353,27 @@ export class LiveSession {
         // Gemini so the turn completes.
         else if (UI_CONTROL_TOOL_NAMES.has(name)) {
           responses.push({ id: call?.id, name, response: { result: 'ok' } });
+        }
+        // Integration tools (calendar/email/tasks/slack/notion/spotify) run
+        // SERVER-SIDE because the OAuth tokens live here. We return a short,
+        // speakable summary as the function result so Nicole reads it back.
+        else if (isIntegrationTool(name)) {
+          const result = await dispatchIntegrationTool(name, args, this.deps.userId);
+          responses.push({
+            id: call?.id,
+            name,
+            response: { result: result.ok ? 'ok' : 'error', summary: result.summary },
+          });
+          // Echo the result to the BROWSER so it can show a success/error toast
+          // (the raw toolCall was already relayed for the in-progress toast).
+          if (this.deps.client.isOpen()) {
+            this.deps.client.send({
+              type: 'tool-result',
+              name,
+              ok: result.ok,
+              summary: result.summary,
+            });
+          }
         }
       }
       if (responses.length && this.session?.sendToolResponse) {
