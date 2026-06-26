@@ -18,6 +18,8 @@ interface FakeInstance {
   transcript: TranscriptLine[];
   /** Every text sent via sendText (used to assert the one-shot opener). */
   sentTexts: string[];
+  /** The onToolCall handler passed by the consumer, if any. */
+  onToolCall?: UseNicoleSessionOptions['onToolCall'];
 }
 
 const instances: FakeInstance[] = [];
@@ -46,6 +48,7 @@ vi.mock('../engine/useNicoleSession', () => {
         instances.push(inst);
       }
       inst.options = opts; // keep latest options (e.g. updated systemOverlay)
+      inst.onToolCall = opts.onToolCall; // capture latest onToolCall handler
       return {
         connected: inst.started,
         micOn: false,
@@ -111,6 +114,11 @@ function renderCoaching(lesson = LESSONS[0]) {
     setPhase(phase: string) {
       // Access the exposed setPhase from the hook result if available.
       (result.current as any)._setPhase?.(phase);
+    },
+    /** Invoke the onToolCall handler captured by the COACH instance. */
+    emitCoachToolCall(calls: { name: string; args: Record<string, unknown> }[]) {
+      const inst = instances.find((i) => i.options.mode === 'coach');
+      inst?.onToolCall?.(calls);
     },
   };
 }
@@ -220,6 +228,13 @@ describe('useCoachingSession', () => {
       }),
     );
     expect(result.current.scorecard).toHaveLength(2);
+  });
+
+  it('routes training_mark_progress tool calls into the scorecard', async () => {
+    const view = renderCoaching();
+    await act(async () => { await view.result.current.start(); });
+    act(() => { view.emitCoachToolCall([{ name: 'training_mark_progress', args: { dimension: 'Acknowledge', hit: true, tip: 'Nice restate' } }]); });
+    expect(view.result.current.scorecard).toEqual([{ dimension: 'Acknowledge', hit: true, tip: 'Nice restate' }]);
   });
 
   it('stop() stops BOTH the coach and prospect sessions', async () => {

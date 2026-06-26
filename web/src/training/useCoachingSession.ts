@@ -111,12 +111,29 @@ export function useCoachingSession(
     [lesson, phase],
   );
 
+  // Forward ref so the onToolCall closure below can always call the latest
+  // markProgress without capturing a stale closure — markProgress is defined
+  // further below, after this hook call.
+  const markProgressRef = useRef<(e: ScoreEntry) => void>(() => {});
+
   // COACH — always active, drives the avatar.
   const coach = useNicoleSession({
     voiceName: coachVoice,
     mode: 'coach',
     systemOverlay: coachOverlay,
     authToken: token,
+    onToolCall: (calls) => {
+      for (const c of calls) {
+        if (c.name === 'training_mark_progress' && c.args) {
+          const a = c.args as { dimension?: unknown; hit?: unknown; tip?: unknown };
+          markProgressRef.current({
+            dimension: String(a.dimension ?? ''),
+            hit: !!a.hit,
+            tip: String(a.tip ?? ''),
+          });
+        }
+      }
+    },
   });
 
   // PROSPECT — only connected during the roleplay phase. The overlay is the
@@ -194,6 +211,9 @@ export function useCoachingSession(
   const markProgress = useCallback((entry: ScoreEntry) => {
     setScorecard((prev) => [...prev, entry]);
   }, []);
+  // Keep the forward ref current so the onToolCall closure always calls the
+  // latest version of markProgress (avoids a stale-closure on the hook above).
+  markProgressRef.current = markProgress;
 
   const buildPracticeTranscript = useCallback((): ResultLine[] => {
     const youLines: ResultLine[] = coach.transcript.filter((l) => l.speaker === 'you').map((l) => ({ speaker: 'you' as const, text: l.text }));
