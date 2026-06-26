@@ -1,7 +1,7 @@
 // Client for the Nicole 2.0 training/roleplay backend API.
 // Talks to the server's /api/training/* routes.
 
-const HTTP_BASE =
+export const HTTP_BASE =
   (import.meta as unknown as { env?: Record<string, string> }).env
     ?.VITE_SERVER_HTTP ?? 'http://localhost:4000';
 
@@ -94,15 +94,20 @@ export async function generateCustomSpec(input: {
   return res.json();
 }
 
-/** List past training/roleplay runs (newest first). */
-export async function fetchHistory(): Promise<TrainingRun[]> {
-  const res = await fetch(`${HTTP_BASE}/api/training/history`);
+/** Auth header when a token is provided (history is now per-user). */
+function authH(token?: string | null): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** List past training/roleplay runs (newest first), scoped to the user. */
+export async function fetchHistory(token?: string | null): Promise<TrainingRun[]> {
+  const res = await fetch(`${HTTP_BASE}/api/training/history`, { headers: authH(token) });
   if (!res.ok) throw new Error(`history ${res.status}`);
   const data = await res.json();
   return data.runs ?? [];
 }
 
-/** Persist a finished run with its scorecard. */
+/** Persist a finished run with its scorecard, scoped to the user. */
 export async function saveRun(run: {
   kind: 'roleplay' | 'training';
   profileId?: string;
@@ -112,10 +117,10 @@ export async function saveRun(run: {
   score?: number;
   scorecard?: unknown;
   transcript?: string;
-}): Promise<{ id: number }> {
+}, token?: string | null): Promise<{ id: number }> {
   const res = await fetch(`${HTTP_BASE}/api/training/history`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authH(token) },
     body: JSON.stringify(run),
   });
   if (!res.ok) throw new Error(`saveRun ${res.status}`);
