@@ -228,6 +228,17 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
   const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, volume, muted, setVolume, setMuted } = session;
 
+  // "Connecting" guard so the Start button can't be spam-clicked between the tap
+  // and the session going live (each extra click would open another session).
+  const [starting, setStarting] = useState(false);
+  const beginSession = useCallback(() => {
+    if (starting || connected) return;
+    setStarting(true);
+    void start();
+  }, [starting, connected, start]);
+  // Once we're live, the guard is no longer needed.
+  useEffect(() => { if (connected) setStarting(false); }, [connected]);
+
   // Mirror sendText in a ref so the [STATUS] effect below never re-fires due to
   // sendText changing reference — the effect deps stay primitive.
   const sendTextRef = useRef(session.sendText);
@@ -285,13 +296,16 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   // One-tap-to-send: when a home starter is tapped we stash its prompt and call
   // start(); once the session connects, seed that prompt as the first turn.
   const pendingPromptRef = useRef<string | null>(null);
+  const promptSentRef = useRef(false);
   useEffect(() => {
-    if (connected && pendingPromptRef.current) {
+    if (connected && pendingPromptRef.current && !promptSentRef.current) {
       const text = pendingPromptRef.current;
+      // Mark sent BEFORE the async send so React StrictMode's double-invoke (which
+      // cancels the first effect's timeout) can't drop it — and don't clear the
+      // ref via cleanup. The server also queues text until the session is ready.
+      promptSentRef.current = true;
       pendingPromptRef.current = null;
-      // Small delay so the live session is fully ready to accept a turn.
-      const t = setTimeout(() => session.sendText(text), 500);
-      return () => clearTimeout(t);
+      setTimeout(() => session.sendText(text), 500);
     }
   }, [connected, session]);
 
@@ -450,7 +464,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
           {transcript.length === 0 && !realtime.you && !realtime.nicole ? (
             <div className="talk-empty">
               <HomePanel
-                onStarter={(prompt) => { pendingPromptRef.current = prompt; void start(); }}
+                onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
                 onResume={(item) => { if (item.kind === 'training') onTrain?.(); else onRoleplay?.(); }}
                 onDrill={() => onTrain?.()}
               />
@@ -467,9 +481,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
           )}
           <div className="talk-controls">
             {!connected ? (
-              <button type="button" className="talk-start-btn" onClick={() => void start()} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
+              <button type="button" className="talk-start-btn" onClick={beginSession} disabled={starting} aria-busy={starting} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Start talking
+                {starting ? 'Connecting…' : 'Start talking'}
               </button>
             ) : (
               <div className="live-controls live-controls--icons">

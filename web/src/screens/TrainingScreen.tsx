@@ -14,6 +14,7 @@ import { PHASE_ORDER, type Phase } from '../training/phaseMachine';
 import { useCoachingSession } from '../training/useCoachingSession';
 import { LiveRoom } from '../components/LiveRoom';
 import { CallPresence } from '../components/CallPresence';
+import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { SessionResults } from '../components/SessionResults';
 import '../components/ProfilePanel.css';
 import './TrainingScreen.css';
@@ -345,7 +346,8 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
   const currentIndex = PHASE_ORDER.indexOf(phase);
   const atEnd = phase === 'debrief';
-  const speaking = session.coachAmplitude > 0.02;
+  // Debounced so the coach status doesn't flicker Speaking/Coaching on voice dips.
+  const speaking = useDebouncedSpeaking(session.coachAmplitude > 0.02);
 
   const handleExit = useCallback(() => {
     session.stop();

@@ -16,6 +16,7 @@ import {
   type ScenarioOption,
 } from '../training/trainingApi';
 import { useRoleplaySession } from '../training/useRoleplaySession';
+import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { LiveRoom } from '../components/LiveRoom';
 import { CallPresence } from '../components/CallPresence';
 import { SessionResults } from '../components/SessionResults';
@@ -504,7 +505,8 @@ function RoleplayRoom({
   }, [lastLine, transcript.length, endPromptOpen]);
 
   const alias = persona.characterAlias || persona.name;
-  const speaking = amplitude > SPEAKING_AMP;
+  // Debounced so the Speaking/Listening label doesn't flicker on brief voice dips.
+  const speaking = useDebouncedSpeaking(amplitude > SPEAKING_AMP);
 
   const endAndScore = useCallback(async () => {
     if (scoringRef.current) return; // ignore double-clicks during scoring
