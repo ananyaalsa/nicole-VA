@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NICOLE_BASE_PROMPT, buildSystemPrompt } from './nicolePrompt.js';
+import { NICOLE_BASE_PROMPT, NICOLE_CORE_IDENTITY, buildSystemPrompt } from './nicolePrompt.js';
 
 describe('NICOLE_BASE_PROMPT', () => {
   it('establishes Nicole identity and the no-Gemini rule', () => {
@@ -14,6 +14,15 @@ describe('NICOLE_BASE_PROMPT', () => {
     expect(NICOLE_BASE_PROMPT).toContain('YOUR VOICE CHARACTER');
     expect(NICOLE_BASE_PROMPT).toContain('HOW REAL HUMANS TALK');
     expect(NICOLE_BASE_PROMPT).toContain('NOISE & BACKGROUND VOICE HANDLING');
+  });
+
+  it('makes her a concise voice assistant (not a rambly chatbot)', () => {
+    expect(NICOLE_BASE_PROMPT).toContain('BE A VOICE ASSISTANT, NOT A CHATBOT');
+    expect(NICOLE_BASE_PROMPT).toMatch(/one or two sentences/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/do not end your turn with a question/i);
+    // Short greeting + anti-hallucination guards.
+    expect(NICOLE_BASE_PROMPT).toContain('GREETING — ONE SHORT LINE');
+    expect(NICOLE_BASE_PROMPT).toContain("DON'T MAKE THINGS UP");
   });
 
   it('mentions the memory tools and proactive remembering', () => {
@@ -84,6 +93,17 @@ describe('buildSystemPrompt', () => {
     expect(out).not.toContain('Earlier in this conversation');
   });
 
+  it('appends the integration capability section ONLY when integrationsEnabled', () => {
+    const off = buildSystemPrompt({});
+    expect(off).not.toContain('YOU CAN ACTUALLY DO THINGS NOW');
+
+    const on = buildSystemPrompt({ integrationsEnabled: true });
+    expect(on).toContain('YOU CAN ACTUALLY DO THINGS NOW');
+    // The confirm-before-acting safety must be present (it's enforced by prompt).
+    expect(on).toContain('CONFIRM BEFORE ANYTHING IRREVERSIBLE');
+    expect(on).toMatch(/book_meeting|send_email|post_slack/);
+  });
+
   it('appends the overlay and stylePrompt when present', () => {
     const out = buildSystemPrompt({
       overlay: 'TRAINING OVERLAY: act as a tough prospect.',
@@ -109,5 +129,26 @@ describe('buildSystemPrompt', () => {
     expect(iMem).toBeLessThan(iSum);
     expect(iSum).toBeLessThan(iOverlay);
     expect(iOverlay).toBeLessThan(iStyle);
+  });
+
+  it('coach/prospect modes use the lean core, NOT the full Talk personality', () => {
+    const coach = buildSystemPrompt({ mode: 'coach', overlay: 'PHASE: TEACH the framework.' });
+    // Lean identity core, the overlay — but NOT the Talk-assistant framing that
+    // made her drop out of a lesson into "what can I do for you?".
+    expect(coach).toContain(NICOLE_CORE_IDENTITY);
+    expect(coach).toContain('PHASE: TEACH the framework.');
+    expect(coach).not.toContain(NICOLE_BASE_PROMPT);
+    expect(coach).not.toContain('what can I do for you');
+    expect(coach).not.toContain('GREETING');
+
+    const prospect = buildSystemPrompt({ mode: 'prospect', overlay: 'You are a busy CFO.' });
+    expect(prospect).toContain(NICOLE_CORE_IDENTITY);
+    expect(prospect).toContain('You are a busy CFO.');
+    expect(prospect).not.toContain(NICOLE_BASE_PROMPT);
+  });
+
+  it('talk mode still uses the full personality', () => {
+    const talk = buildSystemPrompt({ mode: 'talk' });
+    expect(talk).toContain(NICOLE_BASE_PROMPT);
   });
 });

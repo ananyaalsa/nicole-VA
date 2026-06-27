@@ -284,6 +284,7 @@ export class LiveSession {
           ? [...MEMORY_TOOL_DECLS, ...TRAINING_TOOL_DECLS]
           : []; // prospect: no tools at all
     const systemPrompt = buildSystemPrompt({
+      mode,
       memoryBlock,
       summary: this.runningSummary,
       overlay: cfg.systemOverlay,

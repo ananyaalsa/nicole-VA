@@ -212,6 +212,23 @@ never acceptable. When they DO ask, deliver it prioritized and spoken (lead with
 time-sensitive, who an email is from when it matters), in a breath or two, ending with one
 "want me to..." offer rather than reading everything.`;
 
+/**
+ * A LEAN identity core for the practice modes (coach / prospect). It carries ONLY
+ * who she is + how she speaks aloud — NOT the Talk-assistant framing (greeting,
+ * "what can I do for you?", UI control, "is there anything else"). In those modes
+ * the per-session overlay is the WHOLE job, and the Talk personality must not bleed
+ * in (she was dropping out of a lesson into "Hey, what can I do for you?").
+ */
+export const NICOLE_CORE_IDENTITY = `## IDENTITY
+You are **Nicole**, made by AlsaTalk. If anyone asks who you are, you are Nicole — never Gemini, never "a Google AI", never a large language model.
+
+## HOW YOU SPEAK
+- You are speaking ALOUD. No markdown, no asterisks, no bullet symbols, no stage directions in brackets — just natural spoken sentences.
+- Be concise and natural. One idea per turn.`;
+
+/** Mode that determines how much of the personality the system prompt carries. */
+export type PromptMode = 'talk' | 'coach' | 'prospect';
+
 /** Options for assembling the full per-session system prompt. */
 export interface BuildSystemPromptOpts {
   /** Pre-formatted [MEMORY] block from formatMemoryBlock (may be empty). */
@@ -228,6 +245,12 @@ export interface BuildSystemPromptOpts {
    * provider is configured, so Nicole never claims abilities she lacks.
    */
   integrationsEnabled?: boolean;
+  /**
+   * Session mode. 'talk' = the full assistant personality. 'coach'/'prospect' =
+   * the lean identity core + the overlay only, so the practice role is total and
+   * the Talk-assistant behavior never leaks in.
+   */
+  mode?: PromptMode;
 }
 
 /**
@@ -236,6 +259,24 @@ export interface BuildSystemPromptOpts {
  * prompt — each as its own block, in that order. Empty pieces are omitted.
  */
 export function buildSystemPrompt(opts: BuildSystemPromptOpts): string {
+  const mode = opts.mode ?? 'talk';
+  const overlay = opts.overlay?.trim();
+
+  // PRACTICE MODES (coach / prospect): the overlay IS the whole role. Use only the
+  // lean identity core so the Talk-assistant personality (greeting, "what can I do
+  // for you?", UI control) can't bleed in — she stays fully in the lesson / scene.
+  if (mode === 'coach' || mode === 'prospect') {
+    const blocks: string[] = [NICOLE_CORE_IDENTITY];
+    if (overlay) blocks.push(overlay);
+    // Memory (the user's name/facts) still helps her coach/role-play personally.
+    const mem = opts.memoryBlock?.trim();
+    if (mem) blocks.push(mem);
+    const style = opts.stylePrompt?.trim();
+    if (style) blocks.push(style);
+    return blocks.join('\n\n');
+  }
+
+  // TALK MODE: the full assistant personality.
   const blocks: string[] = [NICOLE_BASE_PROMPT];
 
   // Capability section only when integrations are live (key-gated upstream).
@@ -247,7 +288,6 @@ export function buildSystemPrompt(opts: BuildSystemPromptOpts): string {
   const summary = opts.summary?.trim();
   if (summary) blocks.push(`[SUMMARY] Earlier in this conversation: ${summary}`);
 
-  const overlay = opts.overlay?.trim();
   if (overlay) blocks.push(overlay);
 
   const stylePrompt = opts.stylePrompt?.trim();
