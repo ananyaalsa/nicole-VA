@@ -116,19 +116,9 @@ const MAX_TRANSCRIPT_LINES = 400;
 // governs interrupting her mid-speech — it must NOT be so high that normal
 // speech fails to register. Kept low + a short sustain so interrupting is easy.
 
-/**
- * Input gain applied to every mic frame before sending to Gemini. autoGainControl
- * is off (it was clipping soft speech in quiet rooms), so we boost manually: a
- * normal speaking voice reaches Gemini at a level its VAD catches without the
- * user having to shout. 2.6x is a comfortable lift; the soft limiter in the
- * processor prevents loud peaks from distorting.
- */
-const MIC_INPUT_GAIN = 2.6;
-
-/** RMS floor below which audio is ignored for barge-in. Computed on the BOOSTED
- *  frame (post-gain), so it's scaled up from the old raw-level 0.045 to keep the
- *  same real-world sensitivity now that frames are ~2.6x louder. */
-const BARGE_IN_RMS_THRESHOLD = 0.1;
+/** RMS floor below which audio is ignored for barge-in, on the RAW mic signal.
+ *  Low so a normal speaking voice interrupts her, high enough to ignore a blip. */
+const BARGE_IN_RMS_THRESHOLD = 0.045;
 /**
  * Consecutive over-threshold frames before we treat it as a real interruption.
  * One frame (4096 samples @16kHz) ≈ 256ms, so 2 frames ≈ ~500ms — enough to
@@ -137,17 +127,19 @@ const BARGE_IN_RMS_THRESHOLD = 0.1;
  */
 const BARGE_IN_SUSTAIN_FRAMES = 2;
 /**
- * Mic constraints. We keep ECHO CANCELLATION on (stops Nicole's own voice from
- * feeding back into the mic — essential for a speaker setup), but leave
- * NOISE SUPPRESSION and AUTO-GAIN OFF: both were swallowing a normal-volume
- * voice (AGC dropped the gain in a quiet room; suppression clipped soft speech),
- * forcing the user to shout. Off = your voice comes through at its true level.
+ * Mic constraints. ALL of the browser's built-in processing is ON:
+ *   - echoCancellation: stops Nicole's own voice feeding back (speaker setups).
+ *   - autoGainControl: normalizes a normal-volume voice up to a usable level so
+ *     the user never has to shout (a flat manual multiply did this badly and
+ *     distorted peaks, which garbled transcription — "hello" x5, gibberish).
+ *   - noiseSuppression: cleans the signal so Gemini's transcription is accurate.
+ * We send this processed signal straight through — NO manual gain/soft-clip.
  */
 const MIC_CONSTRAINTS: MediaStreamConstraints = {
   audio: {
     echoCancellation: true,
-    noiseSuppression: false,
-    autoGainControl: false,
+    noiseSuppression: true,
+    autoGainControl: true,
     channelCount: 1,
   },
 };
@@ -615,19 +607,11 @@ export function useNicoleSession(
       if (processor) {
         processor.onaudioprocess = (ev: AudioProcessingEvent) => {
           const input = ev.inputBuffer.getChannelData(0);
-          // Copy out of the live buffer AND apply an input-gain BOOST so a
-          // normal speaking voice reaches Gemini at a level its VAD reliably
-          // hears (autoGainControl is off, so the raw mic is otherwise too quiet
-          // and the user had to shout). Soft-clip to avoid harsh distortion.
-          const frame = new Float32Array(input.length);
-          for (let i = 0; i < input.length; i++) {
-            let v = input[i] * MIC_INPUT_GAIN;
-            // Soft limiter: tanh-like knee keeps loud peaks from hard-clipping.
-            if (v > 1) v = 1; else if (v < -1) v = -1;
-            else if (v > 0.85) v = 0.85 + (v - 0.85) * 0.4;
-            else if (v < -0.85) v = -0.85 + (v + 0.85) * 0.4;
-            frame[i] = v;
-          }
+          // Send the browser-processed signal as-is (echo-cancel + AGC + noise
+          // suppression already did the work). A copy is needed because the live
+          // buffer is reused each tick. NO manual gain/soft-clip — that distorted
+          // peaks and garbled the transcription.
+          const frame = new Float32Array(input);
 
           // Barge-in gate: only a REAL, SUSTAINED utterance interrupts Nicole.
           // A single loud frame (a cough, a phone buzz, a door, a stray word
