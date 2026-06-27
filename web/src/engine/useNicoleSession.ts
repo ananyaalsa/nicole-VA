@@ -689,6 +689,9 @@ export function useNicoleSession(
     if (playCtx.createAnalyser) {
       const analyser = playCtx.createAnalyser();
       analyser.fftSize = 256;
+      // Low smoothing → the amplitude tracks the live waveform almost instantly
+      // (the default 0.8 averages over ~100ms+, making the mouth trail her voice).
+      analyser.smoothingTimeConstant = 0.1;
       // Analyser feeds the gain (so the wave reads pre-volume amplitude, and
       // audio is attenuated by the gain on its way to the speakers).
       if (gainNodeRef.current) analyser.connect(gainNodeRef.current);
