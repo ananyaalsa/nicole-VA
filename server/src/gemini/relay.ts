@@ -351,13 +351,14 @@ export class LiveSession {
       /* never break the proxy */
     }
 
-    // goAway: Gemini warns ~60s before it closes the connection. Reconnect NOW
-    // (resuming via the handle, so context + voice continue with no re-greeting)
-    // BEFORE the socket actually drops — this turns an unavoidable connection
-    // recycle into a seamless swap the user never perceives. Don't reconnect
-    // mid-utterance; if the user is speaking, the drop-handler covers it.
+    // goAway: Gemini warns ~60s before it closes the connection. In TALK mode we
+    // reconnect now (resuming via the handle) BEFORE the socket drops, so the
+    // long-lived assistant stays up seamlessly. In a COACH/PROSPECT session we do
+    // NOT proactively reconnect — a practice rep is short and bounded, and a
+    // mid-lesson reconnect froze transcription and made her re-greet. If such a
+    // session ever outlives the connection, the drop-handler reconnects it.
     try {
-      if (m?.goAway && !this.busy && !this.userSpeaking) {
+      if (m?.goAway && this.sessionConfig?.mode === 'talk' && !this.busy && !this.userSpeaking) {
         void this.reconnect('goaway');
       }
     } catch {
@@ -540,15 +541,15 @@ export class LiveSession {
 
   private async tickWatchdog(): Promise<void> {
     if (this.closed || this.busy || !this.session) return;
+    // Proactive refresh is for the long-lived TALK assistant only — never
+    // interrupt a bounded coach/prospect practice session.
+    if (this.sessionConfig?.mode !== 'talk') return;
     const sessionAge = this.now() - this.sessionOpenedAt;
     const handleAge = this.resumeHandleAt == null ? null : this.now() - this.resumeHandleAt;
     if (shouldProactiveReconnect(sessionAge, handleAge, this.userSpeaking)) {
-      this.busy = true;
-      try {
-        await this.reconnect('proactive');
-      } finally {
-        this.busy = false;
-      }
+      // reconnect() holds the busy guard itself — don't pre-set it (that made the
+      // guarded reconnect early-return and the proactive refresh never ran).
+      await this.reconnect('proactive');
     }
   }
 
