@@ -290,11 +290,17 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   const { token } = (useAuth() as { token?: string | null });
   const startedAtRef = useRef(Date.now());
   const savedRef = useRef(false);
+  const autoStartedRef = useRef(false);
 
   // Mounting this component IS the user's intent to begin (they tapped "Start
   // drill" on the picker), so we AUTO-START the lesson — no extra "Begin lesson"
   // click. Nicole opens the drill herself and drives it from here.
+  // GUARDED so it fires exactly once: React StrictMode double-invokes mount
+  // effects in dev, and a second start() reconnected the coach and stranded the
+  // [OPEN] directive — the room got stuck on "getting your lesson ready…".
   useEffect(() => {
+    if (autoStartedRef.current) return;
+    autoStartedRef.current = true;
     setStarted(true);
     startedAtRef.current = Date.now();
     void postLiveStatus(

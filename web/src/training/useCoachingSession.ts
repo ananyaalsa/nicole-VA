@@ -110,6 +110,12 @@ export function useCoachingSession(
     () => buildPhasePrompt(lesson, phase, null),
     [lesson, phase],
   );
+  // Mirror the overlay + track which one the live coach session is connected with,
+  // so the reconnect effect only reconnects on a REAL phase change (not on the
+  // initial connect, which would strand the [OPEN] and stick the room).
+  const coachOverlayRef = useRef(coachOverlay);
+  coachOverlayRef.current = coachOverlay;
+  const reconnectOverlaySeenRef = useRef<string | null>(null);
 
   // Forward ref so the onToolCall closure below can always call the latest
   // markProgress without capturing a stale closure — markProgress is defined
@@ -187,6 +193,9 @@ export function useCoachingSession(
     startedRef.current = true;
     // Fresh session → allow the one-shot opener to fire on this connect.
     sentCoachOpenRef.current = false;
+    // Record the overlay we're connecting WITH so the reconnect effect doesn't
+    // immediately reconnect (which stranded the [OPEN] and stuck the room).
+    reconnectOverlaySeenRef.current = coachOverlayRef.current;
     await coachStartRef.current();
   }, []);
 
@@ -328,10 +337,18 @@ export function useCoachingSession(
   // When the phase changes (after start), reconnect the coach so the backend
   // receives the new phase overlay. Deferred via afterNextModelTurn so Nicole
   // isn't cut off mid-sentence when the phase boundary fires.
+  //
+  // CRITICAL: skip the FIRST overlay value. start() already connects the coach
+  // with the intro overlay, so reconnecting again immediately would tear down the
+  // session before Nicole answers the [OPEN] directive — the room got stuck on
+  // "getting your lesson ready…". Only reconnect on a genuine later phase change.
   useEffect(() => {
     if (!startedRef.current) return;
+    // start() recorded the overlay it connected with; reconnect only when the
+    // overlay genuinely changes (a real phase change), never on the first connect.
+    if (reconnectOverlaySeenRef.current === coachOverlay) return;
+    reconnectOverlaySeenRef.current = coachOverlay;
     coachAfterTurnRef.current(() => { void coachStartRef.current(); });
-    // coachOverlay is the meaningful trigger; re-run when it changes.
   }, [coachOverlay]);
 
   // Bring the prospect session up only during the roleplay phase, and tear it

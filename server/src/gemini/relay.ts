@@ -157,6 +157,23 @@ export class LiveSession {
    * proper turns structure (sendRealtimeInput is audio-only).
    */
   sendText(text: string): void {
+    if (!text) return;
+    // The browser may fire an opener ([OPEN]/[STATUS]/[WEATHER]) right after our
+    // `ready` signal, but the Gemini session object isn't assigned until
+    // ai.live.connect() resolves — which can be slower than the client's delay
+    // (this stranded the coach's [OPEN] and stuck the training room). If the
+    // session isn't ready yet, QUEUE the text and flush it once setup completes.
+    if (!this.session) {
+      this.pendingTexts.push(text);
+      return;
+    }
+    this.dispatchText(text);
+  }
+
+  /** Texts requested before the Gemini session was ready, flushed on setup. */
+  private pendingTexts: string[] = [];
+
+  private dispatchText(text: string): void {
     if (!this.session || !text) return;
     try {
       if (typeof this.session.sendClientContent === 'function') {
@@ -173,6 +190,14 @@ export class LiveSession {
     } catch {
       /* surfaced via onerror */
     }
+  }
+
+  /** Flush any text queued before the session was ready (called once connected). */
+  private flushPendingTexts(): void {
+    if (!this.session || this.pendingTexts.length === 0) return;
+    const queued = this.pendingTexts;
+    this.pendingTexts = [];
+    for (const t of queued) this.dispatchText(t);
   }
 
   /** Forward a tool response from the client to Gemini. */
@@ -299,9 +324,14 @@ export class LiveSession {
       },
     });
     this.sessionOpenedAt = this.now();
+    // The session object now exists — flush any text queued before it was ready.
+    this.flushPendingTexts();
   }
 
   private onGeminiMessage(m: any): void {
+    // Gemini signals it's truly ready for turns with setupComplete — flush any
+    // opener text that was queued before the session could accept it.
+    if (m?.setupComplete) this.flushPendingTexts();
     // Relay verbatim to the browser (audio + everything).
     if (this.deps.client.isOpen()) {
       this.deps.client.send({ type: 'message', payload: m });
