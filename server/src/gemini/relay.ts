@@ -220,6 +220,8 @@ export class LiveSession {
   close(): void {
     this.closed = true;
     this.stopWatchdog();
+    // Drop any queued opener text so it can't fire on a later reconnect.
+    this.pendingTexts = [];
     try {
       this.session?.close?.();
     } catch {

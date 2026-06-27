@@ -349,8 +349,14 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
   const handleExit = useCallback(() => {
     session.stop();
+    // Mark the drill ended so Talk-Nicole doesn't think you're still mid-training
+    // and keep coaching when you return (the live-status was stuck on 'active').
+    void postLiveStatus(
+      { mode: 'training', state: 'finished', skill: lesson.title, startedAt: startedAtRef.current, finishedAt: Date.now() },
+      token ?? undefined,
+    );
     onExit();
-  }, [session, onExit]);
+  }, [session, onExit, lesson, token]);
 
   const handleFinishPractice = useCallback(async () => {
     if (scoring) return;
