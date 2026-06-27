@@ -16,10 +16,15 @@ describe('formatLiveStatusLine', () => {
     expect(line).toContain('currently in a Training drill');
     expect(line).toContain('Cold-call open');
   });
-  it('describes a just-finished roleplay with score', () => {
+  it('describes a just-completed roleplay with score', () => {
     const line = formatLiveStatusLine({ mode: 'roleplay', state: 'finished', skill: 'Pricing call', startedAt: now - 300_000, finishedAt: now - 60_000, score: 6.4 }, now);
-    expect(line).toContain('just finished a Roleplay');
+    expect(line).toContain('COMPLETED a Roleplay');
     expect(line).toContain('6.4');
+  });
+  it('describes a LEFT drill so Nicole does not congratulate it', () => {
+    const line = formatLiveStatusLine({ mode: 'training', state: 'left', skill: 'Cold-call open', startedAt: now - 60_000, finishedAt: now - 5000 }, now);
+    expect(line).toContain('LEFT WITHOUT completing');
+    expect(line).not.toContain('COMPLETED a Training'); // never implies completion
   });
   it('describes entered-but-not-started', () => {
     const line = formatLiveStatusLine({ mode: 'training', state: 'entered', startedAt: now - 5000 }, now);

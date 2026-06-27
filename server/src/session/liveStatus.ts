@@ -1,6 +1,14 @@
 export interface LiveStatus {
+  /**
+   * entered  — opened the screen, no drill/rep started yet.
+   * active   — currently in a drill/rep.
+   * finished — COMPLETED it (has a score / saw the debrief).
+   * left     — exited WITHOUT completing (bailed mid-drill or right after start).
+   *            Distinct from 'finished' so Nicole never congratulates a drill the
+   *            user abandoned.
+   */
   mode: 'training' | 'roleplay';
-  state: 'entered' | 'active' | 'finished';
+  state: 'entered' | 'active' | 'finished' | 'left';
   skill?: string;
   startedAt: number;       // epoch ms
   finishedAt?: number;
@@ -34,7 +42,10 @@ export function formatLiveStatusLine(s: LiveStatus, nowMs: number): string | nul
   }
   if (s.state === 'finished') {
     const score = typeof s.score === 'number' ? ` — scored ${s.score.toFixed(1)}/10` : '';
-    return `User just finished a ${modeLabel}${skill} ${minutesAgo(nowMs - (s.finishedAt ?? s.startedAt))}${score}.`;
+    return `User just COMPLETED a ${modeLabel}${skill} ${minutesAgo(nowMs - (s.finishedAt ?? s.startedAt))}${score}. You may ask how it went.`;
+  }
+  if (s.state === 'left') {
+    return `User opened a ${modeLabel}${skill} and then LEFT WITHOUT completing it. Do NOT congratulate them or say "nice work finishing" — they did not finish. If anything, ask if they want to actually run it.`;
   }
   // entered
   return `User opened ${modeLabel} a moment ago but hasn't started ${s.mode === 'training' ? 'a drill' : 'a rep'} yet.`;

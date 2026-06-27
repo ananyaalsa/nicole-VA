@@ -38,7 +38,7 @@ export async function requestScore(
 }
 
 export interface LiveStatusInput {
-  mode: 'training' | 'roleplay'; state: 'entered' | 'active' | 'finished';
+  mode: 'training' | 'roleplay'; state: 'entered' | 'active' | 'finished' | 'left';
   skill?: string; startedAt: number; finishedAt?: number; score?: number;
 }
 

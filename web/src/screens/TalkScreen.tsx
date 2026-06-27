@@ -243,11 +243,14 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
     void (async () => {
       const st = await fetchLiveStatus(token ?? undefined);
       if (!st) return;
+      const skill = st.skill ? ` (${st.skill})` : '';
       const line = st.state === 'finished'
-        ? `[STATUS] The user just finished a ${st.mode} ${st.skill ? `(${st.skill})` : ''}${typeof st.score === 'number' ? `, scored ${st.score}/10` : ''}. If relevant, ask how it went; do not offer to start it again.`
-        : st.state === 'active'
-          ? `[STATUS] The user is mid-${st.mode}${st.skill ? ` (${st.skill})` : ''}.`
-          : `[STATUS] The user opened ${st.mode} but did not start.`;
+        ? `[STATUS] The user just COMPLETED a ${st.mode}${skill}${typeof st.score === 'number' ? `, scored ${st.score}/10` : ''}. If relevant, ask how it went; do not offer to start it again.`
+        : st.state === 'left'
+          ? `[STATUS] The user opened a ${st.mode}${skill} and LEFT WITHOUT completing it. Do NOT say "nice work finishing" or congratulate them — they did not finish.`
+          : st.state === 'active'
+            ? `[STATUS] The user is mid-${st.mode}${skill}.`
+            : `[STATUS] The user opened ${st.mode} but did not start.`;
       sendTextRef.current(line);
     })();
   }, [backgrounded, connected, token]);

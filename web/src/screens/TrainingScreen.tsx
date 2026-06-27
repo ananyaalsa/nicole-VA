@@ -349,12 +349,16 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
   const handleExit = useCallback(() => {
     session.stop();
-    // Mark the drill ended so Talk-Nicole doesn't think you're still mid-training
-    // and keep coaching when you return (the live-status was stuck on 'active').
-    void postLiveStatus(
-      { mode: 'training', state: 'finished', skill: lesson.title, startedAt: startedAtRef.current, finishedAt: Date.now() },
-      token ?? undefined,
-    );
+    // Tell Talk-Nicole the truth about what just happened so she doesn't
+    // mis-congratulate. If the drill produced a scorecard the user COMPLETED it
+    // (state 'finished' is already posted by the save effect); if they bailed
+    // before finishing, mark it 'left' so she never says "nice work finishing!".
+    if (!session.scorecardResult) {
+      void postLiveStatus(
+        { mode: 'training', state: 'left', skill: lesson.title, startedAt: startedAtRef.current, finishedAt: Date.now() },
+        token ?? undefined,
+      );
+    }
     onExit();
   }, [session, onExit, lesson, token]);
 

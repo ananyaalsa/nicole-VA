@@ -42,7 +42,7 @@ export async function handleSessionRoute(req: IncomingMessage, res: ServerRespon
     if (req.method === 'POST') {
       const b = await readBody(req);
       const mode = b.mode === 'roleplay' ? 'roleplay' : 'training';
-      const state = ['entered', 'active', 'finished'].includes(b.state) ? b.state : 'entered';
+      const state = ['entered', 'active', 'finished', 'left'].includes(b.state) ? b.state : 'entered';
       const status: LiveStatus = {
         mode,
         state,
