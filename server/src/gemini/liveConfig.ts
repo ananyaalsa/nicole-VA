@@ -16,11 +16,12 @@ export const REALTIME_INPUT_CONFIG = {
     startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
     endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
     prefixPaddingMs: 600,
-    // 800ms: a touch more patient than CHAT's 700ms so a brief mid-thought
-    // pause doesn't make her jump in — but NOT so long she feels unresponsive.
-    // (1100ms was too long: combined with the mic DSP it made her seem deaf to
-    // normal speech.) The client's sustained-frame barge-in gate handles blips.
-    silenceDurationMs: 800,
+    // 1000ms: tolerate natural pauses BETWEEN WORDS so one slow-spoken utterance
+    // stays ONE turn (not many short turns → fragmented bubbles + reply-spam).
+    // The mic input boost ensures the speech itself reaches the VAD, so this
+    // longer window doesn't make her seem deaf. The client's sustained-frame
+    // barge-in gate still lets the user interrupt her quickly.
+    silenceDurationMs: 1000,
   },
 } as const;
 
@@ -60,11 +61,23 @@ export function buildLiveConfig(
         prebuiltVoiceConfig: { voiceName: opts.voiceName },
       },
     },
+    // Lower temperature reins in random embellishment + reduces hallucination,
+    // reinforcing the "be concise, don't make things up" prompt rules. (Not a
+    // brevity cap — maxOutputTokens would clip audio mid-sentence; brevity comes
+    // from the system prompt.)
+    generationConfig: { temperature: 0.3 },
     systemInstruction: opts.systemPrompt,
     realtimeInputConfig: REALTIME_INPUT_CONFIG,
     tools,
     // Empty object requests session-resumption handles from the server.
     sessionResumption: {},
+    // Lift the hard session-duration cap (15 min audio) to effectively unlimited:
+    // a sliding window discards the oldest turns instead of ending the session, so
+    // Nicole never hits a wall and goes down. Combined with session resumption +
+    // proactive reconnect, the assistant stays continuously available. Anything
+    // that must never be forgotten lives in the system prompt / memory, not the
+    // live window, so pruning old turns is safe.
+    contextWindowCompression: { slidingWindow: {} },
     // Empty objects request both-side audio transcripts.
     inputAudioTranscription: {},
     outputAudioTranscription: {},

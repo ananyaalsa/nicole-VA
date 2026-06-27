@@ -8,8 +8,8 @@ describe('REALTIME_INPUT_CONFIG', () => {
         startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
         endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
         prefixPaddingMs: 600,
-        // Slightly patient (800ms) without making her deaf to normal speech.
-        silenceDurationMs: 800,
+        // Patient (1000ms) so a slow-spoken utterance with pauses stays one turn.
+        silenceDurationMs: 1000,
       },
     });
   });
@@ -43,6 +43,11 @@ describe('buildLiveConfig', () => {
   it('requests session resumption handles', () => {
     const cfg = buildLiveConfig(base) as any;
     expect(cfg.sessionResumption).toEqual({});
+  });
+
+  it('enables sliding-window context compression (unlimited session duration)', () => {
+    const cfg = buildLiveConfig(base) as any;
+    expect(cfg.contextWindowCompression).toEqual({ slidingWindow: {} });
   });
 
   it('requests both input and output audio transcription', () => {

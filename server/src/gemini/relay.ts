@@ -351,6 +351,19 @@ export class LiveSession {
       /* never break the proxy */
     }
 
+    // goAway: Gemini warns ~60s before it closes the connection. Reconnect NOW
+    // (resuming via the handle, so context + voice continue with no re-greeting)
+    // BEFORE the socket actually drops — this turns an unavoidable connection
+    // recycle into a seamless swap the user never perceives. Don't reconnect
+    // mid-utterance; if the user is speaking, the drop-handler covers it.
+    try {
+      if (m?.goAway && !this.busy && !this.userSpeaking) {
+        void this.reconnect('goaway');
+      }
+    } catch {
+      /* never break the proxy */
+    }
+
     // Accumulate transcripts → turns (for summary + close-out memory).
     try {
       const sc = m?.serverContent;
@@ -465,7 +478,8 @@ export class LiveSession {
         : fresh;
       this.turns = toKeep;
       // Reconnect seeded with the new [SUMMARY] so the live context is light.
-      await this.reconnect('summary');
+      // We already hold `busy`, so call the unguarded form.
+      await this.doReconnect();
     } catch {
       /* if summarization fails, keep going on the existing session */
     } finally {
@@ -493,14 +507,24 @@ export class LiveSession {
     });
   }
 
-  /** Close the current Gemini session and open a fresh one (handle reused). */
+  /** Close the current Gemini session and open a fresh one (handle reused).
+   *  Guarded so overlapping triggers (goAway + drop + proactive) can't stack into
+   *  duplicate reconnects. (maybeSummarize sets `busy` itself, so it calls the
+   *  unguarded doReconnect directly.) */
   private async reconnect(_why: string): Promise<void> {
-    if (this.closed) return;
+    if (this.closed || this.busy) return;
+    this.busy = true;
     try {
-      this.session?.close?.();
-    } catch {
-      /* ignore */
+      await this.doReconnect();
+    } finally {
+      this.busy = false;
     }
+  }
+
+  /** The actual close-and-reopen. Callers must hold the `busy` guard. */
+  private async doReconnect(): Promise<void> {
+    if (this.closed) return;
+    try { this.session?.close?.(); } catch { /* ignore */ }
     this.session = null;
     await this.openGemini();
   }
