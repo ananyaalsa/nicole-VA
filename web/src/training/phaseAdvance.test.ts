@@ -8,22 +8,21 @@ describe('shouldAdvancePhase', () => {
     expect(shouldAdvancePhase('debrief', { turns: 99, litDelta: 99, timeInPhaseMs: 9_999_999 })).toBe(false);
   });
 
-  it('intro advances quickly on one turn past the floor', () => {
-    expect(shouldAdvancePhase('intro', { turns: 1, litDelta: 0, timeInPhaseMs: 6500 })).toBe(true);
+  it('intro advances on one turn past the floor (8s dwell)', () => {
+    expect(shouldAdvancePhase('intro', { turns: 1, litDelta: 0, timeInPhaseMs: 8500 })).toBe(true);
     expect(shouldAdvancePhase('intro', { turns: 0, litDelta: 0, timeInPhaseMs: 2000 })).toBe(false);
   });
 
-  it('teach advances on enough lit moves', () => {
-    expect(shouldAdvancePhase('teach', { turns: 0, litDelta: 1, timeInPhaseMs: 1000 })).toBe(true);
-  });
-
-  it('teach advances on the engagement floor', () => {
-    expect(shouldAdvancePhase('teach', { turns: 2, litDelta: 0, timeInPhaseMs: 13000 })).toBe(true);
-    expect(shouldAdvancePhase('teach', { turns: 2, litDelta: 0, timeInPhaseMs: 5000 })).toBe(false);
+  it('teach lingers — needs a real exchange (3 turns past a 25s dwell), not a single lit move', () => {
+    // A single lit move no longer rushes it onward (minLitDelta is 0 → scorer
+    // trigger off); the learner gets time to absorb.
+    expect(shouldAdvancePhase('teach', { turns: 1, litDelta: 1, timeInPhaseMs: 5000 })).toBe(false);
+    expect(shouldAdvancePhase('teach', { turns: 3, litDelta: 0, timeInPhaseMs: 26000 })).toBe(true);
+    expect(shouldAdvancePhase('teach', { turns: 3, litDelta: 0, timeInPhaseMs: 10000 })).toBe(false);
   });
 
   it('always force-advances past the hard ceiling even with no engagement', () => {
-    expect(shouldAdvancePhase('guided_practice', { turns: 0, litDelta: 0, timeInPhaseMs: 200_000 })).toBe(true);
+    expect(shouldAdvancePhase('guided_practice', { turns: 0, litDelta: 0, timeInPhaseMs: 320_000 })).toBe(true);
   });
 
   it('exposes the four auto phases', () => {

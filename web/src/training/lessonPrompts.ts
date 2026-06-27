@@ -187,7 +187,7 @@ export function buildPhasePrompt(
       break;
     case 'debrief':
       // The lesson IS over here — no drift guard, no advance/gate rider.
-      return `${base}\nPHASE: DEBRIEF. The rep is over. Give direct, specific feedback against each ${lesson.coreFramework.name} move (${moveList}) — what they did well and what to fix — then name the ONE thing to drill next. Be honest and concrete, grounded in THIS scenario.`;
+      return `${base}\nPHASE: DEBRIEF. The rep is over. Give direct, specific feedback against each ${lesson.coreFramework.name} move (${moveList}) — what they did well and what to fix — then name the ONE thing to drill next. Be honest and concrete, grounded in THIS scenario. Then DON'T rush off — ask the learner whether they want to run another round or go over this one more, and wait for their answer.`;
     default:
       return base;
   }

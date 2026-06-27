@@ -8,11 +8,14 @@ export interface AdvanceSignals {
 
 interface PhaseCfg { minLitDelta: number; minTurns: number; minPhaseMs: number; maxPhaseMs: number }
 
+// Pacing: LINGER, don't rush. Each teaching phase needs a real exchange (more
+// turns) and a longer minimum dwell before the app moves on, so the learner has
+// time to absorb. The hard ceiling only force-advances if a phase truly stalls.
 const CFG: Record<string, PhaseCfg> = {
-  intro:           { minLitDelta: 0, minTurns: 1, minPhaseMs: 6000,  maxPhaseMs: 90000 },
-  teach:           { minLitDelta: 1, minTurns: 2, minPhaseMs: 12000, maxPhaseMs: 180000 },
-  model:           { minLitDelta: 1, minTurns: 2, minPhaseMs: 12000, maxPhaseMs: 180000 },
-  guided_practice: { minLitDelta: 2, minTurns: 2, minPhaseMs: 12000, maxPhaseMs: 180000 },
+  intro:           { minLitDelta: 0, minTurns: 1, minPhaseMs: 8000,  maxPhaseMs: 120000 },
+  teach:           { minLitDelta: 0, minTurns: 3, minPhaseMs: 25000, maxPhaseMs: 240000 },
+  model:           { minLitDelta: 0, minTurns: 3, minPhaseMs: 25000, maxPhaseMs: 240000 },
+  guided_practice: { minLitDelta: 3, minTurns: 4, minPhaseMs: 30000, maxPhaseMs: 300000 },
 };
 
 /** The phases the APP advances on its own. Gates (readiness_check, roleplay_demo,
