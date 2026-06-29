@@ -162,17 +162,23 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
       <h2 className="home-greeting" data-testid="home-greeting">{hello}</h2>
       <p className="home-sub">Start talking, or pick one below.</p>
 
-      {/* Coach strip — only with history */}
-      {(stats.streak > 0 || stats.lastScore != null) && (
+      {/* Coach strip — only with meaningful history. A 0.0 last score is almost
+          always a junk/failed run, so don't surface it (the user found "Last: 0.0"
+          confusing). Only show the last-score pill for a real (> 0) score. */}
+      {(() => {
+        const showScore = stats.lastScore != null && stats.lastScore > 0;
+        const showStrip = stats.streak > 0 || showScore || !!stats.weakest;
+        if (!showStrip) return null;
+        return (
         <div className="home-coach" data-testid="home-coach">
           {stats.streak > 0 && (
             <span className="home-coach__pill" title="Practice streak">
               {STREAK_ICON} {stats.streak}-day streak
             </span>
           )}
-          {stats.lastScore != null && (
+          {showScore && (
             <span className="home-coach__pill">
-              Last: {stats.lastScore.toFixed(1)}
+              Last: {stats.lastScore!.toFixed(1)}
               {stats.trend === 'up' && <span className="home-coach__trend up"> ↑</span>}
               {stats.trend === 'down' && <span className="home-coach__trend down"> ↓</span>}
             </span>
@@ -183,7 +189,8 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
             </button>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Starter chips — one tap to send */}
       <div className="home-chips" data-testid="home-chips">

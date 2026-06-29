@@ -51,16 +51,22 @@
        she stands right above "Start talking", clear of the starter chips. */
     bottom: 78px;
   }
+  /* Fixed pixel size; the speaking emphasis uses transform:scale (GPU-composited)
+     NOT width/height. Animating a <canvas>'s width/height re-rasterizes its
+     drawing buffer every frame, which made the avatar visibly glitch/jitter while
+     speaking on mobile. transform:scale is smooth and never touches the canvas
+     backing store. */
   .l2d-companion__stage {
-    width: 90px;
-    height: 132px;
-    opacity: 0.92;
-    transform-origin: bottom right;
-    transition: width 240ms ease, height 240ms ease, opacity 240ms ease;
-  }
-  .l2d-companion.is-speaking .l2d-companion__stage {
     width: 116px;
     height: 178px;
+    opacity: 0.92;
+    transform-origin: bottom right;
+    transform: scale(0.8);
+    transition: transform 240ms ease, opacity 240ms ease;
+    will-change: transform;
+  }
+  .l2d-companion.is-speaking .l2d-companion__stage {
+    transform: scale(1);
     opacity: 1;
   }
 }

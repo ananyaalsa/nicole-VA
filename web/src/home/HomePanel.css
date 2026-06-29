@@ -133,12 +133,13 @@
   .home-chips {
     flex-wrap: nowrap;
     overflow-x: auto;
-    justify-content: flex-start;
+    /* `safe center` centers the row when the chips FIT, but falls back to
+       start-alignment (no clipping of the first chip) when they overflow and
+       must scroll. Plain `center` would hide the start of an overflowing row. */
+    justify-content: safe center;
     gap: 8px;
     padding: 2px 16px 4px;
-    margin: 0 -4px; /* let the row use full width inside the centered .home */
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
     scroll-snap-type: x proximity;
   }
   .home-chips::-webkit-scrollbar { display: none; }
