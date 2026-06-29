@@ -468,10 +468,13 @@ function RoleplayRoom({
     scenario,
     extraOverlay: DIFFICULTY_META[difficulty].overlay,
   });
-  const { connected, micOn, transcript, amplitude, realtime, start, stop, toggleMic } = session;
+  const { connected, micOn, transcript, amplitude, realtime, start, stop, toggleMic, setMic, clearTranscript } = session;
 
   const [scResult, setScResult] = useState<Scorecard | null>(null);
   const [saving, setSaving] = useState(false);
+  // True from the moment "End & score" is tapped until the report is ready, so we
+  // leave the call screen and show a "generating your report…" state (no stuck UI).
+  const [scoring, setScoring] = useState(false);
   // Auto end-of-call prompt: appears when either side says goodbye, offering
   // End & score / Replay (dismissible so a false 'later' mid-call doesn't trap).
   const [endPromptOpen, setEndPromptOpen] = useState(false);
@@ -501,8 +504,13 @@ function RoleplayRoom({
   useEffect(() => {
     if (endPromptDismissedRef.current || endPromptOpen) return;
     if (transcript.length < 3) return; // need a real exchange first
-    if (lastLine && isClosingLine(lastLine.text)) setEndPromptOpen(true);
-  }, [lastLine, transcript.length, endPromptOpen]);
+    if (lastLine && isClosingLine(lastLine.text)) {
+      setEndPromptOpen(true);
+      // Silence the mic while the end-of-call prompt is up — the user's "replay
+      // or end?" decision should drive a BUTTON, not get spoken into the rep.
+      setMic(false);
+    }
+  }, [lastLine, transcript.length, endPromptOpen, setMic]);
 
   const alias = persona.characterAlias || persona.name;
   // Debounced so the Speaking/Listening label doesn't flicker on brief voice dips.
@@ -511,6 +519,7 @@ function RoleplayRoom({
   const endAndScore = useCallback(async () => {
     if (scoringRef.current) return; // ignore double-clicks during scoring
     scoringRef.current = true;
+    setScoring(true); // leave the call screen → show "generating your report…"
     const lines: ResultLine[] = transcript.map((l) => ({
       speaker: l.speaker === 'you' ? 'you' : 'rep',
       text: l.text,
@@ -569,6 +578,39 @@ function RoleplayRoom({
       token ?? undefined,
     );
   }, [transcript, dimensions, stop, profileId, persona, scenario, alias, token]);
+
+  // Replay the SAME scene from scratch: wipe the conversation (it is NOT saved —
+  // only End & score persists), re-arm the end prompt, turn the mic back on, and
+  // restart the session.
+  const replayScene = useCallback(() => {
+    setEndPromptOpen(false);
+    endPromptDismissedRef.current = false;
+    clearTranscript();
+    setMic(true);
+    void start();
+  }, [clearTranscript, setMic, start]);
+
+  // "Keep talking" — dismiss the prompt and re-open the mic so the call continues.
+  const keepTalking = useCallback(() => {
+    endPromptDismissedRef.current = true;
+    setEndPromptOpen(false);
+    setMic(true);
+  }, [setMic]);
+
+  // GENERATING stage — between "End & score" and the report being ready. We
+  // leave the call screen immediately so the user sees clear progress, not a
+  // frozen room while the judge runs. (All hooks above this point.)
+  if (scoring && !scResult) {
+    return (
+      <div className="roleplay roleplay--generating" data-testid="roleplay-generating">
+        <div className="rp-generating">
+          <div className="rp-generating__spinner" aria-hidden="true" />
+          <p className="rp-generating__title">Generating your report…</p>
+          <p className="rp-generating__sub">Scoring your call against {persona.name}. One moment.</p>
+        </div>
+      </div>
+    );
+  }
 
   // RESULT stage — full SessionResults debrief from the judge.
   if (scResult) {
@@ -650,7 +692,7 @@ function RoleplayRoom({
               type="button"
               className="session-replay"
               data-testid="restart-scene-button"
-              onClick={() => void start()}
+              onClick={replayScene}
             >
               Restart scene
             </button>
@@ -691,7 +733,7 @@ function RoleplayRoom({
             className="endcall__scrim"
             aria-label="Keep talking"
             data-testid="endcall-dismiss"
-            onClick={() => { endPromptDismissedRef.current = true; setEndPromptOpen(false); }}
+            onClick={keepTalking}
           />
           <div className="endcall__card">
             <p className="endcall__title">Sounds like you're wrapping up.</p>
@@ -700,7 +742,7 @@ function RoleplayRoom({
                 type="button"
                 className="endcall__replay"
                 data-testid="endcall-replay"
-                onClick={() => { setEndPromptOpen(false); void start(); }}
+                onClick={replayScene}
               >
                 Replay
               </button>
@@ -717,7 +759,7 @@ function RoleplayRoom({
               type="button"
               className="endcall__keep"
               data-testid="endcall-keep"
-              onClick={() => { endPromptDismissedRef.current = true; setEndPromptOpen(false); }}
+              onClick={keepTalking}
             >
               Keep talking
             </button>

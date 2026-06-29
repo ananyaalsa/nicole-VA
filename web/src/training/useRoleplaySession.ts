@@ -39,6 +39,11 @@ export interface UseRoleplayResult {
   start: () => Promise<void>;
   stop: () => void;
   toggleMic: () => void;
+  /** Set the mic on/off explicitly (used to silence the mic when the end-of-call
+   *  prompt appears, so the user's "replay or end?" decision isn't transcribed). */
+  setMic: (on: boolean) => void;
+  /** Wipe the visible transcript — used by Replay to start the same scene fresh. */
+  clearTranscript: () => void;
 }
 
 /**
@@ -129,5 +134,7 @@ export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult 
     start,
     stop: session.stop,
     toggleMic: session.toggleMic,
+    setMic: session.setMic,
+    clearTranscript: session.clearTranscript,
   };
 }

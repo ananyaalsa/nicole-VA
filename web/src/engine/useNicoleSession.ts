@@ -79,6 +79,7 @@ export interface UseNicoleSessionResult {
   /** Clear the visible transcript (after End — durable facts stay in memory). */
   clearTranscript: () => void;
   toggleMic: () => void;
+  setMic: (on: boolean) => void;
   setVoice: (v: string) => void;
   /** Send a silent text directive to the model (e.g. roleplay "[OPEN]" autostart). */
   sendText: (text: string) => void;
@@ -979,6 +980,14 @@ export function useNicoleSession(
     });
   }, []);
 
+  /** Force the mic on or off (idempotent — unlike toggleMic which flips). */
+  const setMic = useCallback((on: boolean) => {
+    wantMicRef.current = on;
+    const stream = streamRef.current;
+    if (stream) for (const track of stream.getTracks()) track.enabled = on;
+    setMicOn(on);
+  }, []);
+
   // ------------------------------------------------------------------------
   // Public: setVoice (reconnect with new voice, preserving transcript)
   // ------------------------------------------------------------------------
@@ -1102,6 +1111,7 @@ export function useNicoleSession(
     stop,
     clearTranscript,
     toggleMic,
+    setMic,
     setVoice,
     sendText,
     sendVideoFrame,
