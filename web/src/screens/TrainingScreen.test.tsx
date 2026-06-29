@@ -22,6 +22,12 @@ const fake = {
   activeRealtime: { you: '', nicole: '' },
   activeAmplitude: 0,
   inLiveRep: false,
+  prospectLabel: 'Grant',
+  ready: true,
+  micOn: true,
+  toggleMic: vi.fn(),
+  aiMuted: false,
+  toggleAiMute: vi.fn(),
   scorecardResult: null as null | {
     overallScore: number;
     band: 'needs_work' | 'developing' | 'proficient' | 'strong';

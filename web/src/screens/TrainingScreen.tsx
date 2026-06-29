@@ -14,6 +14,7 @@ import { PHASE_ORDER, type Phase } from '../training/phaseMachine';
 import { useCoachingSession } from '../training/useCoachingSession';
 import { LiveRoom } from '../components/LiveRoom';
 import { CallPresence } from '../components/CallPresence';
+import { MicControls } from '../components/MicControls';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { SessionResults } from '../components/SessionResults';
 import '../components/ProfilePanel.css';
@@ -545,9 +546,15 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         rail={rail}
         footer={
           <>
-            <span className="room-footer__turn">
-              {scoreError ? "Couldn't score — try again" : speaking ? 'Speaking…' : started ? 'Live' : 'Ready'}
-            </span>
+            {/* Mic-ready indicator + manual mic / AI-mute, so the user knows when
+                their voice is heard and can mute either side at will. */}
+            <MicControls
+              ready={session.ready}
+              micOn={session.micOn}
+              onToggleMic={session.toggleMic}
+              aiMuted={session.aiMuted}
+              onToggleAiMute={session.toggleAiMute}
+            />
             <div className="room-footer__actions">
               {phase === 'roleplay_demo' && (
                 <button

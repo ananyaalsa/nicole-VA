@@ -63,6 +63,16 @@ export interface UseCoachingSessionResult {
   /** The fixed in-character name of the live-rep prospect (e.g. "Grant"), so the
    *  UI labels the speaker with the real persona instead of a generic "Prospect". */
   prospectLabel: string;
+  /** True once the ACTIVE session will accept mic audio — drives the mic indicator. */
+  ready: boolean;
+  /** Is the user's mic currently on (for the manual mic button). */
+  micOn: boolean;
+  /** Toggle the user's mic on/off (manual control). */
+  toggleMic: () => void;
+  /** Whether Nicole/the prospect's audio output is muted (manual AI-mute). */
+  aiMuted: boolean;
+  /** Toggle muting the AI's voice (Nicole while coaching, the prospect in the rep). */
+  toggleAiMute: () => void;
   /** Begin the session (starts the coach; prospect starts only in roleplay). */
   start: () => Promise<void>;
   /** End the session — stops BOTH the coach and the prospect. */
@@ -129,6 +139,8 @@ export function useCoachingSession(
   const [scorecard, setScorecard] = useState<ScoreEntry[]>([]);
   const [scorecardResult, setScorecardResult] = useState<Scorecard | null>(null);
   const [practiceTranscript, setPracticeTranscript] = useState<ResultLine[]>([]);
+  // Manual AI-mute (mute Nicole/the prospect's voice). Applied to both sessions.
+  const [aiMuted, setAiMuted] = useState(false);
   const { token } = useAuth();
 
   // The coach overlay is fully derived from lesson + phase.
@@ -154,6 +166,7 @@ export function useCoachingSession(
     mode: 'coach',
     systemOverlay: coachOverlay,
     authToken: token,
+    aiMuted,
     onToolCall: (calls) => {
       for (const c of calls) {
         if (c.name === 'training_mark_progress' && c.args) {
@@ -177,6 +190,7 @@ export function useCoachingSession(
     mode: 'prospect',
     systemOverlay: buildProspectOverlay(lesson),
     authToken: token,
+    aiMuted,
   });
 
   // Track whether the session has been started so phase-change effects only
@@ -197,12 +211,16 @@ export function useCoachingSession(
   const prospectStopRef = useRef(prospect.stop);
   const coachSendTextRef = useRef(coach.sendText);
   const prospectSendTextRef = useRef(prospect.sendText);
+  const coachToggleMicRef = useRef(coach.toggleMic);
+  const prospectToggleMicRef = useRef(prospect.toggleMic);
   coachStartRef.current = coach.start;
   coachStopRef.current = coach.stop;
   prospectStartRef.current = prospect.start;
   prospectStopRef.current = prospect.stop;
   coachSendTextRef.current = coach.sendText;
   prospectSendTextRef.current = prospect.sendText;
+  coachToggleMicRef.current = coach.toggleMic;
+  prospectToggleMicRef.current = prospect.toggleMic;
   // Fire the coach opener once per connect so Nicole speaks first.
   const sentCoachOpenRef = useRef(false);
   // Fire the prospect opener once when the rep session connects so the character
@@ -316,6 +334,15 @@ export function useCoachingSession(
 
   const replayPractice = useCallback(() => { setPhase('roleplay_demo'); }, []);
   const reteach = useCallback(() => { setPhase('model'); }, []);
+
+  // Manual controls. The mic lives on whichever session is currently live (the
+  // prospect during the rep, the coach otherwise); toggle that one. AI-mute is a
+  // single flag applied to both sessions' audio output.
+  const inLiveRepNow = phase === ROLEPLAY_PHASE;
+  const toggleMic = useCallback(() => {
+    (inLiveRepNow ? prospectToggleMicRef.current : coachToggleMicRef.current)();
+  }, [inLiveRepNow]);
+  const toggleAiMute = useCallback(() => setAiMuted((m) => !m), []);
 
   // Reset phase-tracking counters whenever the phase changes.
   useEffect(() => {
@@ -508,6 +535,11 @@ export function useCoachingSession(
     activeAmplitude: inLiveRep ? prospect.amplitude : coach.amplitude,
     inLiveRep,
     prospectLabel: prospectName(lesson),
+    ready: inLiveRep ? prospect.ready : coach.ready,
+    micOn: inLiveRep ? prospect.micOn : coach.micOn,
+    toggleMic,
+    aiMuted,
+    toggleAiMute,
     start,
     stop,
     advance,

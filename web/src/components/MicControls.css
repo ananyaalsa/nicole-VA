@@ -1,0 +1,68 @@
+.mic-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* "Connecting… / Listening / Mic off" status pill. */
+.mic-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.mic-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+/* Live (ready + mic on): a steady green-ish accent dot that gently pulses. */
+.mic-status__dot.is-live {
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.5);
+  animation: mic-pulse 1.6s ease-out infinite;
+}
+.mic-status--connecting { color: var(--text-3); }
+.mic-status--connecting .mic-status__dot { background: #c9a227; animation: mic-blink 1s steps(2, start) infinite; }
+.mic-status--off { color: var(--danger, #b91c1c); }
+.mic-status--off .mic-status__dot { background: var(--danger, #b91c1c); }
+
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.45); }
+  70% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0); }
+}
+@keyframes mic-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Round mic / AI-mute buttons. */
+.mic-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 130ms ease, border-color 130ms ease, color 130ms ease, transform 100ms ease;
+}
+.mic-ctrl-btn:hover:not(:disabled) { border-color: var(--border-strong); transform: translateY(-1px); }
+.mic-ctrl-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Off/muted state: a clear red-tinted treatment so the user sees it's muted. */
+.mic-ctrl-btn.is-off {
+  background: var(--danger-light, #fbe9e9);
+  border-color: var(--danger, #b91c1c);
+  color: var(--danger, #b91c1c);
+}
+.mic-ctrl-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-light); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-status__dot.is-live, .mic-status--connecting .mic-status__dot { animation: none; }
+}

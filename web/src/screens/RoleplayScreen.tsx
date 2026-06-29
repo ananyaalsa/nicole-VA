@@ -19,6 +19,7 @@ import { useRoleplaySession } from '../training/useRoleplaySession';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { LiveRoom } from '../components/LiveRoom';
 import { CallPresence } from '../components/CallPresence';
+import { MicControls } from '../components/MicControls';
 import { SessionResults } from '../components/SessionResults';
 import { requestScore, postLiveStatus, type ResultLine, type Scorecard } from '../training/scoreApi';
 import '../components/ProfilePanel.css';
@@ -468,7 +469,7 @@ function RoleplayRoom({
     scenario,
     extraOverlay: DIFFICULTY_META[difficulty].overlay,
   });
-  const { connected, micOn, transcript, amplitude, realtime, start, stop, toggleMic, setMic, clearTranscript } = session;
+  const { connected, ready, micOn, transcript, amplitude, realtime, start, stop, toggleMic, setMic, clearTranscript, aiMuted, toggleAiMute } = session;
 
   const [scResult, setScResult] = useState<Scorecard | null>(null);
   const [saving, setSaving] = useState(false);
@@ -735,15 +736,14 @@ function RoleplayRoom({
           <>
             <span className={`room-footer__turn room-footer__turn--${turnState}`}>{turnLabel}</span>
             <div className="room-footer__actions">
-              <button
-                type="button"
-                className={`ctrl-btn${micOn ? '' : ' is-muted'}`}
-                data-testid="mic-toggle"
-                onClick={toggleMic}
-                aria-pressed={micOn ? 'false' : 'true'}
-              >
-                {micOn ? 'Mute' : 'Unmute'}
-              </button>
+              {/* Mic-ready indicator + manual mic + mute-the-character controls. */}
+              <MicControls
+                ready={ready}
+                micOn={micOn}
+                onToggleMic={toggleMic}
+                aiMuted={aiMuted}
+                onToggleAiMute={toggleAiMute}
+              />
               <button
                 type="button"
                 className="ctrl-btn ctrl-btn--end"

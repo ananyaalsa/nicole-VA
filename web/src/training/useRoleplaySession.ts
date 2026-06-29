@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNicoleSession } from '../engine/useNicoleSession';
 import { useAuth } from '../auth/AuthContext';
 import type { TranscriptLine } from '../engine/types';
@@ -29,6 +29,9 @@ export interface UseRoleplayOptions {
 
 export interface UseRoleplayResult {
   connected: boolean;
+  /** True once Gemini will accept mic audio (setupComplete) — drives the
+   *  "connecting → listening" mic indicator so the first words aren't lost. */
+  ready: boolean;
   micOn: boolean;
   /** Live transcript — 'you' = the user, 'nicole' label is shown as the character. */
   transcript: TranscriptLine[];
@@ -44,6 +47,10 @@ export interface UseRoleplayResult {
   setMic: (on: boolean) => void;
   /** Wipe the visible transcript — used by Replay to start the same scene fresh. */
   clearTranscript: () => void;
+  /** Whether the character's voice is muted (manual AI-mute). */
+  aiMuted: boolean;
+  /** Toggle muting the character's voice. */
+  toggleAiMute: () => void;
 }
 
 /**
@@ -82,11 +89,15 @@ export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult 
   const voice = opts.persona.voiceName || 'Charon';
   const { token } = useAuth();
 
+  // Manual AI-mute (mute the character's voice).
+  const [aiMuted, setAiMuted] = useState(false);
+
   const session = useNicoleSession({
     voiceName: voice,
     mode: 'prospect',
     systemOverlay: overlay,
     authToken: token,
+    aiMuted,
   });
 
   const sentOpenRef = useRef(false);
@@ -125,8 +136,11 @@ export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult 
     await startRef.current();
   }, []);
 
+  const toggleAiMute = useCallback(() => setAiMuted((m) => !m), []);
+
   return {
     connected: session.connected,
+    ready: session.ready,
     micOn: session.micOn,
     transcript: session.transcript,
     amplitude: session.amplitude,
@@ -136,5 +150,7 @@ export function useRoleplaySession(opts: UseRoleplayOptions): UseRoleplayResult 
     toggleMic: session.toggleMic,
     setMic: session.setMic,
     clearTranscript: session.clearTranscript,
+    aiMuted,
+    toggleAiMute,
   };
 }

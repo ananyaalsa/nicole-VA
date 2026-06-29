@@ -58,8 +58,10 @@ vi.mock('../training/trainingApi', () => ({
 const sessionStart = vi.fn(async () => {});
 const sessionStop = vi.fn();
 const toggleMic = vi.fn();
+const toggleAiMute = vi.fn();
 let sessionState = {
   connected: true,
+  ready: true,
   micOn: true,
   transcript: [
     { id: 'a', speaker: 'nicole' as const, text: 'Grant here, what is this about?' },
@@ -70,6 +72,8 @@ let sessionState = {
   start: sessionStart,
   stop: sessionStop,
   toggleMic,
+  aiMuted: false,
+  toggleAiMute,
 };
 vi.mock('../training/useRoleplaySession', () => ({
   useRoleplaySession: () => sessionState,
@@ -127,6 +131,7 @@ beforeEach(() => {
   })) as unknown as typeof fetch);
   sessionState = {
     connected: true,
+    ready: true,
     micOn: true,
     transcript: [
       { id: 'a', speaker: 'nicole', text: 'Grant here, what is this about?' },
@@ -137,6 +142,8 @@ beforeEach(() => {
     start: sessionStart,
     stop: sessionStop,
     toggleMic,
+    aiMuted: false,
+    toggleAiMute,
   };
 });
 

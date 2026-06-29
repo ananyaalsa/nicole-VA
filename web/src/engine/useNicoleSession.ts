@@ -68,6 +68,9 @@ export interface UseNicoleSessionOptions {
 
 export interface UseNicoleSessionResult {
   connected: boolean;
+  /** True once Gemini has signalled setupComplete — i.e. it will actually accept
+   *  mic audio. Use this (not `connected`) to tell the user the mic is live. */
+  ready: boolean;
   micOn: boolean;
   transcript: TranscriptLine[];
   /** The in-progress (not-yet-committed) line per speaker, rendered as a single
@@ -216,6 +219,12 @@ export function useNicoleSession(
   } = opts;
 
   const [connected, setConnected] = useState(false);
+  // `ready` = the Gemini session has signalled setupComplete, i.e. it will
+  // actually ACCEPT mic audio now. `connected` flips earlier (on socket open),
+  // and audio sent in the gap before setupComplete is dropped by Gemini — which
+  // is why the user's FIRST utterance was being lost. The UI shows a "connecting
+  // → listening" indicator off this flag so the user knows when to start talking.
+  const [ready, setReady] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [amplitude, setAmplitude] = useState(0);
@@ -487,6 +496,7 @@ export function useNicoleSession(
           return;
         case 'gemini-close':
           setConnected(false);
+          setReady(false);
           return;
         case 'tool-result':
           if (msg.name) {
@@ -504,6 +514,12 @@ export function useNicoleSession(
       // Nicole can operate the UI.
       const toolCalls = extractToolCalls(msg.payload);
       if (toolCalls.length) onToolCallRef.current?.(toolCalls);
+
+      // Gemini signals it will now accept audio with setupComplete → mark ready so
+      // the UI can show "listening" and the user knows their mic is live.
+      if ((msg.payload as { setupComplete?: unknown } | undefined)?.setupComplete) {
+        setReady(true);
+      }
 
       const sc = msg.payload?.serverContent;
       if (!sc) return;
@@ -798,6 +814,7 @@ export function useNicoleSession(
       };
       ws.onclose = () => {
         setConnected(false);
+        setReady(false);
       };
     },
     [handleRelayMessage],
@@ -939,6 +956,7 @@ export function useNicoleSession(
       queueRef.current.flush();
 
       setConnected(false);
+      setReady(false);
       setMicOn(false);
       setAmplitude(0);
       if (!opts2?.keepTranscript) {
@@ -1103,6 +1121,7 @@ export function useNicoleSession(
 
   return {
     connected,
+    ready,
     micOn,
     transcript,
     realtime,
