@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { HistoryPanel } from '../components/HistoryPanel';
 import { DictationField } from '../components/DictationField';
-import { generateCustomSpec, saveRun } from '../training/trainingApi';
+import { generateCustomSpec, saveRun, fetchHistory } from '../training/trainingApi';
 import { postLiveStatus } from '../training/scoreApi';
 import { Icon } from '../components/Icon';
 import { TopBar } from '../components/TopBar';
@@ -301,6 +301,10 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   // old boolean guard permanently blocked every rep after the first.
   const savedScorecardRef = useRef<unknown>(null);
   const autoStartedRef = useRef(false);
+  // Past overall scores for THIS skill (oldest→newest), for the report's trend
+  // graph. Loaded when the debrief opens; excludes the current run (the report
+  // appends it). Best-effort — the graph just hides if it can't load.
+  const [pastScores, setPastScores] = useState<number[]>([]);
 
   // Mounting this component IS the user's intent to begin (they tapped "Start
   // drill" on the picker), so we AUTO-START the lesson — no extra "Begin lesson"
@@ -354,6 +358,25 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
       token ?? undefined,
     );
   }, [session.scorecardResult, session.practiceTranscript, lesson, token]);
+
+  // Load past scores for THIS skill once the debrief opens, for the trend graph.
+  useEffect(() => {
+    if (phase !== 'debrief') return;
+    let alive = true;
+    void fetchHistory(token)
+      .then((runs) => {
+        if (!alive) return;
+        const scores = runs
+          .filter((r) => r.kind === 'training' && r.profileId === lesson.skillId && typeof r.score === 'number')
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          .map((r) => r.score as number);
+        // Exclude the just-saved current run (the report appends it itself) by
+        // dropping the most recent if it matches this run's score closely.
+        setPastScores(scores.slice(0, Math.max(0, scores.length - 1)));
+      })
+      .catch(() => { /* graph hides if history can't load */ });
+    return () => { alive = false; };
+  }, [phase, lesson.skillId, token]);
 
   const currentIndex = PHASE_ORDER.indexOf(phase);
   const atEnd = phase === 'debrief';
@@ -433,6 +456,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
               transcript={session.practiceTranscript}
               repLabel={lesson.coreFramework.name}
               saving={false}
+              pastScores={pastScores}
               onAgain={() => session.replayPractice()}
               onDone={handleExit}
             />

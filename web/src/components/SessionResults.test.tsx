@@ -19,7 +19,7 @@ describe('SessionResults', () => {
     render(
       <SessionResults scorecard={SC} transcript={[{ speaker: 'you', text: 'hi' }]} repLabel="Marcus" onAgain={onAgain} onDone={onDone} saving={false} />,
     );
-    expect(screen.getByText('6.7')).toBeInTheDocument();
+    expect(screen.getByTestId('results-overall')).toHaveTextContent('6.7');
     expect(screen.getByText('Acknowledge')).toBeInTheDocument();
     expect(screen.getByText('Strong rapport, weak close.')).toBeInTheDocument();
     expect(screen.getByTestId('dual-transcript')).toBeInTheDocument();

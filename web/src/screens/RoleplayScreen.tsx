@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthContext';
 import {
   fetchProfiles,
+  fetchHistory,
   generateCustomSpec,
   saveRun,
   type DimensionDef,
@@ -473,6 +474,8 @@ function RoleplayRoom({
 
   const [scResult, setScResult] = useState<Scorecard | null>(null);
   const [saving, setSaving] = useState(false);
+  // Past scores for this persona·scenario, for the report's trend graph.
+  const [pastScores, setPastScores] = useState<number[]>([]);
   // True from the moment "End & score" is tapped until the report is ready, so we
   // leave the call screen and show a "generating your report…" state (no stuck UI).
   const [scoring, setScoring] = useState(false);
@@ -501,6 +504,25 @@ function RoleplayRoom({
       });
     }
   }, [start, persona, scenario, token]);
+
+  // Load past scores for this persona·scenario when the report opens, for the
+  // trend graph (best-effort; excludes the current run which the report appends).
+  const repTitle = `${persona.name} · ${scenario.name}`;
+  useEffect(() => {
+    if (!scResult) return;
+    let alive = true;
+    void fetchHistory(token)
+      .then((runs) => {
+        if (!alive) return;
+        const scores = runs
+          .filter((r) => r.kind === 'roleplay' && r.title === repTitle && typeof r.score === 'number')
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          .map((r) => r.score as number);
+        setPastScores(scores.slice(0, Math.max(0, scores.length - 1)));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [scResult, repTitle, token]);
 
   // Watch the conversation for a natural close (either side says bye/later/etc.)
   // and surface the End-or-Replay prompt once. A few real turns must have
@@ -659,6 +681,7 @@ function RoleplayRoom({
           transcript={repLines}
           repLabel={alias}
           saving={saving}
+          pastScores={pastScores}
           onAgain={onAgain}
           onDone={onDone}
         />

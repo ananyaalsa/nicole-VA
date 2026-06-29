@@ -49,6 +49,7 @@ const generateCustomSpec = vi.fn<(input: unknown) => Promise<{ ok: boolean; spec
 
 vi.mock('../training/trainingApi', () => ({
   fetchProfiles: () => fetchProfiles(),
+  fetchHistory: vi.fn(async () => []),
   saveRun: (run: unknown) => saveRun(run as never),
   generateCustomSpec: (input: unknown) => generateCustomSpec(input as never),
   HTTP_BASE: 'http://localhost:4000',
@@ -262,7 +263,7 @@ describe('RoleplayScreen', () => {
     fireEvent.click(screen.getByTestId('start-roleplay-button'));
     fireEvent.click(screen.getByTestId('end-score-button'));
     await screen.findByTestId('session-results');
-    expect(screen.getByText('7.2')).toBeInTheDocument();
+    expect(screen.getByTestId('results-overall')).toHaveTextContent('7.2');
   });
 
   it('on a scoring FAILURE shows a retry — never a fake 0/10, never saves', async () => {
