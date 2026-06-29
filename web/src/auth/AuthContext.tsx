@@ -19,6 +19,11 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+// The access token is SHORT-LIVED (24h) and kept in memory + localStorage for the
+// Authorization: Bearer header. The durable session lives in an httpOnly refresh
+// cookie the server set at login — JS can't read it, so XSS can't steal it. On
+// load (and when the access token is missing/expired) we POST /api/auth/refresh
+// with credentials so the cookie mints a fresh access token.
 const TOKEN_KEY = 'nicole_token';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -27,25 +32,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
+    let alive = true;
+
+    /** Try to restore the session from the refresh cookie. Returns true on success. */
+    async function tryRefresh(): Promise<boolean> {
+      try {
+        const r = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+        if (!r.ok) return false;
+        const data = (await r.json()) as { token: string; user: AuthUser };
+        if (!alive) return true;
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setToken(data.token);
+        setUser(data.user);
+        return true;
+      } catch {
+        return false;
+      }
     }
-    fetch('/api/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error('session expired');
-        return r.json() as Promise<AuthUser>;
-      })
-      .then((u) => setUser(u))
-      .catch(() => {
+
+    (async () => {
+      const stored = localStorage.getItem(TOKEN_KEY);
+      if (stored) {
+        // Validate the stored access token; if it's still good, use it.
+        try {
+          const r = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${stored}` },
+            credentials: 'include',
+          });
+          if (r.ok) {
+            const u = (await r.json()) as AuthUser;
+            if (alive) { setToken(stored); setUser(u); }
+            if (alive) setLoading(false);
+            return;
+          }
+        } catch { /* fall through to refresh */ }
+      }
+      // No token, or it was rejected — try the refresh cookie before giving up.
+      const ok = await tryRefresh();
+      if (alive && !ok) {
         localStorage.removeItem(TOKEN_KEY);
         setToken(null);
         setUser(null);
-      })
-      .finally(() => setLoading(false));
-  }, [token]);
+      }
+      if (alive) setLoading(false);
+    })();
+
+    return () => { alive = false; };
+    // Run once on mount. login()/logout() drive state changes after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function login(t: string, u: AuthUser) {
     localStorage.setItem(TOKEN_KEY, t);
@@ -54,6 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // Revoke the refresh token server-side + clear the cookie (best-effort).
+    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);

@@ -85,6 +85,8 @@ export interface LiveSessionDeps {
   loadDisplayName?: (userId: string) => Promise<string | null>;
   /** Override the recent-activity digest builder (tests / DI). */
   loadActivity?: (userId: string) => Promise<string[]>;
+  /** Override the live-status loader (tests inject a fake to avoid a real DB). */
+  loadLiveStatus?: (userId: string) => Promise<import('../session/liveStatus.js').LiveStatus | null>;
   /** Override memory tool handler (tests). */
   onMemoryTool?: (name: string, args: any, userId: string) => Promise<{ ok: boolean }>;
   /** Called when a training_mark_progress tool fires (frontend relays it). */
@@ -283,8 +285,11 @@ export class LiveSession {
       if (cfg.mode === 'talk') {
         const digest = this.deps.loadActivity ?? buildActivityDigest;
         try { activityLines = await digest(this.deps.userId); } catch { /* ignore */ }
-        const ls = getLiveStatus(this.deps.userId);
-        if (ls) liveStatusLine = formatLiveStatusLine(ls, this.now()) ?? undefined;
+        try {
+          const loadLs = this.deps.loadLiveStatus ?? getLiveStatus;
+          const ls = await loadLs(this.deps.userId);
+          if (ls) liveStatusLine = formatLiveStatusLine(ls, this.now()) ?? undefined;
+        } catch { /* ignore — live status is best-effort context */ }
       }
       memoryBlock = formatMemoryBlock(facts as any, { displayName, activityLines, liveStatusLine });
     } catch {

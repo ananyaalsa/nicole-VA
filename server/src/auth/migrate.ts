@@ -12,4 +12,18 @@ export async function ensureAuthSchema(): Promise<void> {
       created_at timestamptz DEFAULT now()
     )
   `);
+  // Refresh tokens: only a SHA-256 HASH of each token is stored (so a DB leak
+  // can't be used to mint access tokens). Rotated on every refresh; expired rows
+  // are swept lazily. One row per active device/session.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nicole2_refresh_tokens (
+      token_hash text PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES nicole2_users(id) ON DELETE CASCADE,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz DEFAULT now()
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_refresh_user ON nicole2_refresh_tokens(user_id)`,
+  );
 }

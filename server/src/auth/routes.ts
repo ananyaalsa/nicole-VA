@@ -6,6 +6,17 @@ import { requireAuth, JWT_SECRET } from './middleware.js';
 import { config } from '../config.js';
 import { readJsonBody } from '../http/readBody.js';
 import { RateLimiter, clientIp } from '../http/rateLimit.js';
+import {
+  issueRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  sweepExpiredRefreshTokens,
+  REFRESH_TTL_MS,
+} from './refreshTokens.js';
+
+/** Name of the httpOnly refresh-token cookie. */
+const REFRESH_COOKIE = 'nicole_rt';
+const IS_PROD = config.nodeEnv === 'production';
 
 /** bcrypt work factor. 12 is the 2025 baseline for password hashing. */
 const BCRYPT_ROUNDS = 12;
@@ -46,19 +57,68 @@ function mapUser(row: UserRow) {
   };
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  const text = JSON.stringify(body);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
+/** Build CORS headers. Credentials must be allowed (the refresh cookie rides
+ *  fetch with credentials:'include'), which requires a SPECIFIC origin, never '*'. */
+function corsHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
     'Access-Control-Allow-Origin': config.frontendUrl,
+    'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-  });
+    ...extra,
+  };
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown, extraHeaders: Record<string, string> = {}): void {
+  const text = JSON.stringify(body);
+  res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders(extraHeaders) });
   res.end(text);
 }
 
+/** Access token (Bearer) — short-lived so a leak is bounded to 24h; the long-
+ *  lived secret is the httpOnly refresh cookie, never readable from JS. */
 function makeToken(userId: string): string {
-  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '24h' });
+}
+
+/** Set-Cookie value for the httpOnly refresh token. SameSite=Lax so it still
+ *  rides the top-level OAuth redirect; Secure in production. */
+function refreshCookie(raw: string): string {
+  const maxAge = Math.floor(REFRESH_TTL_MS / 1000);
+  const parts = [
+    `${REFRESH_COOKIE}=${raw}`,
+    'HttpOnly',
+    'Path=/',
+    'SameSite=Lax',
+    `Max-Age=${maxAge}`,
+  ];
+  if (IS_PROD) parts.push('Secure');
+  return parts.join('; ');
+}
+
+/** Clearing cookie (logout). */
+function clearRefreshCookie(): string {
+  const parts = [`${REFRESH_COOKIE}=`, 'HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=0'];
+  if (IS_PROD) parts.push('Secure');
+  return parts.join('; ');
+}
+
+/** Read the refresh token from the Cookie header. */
+function readRefreshCookie(req: IncomingMessage): string | null {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === REFRESH_COOKIE) return v.join('=') || null;
+  }
+  return null;
+}
+
+/** Issue access token + set a fresh refresh cookie, then respond with {token,user}. */
+async function sendAuthSuccess(res: ServerResponse, status: number, user: ReturnType<typeof mapUser>): Promise<void> {
+  const refresh = await issueRefreshToken(user.id);
+  const token = makeToken(user.id);
+  sendJson(res, status, { token, user }, { 'Set-Cookie': refreshCookie(refresh) });
 }
 
 export async function handleAuthRoute(
@@ -100,8 +160,7 @@ export async function handleAuthRoute(
         [email.toLowerCase().trim(), passwordHash, displayName.trim()],
       );
       const user = mapUser(rows[0]);
-      const token = makeToken(user.id);
-      sendJson(res, 201, { token, user });
+      await sendAuthSuccess(res, 201, user);
     } catch (err: any) {
       if (err.code === '23505') {
         sendJson(res, 409, { error: 'An account with this email already exists' });
@@ -136,8 +195,35 @@ export async function handleAuthRoute(
       return true;
     }
     const user = mapUser(row);
-    const token = makeToken(user.id);
-    sendJson(res, 200, { token, user });
+    await sendAuthSuccess(res, 200, user);
+    return true;
+  }
+
+  // POST /api/auth/refresh — exchange the httpOnly refresh cookie for a new access
+  // token (rotating the refresh token). This is how a 24h access token is renewed
+  // without the user re-logging-in, and how the app restores a session on load.
+  if (url.pathname === '/api/auth/refresh' && req.method === 'POST') {
+    void sweepExpiredRefreshTokens();
+    const presented = readRefreshCookie(req);
+    if (!presented) { sendJson(res, 401, { error: 'No session' }); return true; }
+    const rotated = await rotateRefreshToken(presented);
+    if (!rotated) {
+      // Invalid/expired refresh token — clear the stale cookie.
+      sendJson(res, 401, { error: 'Session expired' }, { 'Set-Cookie': clearRefreshCookie() });
+      return true;
+    }
+    const { rows } = await pool.query<UserRow>(`SELECT * FROM nicole2_users WHERE id = $1`, [rotated.userId]);
+    if (!rows[0]) { sendJson(res, 401, { error: 'Session expired' }, { 'Set-Cookie': clearRefreshCookie() }); return true; }
+    const token = makeToken(rotated.userId);
+    sendJson(res, 200, { token, user: mapUser(rows[0]) }, { 'Set-Cookie': refreshCookie(rotated.token) });
+    return true;
+  }
+
+  // POST /api/auth/logout — revoke the refresh token + clear the cookie.
+  if (url.pathname === '/api/auth/logout' && req.method === 'POST') {
+    const presented = readRefreshCookie(req);
+    if (presented) await revokeRefreshToken(presented);
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearRefreshCookie() });
     return true;
   }
 

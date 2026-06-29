@@ -37,6 +37,8 @@ export function AuthScreen(): JSX.Element {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Include credentials so the server's httpOnly refresh cookie is stored.
+        credentials: 'include',
         body: JSON.stringify(body),
       });
       const data = await res.json() as { token?: string; user?: AuthUser; error?: string };

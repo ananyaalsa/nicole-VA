@@ -21,6 +21,7 @@ import { ensureSchema } from './memory/db.js';
 import { ensureTrainingSchema } from './training/historyDb.js';
 import { ensureAuthSchema } from './auth/migrate.js';
 import { ensureIntegrationsSchema } from './integrations/db.js';
+import { ensureLiveStatusSchema } from './session/liveStatus.js';
 import { LiveSession, type ClientChannel, type GenAILike } from './gemini/relay.js';
 import { SignalingRooms } from './rtc/signalingRoom.js';
 import type { SessionConfig } from './types.js';
@@ -270,6 +271,7 @@ async function main(): Promise<void> {
     await ensureTrainingSchema();
     await ensureAuthSchema();
     await ensureIntegrationsSchema();
+    await ensureLiveStatusSchema();
   } catch (err) {
     console.warn('[server] ensureSchema failed (continuing):', (err as Error).message);
   }

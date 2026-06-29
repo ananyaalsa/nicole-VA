@@ -38,12 +38,12 @@ export async function handleSessionRoute(req: IncomingMessage, res: ServerRespon
         finishedAt: typeof b.finishedAt === 'number' ? b.finishedAt : undefined,
         score: typeof b.score === 'number' ? b.score : undefined,
       };
-      setLiveStatus(userId, status);
+      await setLiveStatus(userId, status);
       sendJson(res, 200, { ok: true });
       return true;
     }
     if (req.method === 'GET') {
-      sendJson(res, 200, { status: getLiveStatus(userId) });
+      sendJson(res, 200, { status: await getLiveStatus(userId) });
       return true;
     }
   }

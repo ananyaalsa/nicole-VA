@@ -1,3 +1,5 @@
+import { pool } from '../memory/db.js';
+
 export interface LiveStatus {
   /**
    * entered  — opened the screen, no drill/rep started yet.
@@ -15,14 +17,57 @@ export interface LiveStatus {
   score?: number;
 }
 
-const STORE = new Map<string, LiveStatus>();
 const STALE_MS = 15 * 60 * 1000;
 
-export function setLiveStatus(userId: string, s: LiveStatus): void {
-  STORE.set(userId, s);
+/** Ensure the table exists (called from server bootstrap alongside other schemas). */
+export async function ensureLiveStatusSchema(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nicole2_live_status (
+      user_id text PRIMARY KEY,
+      status jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
 }
-export function getLiveStatus(userId: string): LiveStatus | null {
-  return STORE.get(userId) ?? null;
+
+/**
+ * Persist the user's live session status to Postgres (one row per user, upserted),
+ * so it survives restarts and is consistent across multiple server instances —
+ * the in-memory Map was lost on restart and invisible to other instances behind a
+ * load balancer. Best-effort: a write failure must never break the live session.
+ */
+export async function setLiveStatus(userId: string, s: LiveStatus): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO nicole2_live_status (user_id, status, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (user_id) DO UPDATE SET status = EXCLUDED.status, updated_at = now()`,
+      [userId, JSON.stringify(s)],
+    );
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[liveStatus] write failed (non-fatal):', (err as Error).message);
+  }
+}
+
+/** Read the user's live status, or null if none / older than the stale window. */
+export async function getLiveStatus(userId: string): Promise<LiveStatus | null> {
+  try {
+    const { rows } = await pool.query<{ status: LiveStatus; updated_at: string }>(
+      `SELECT status, updated_at FROM nicole2_live_status WHERE user_id = $1`,
+      [userId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    // Drop stale rows so a week-old status never resurfaces.
+    if (Date.now() - new Date(row.updated_at).getTime() > STALE_MS) return null;
+    // pg returns jsonb already parsed, but tolerate a string just in case.
+    return typeof row.status === 'string' ? JSON.parse(row.status) : row.status;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[liveStatus] read failed (non-fatal):', (err as Error).message);
+    return null;
+  }
 }
 
 function minutesAgo(ms: number): string {
