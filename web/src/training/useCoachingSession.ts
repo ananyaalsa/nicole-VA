@@ -334,21 +334,22 @@ export function useCoachingSession(
   // Also run evaluate immediately when transcript or scorecard changes.
   useEffect(() => { evaluate(); }, [coach.transcript, scorecard, evaluate]);
 
-  // When the phase changes (after start), reconnect the coach so the backend
-  // receives the new phase overlay. Deferred via afterNextModelTurn so Nicole
-  // isn't cut off mid-sentence when the phase boundary fires.
+  // When the phase changes (after start), tell the coach the new phase's
+  // instructions over the SAME live session — as a silent [PHASE] directive,
+  // NOT by reconnecting. Reconnecting on every phase change tore the Gemini
+  // socket down mid-conversation, which dropped/garbled the user's mic audio and
+  // corrupted transcription (this is exactly why training transcribed worse than
+  // roleplay, which never reconnects). Deferred via afterNextModelTurn so we don't
+  // cut Nicole off mid-sentence.
   //
-  // CRITICAL: skip the FIRST overlay value. start() already connects the coach
-  // with the intro overlay, so reconnecting again immediately would tear down the
-  // session before Nicole answers the [OPEN] directive — the room got stuck on
-  // "getting your lesson ready…". Only reconnect on a genuine later phase change.
+  // Skip the FIRST overlay value — start() already connected with the intro
+  // overlay and the [OPEN] directive handles the opening.
   useEffect(() => {
     if (!startedRef.current) return;
-    // start() recorded the overlay it connected with; reconnect only when the
-    // overlay genuinely changes (a real phase change), never on the first connect.
     if (reconnectOverlaySeenRef.current === coachOverlay) return;
     reconnectOverlaySeenRef.current = coachOverlay;
-    coachAfterTurnRef.current(() => { void coachStartRef.current(); });
+    const directive = `[PHASE] The lesson has moved to its next phase. Follow these instructions for what to do now, continuing the SAME conversation naturally (do not greet again):\n${coachOverlay}`;
+    coachAfterTurnRef.current(() => { coachSendTextRef.current(directive); });
   }, [coachOverlay]);
 
   // Bring the prospect session up only during the roleplay phase, and tear it

@@ -185,19 +185,18 @@ describe('useCoachingSession', () => {
     expect(result.current.phase).toBe('model');
   });
 
-  it('re-starts the coach with an updated overlay when the phase changes', async () => {
+  it('sends a [PHASE] directive over the SAME session on phase change (no reconnect)', async () => {
     const { result } = renderHook(() => useCoachingSession({ lesson }));
     await act(async () => {
       await result.current.start();
     });
     const startsAfterStart = coach().startCalls;
-    const introOverlay = coach().options.systemOverlay;
     act(() => result.current.advance());
     expect(result.current.phase).toBe('teach');
-    // Overlay updated to the teach phase prompt...
-    expect(coach().options.systemOverlay).not.toBe(introOverlay);
-    // ...and the coach reconnected with the new overlay.
-    expect(coach().startCalls).toBeGreaterThan(startsAfterStart);
+    // The phase change tells the coach what to do now via a silent [PHASE] turn —
+    // NOT by reconnecting (reconnecting mid-conversation garbled transcription).
+    expect(coach().sentTexts.some((t) => t.startsWith('[PHASE]'))).toBe(true);
+    expect(coach().startCalls).toBe(startsAfterStart); // session NOT reconnected
   });
 
   it('activates the prospect session only during roleplay_demo', async () => {
