@@ -2,9 +2,9 @@
 // Handles the /api/training* surface for the single local user. Returns JSON.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
-import { JWT_SECRET } from '../auth/middleware.js';
+import { resolveUserId } from '../auth/middleware.js';
+import { readJsonBody } from '../http/readBody.js';
 import { listProfilesFull } from './profiles.js';
 import { generateCustomSpec, type SpecGenInput } from './specGenerator.js';
 import { saveTrainingRun, listTrainingHistory, getTrainingRun } from './historyDb.js';
@@ -27,32 +27,11 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(text);
 }
 
-/** Resolve the user from the JWT so history is per-user; fall back to the
- *  server default user when no/invalid token (local dev). */
-function resolveUserId(req: IncomingMessage): string {
-  const header = req.headers.authorization ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) return config.userId;
-  try {
-    return (jwt.verify(token, JWT_SECRET) as { sub: string }).sub;
-  } catch {
-    return config.userId;
-  }
-}
-
-function readBody(req: IncomingMessage): Promise<any> {
-  return new Promise((resolve) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch {
-        resolve({});
-      }
-    });
-    req.on('error', () => resolve({}));
-  });
+/** Resolve the user from the JWT so history is per-user. Returns null in
+ *  production when the token is missing/invalid (caller MUST 401); falls back to
+ *  the dev user only outside production. */
+function userId(req: IncomingMessage): string | null {
+  return resolveUserId(req, config.userId);
 }
 
 /** Short slug for deriving a stable custom-spec id from a title/skill. */
@@ -86,7 +65,7 @@ export async function handleTrainingRoute(
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (!url.pathname.startsWith('/api/training')) return false;
 
-  const userId = resolveUserId(req);
+  const uid = userId(req);
 
   if (req.method === 'OPTIONS') {
     sendJson(res, 204, {});
@@ -101,7 +80,7 @@ export async function handleTrainingRoute(
 
   // POST /api/training/generate  — AI custom-spec generation.
   if (url.pathname === '/api/training/generate' && req.method === 'POST') {
-    const body = await readBody(req);
+    const body = await readJsonBody(req);
     const input: SpecGenInput = {
       dictation: typeof body.dictation === 'string' ? body.dictation : '',
       skill: typeof body.skill === 'string' ? body.skill : '',
@@ -122,7 +101,7 @@ export async function handleTrainingRoute(
 
   // POST /api/training/score  — grade a finished practice/roleplay transcript.
   if (url.pathname === '/api/training/score' && req.method === 'POST') {
-    const body = await readBody(req);
+    const body = await readJsonBody(req);
     const dimensions = Array.isArray(body.dimensions) ? body.dimensions : null;
     const transcript = Array.isArray(body.transcript) ? body.transcript : null;
     if (!dimensions || !transcript) {
@@ -135,21 +114,26 @@ export async function handleTrainingRoute(
     return true;
   }
 
-  // /api/training/history  (collection)
+  // /api/training/history  (collection) — per-user; requires auth.
   if (url.pathname === '/api/training/history') {
+    if (!uid) { sendJson(res, 401, { error: 'Unauthorized' }); return true; }
     if (req.method === 'GET') {
-      const runs = await listTrainingHistory(userId);
+      const runs = await listTrainingHistory(uid);
       sendJson(res, 200, { runs });
       return true;
     }
     if (req.method === 'POST') {
-      const body = await readBody(req);
+      const body = await readJsonBody(req);
       if (typeof body.kind !== 'string' || typeof body.title !== 'string' || !body.title.trim()) {
         sendJson(res, 400, { error: 'kind and title are required' });
         return true;
       }
+      if (typeof body.transcript === 'string' && body.transcript.length > 1_000_000) {
+        sendJson(res, 400, { error: 'Transcript too large' });
+        return true;
+      }
       const { id } = await saveTrainingRun({
-        userId,
+        userId: uid,
         kind: body.kind === 'training' ? 'training' : 'roleplay',
         profileId: typeof body.profileId === 'string' ? body.profileId : undefined,
         personaId: typeof body.personaId === 'string' ? body.personaId : undefined,
@@ -164,10 +148,11 @@ export async function handleTrainingRoute(
     }
   }
 
-  // GET /api/training/history/:id  (item)
+  // GET /api/training/history/:id  (item) — per-user; requires auth.
   const match = url.pathname.match(/^\/api\/training\/history\/(\d+)$/);
   if (match && req.method === 'GET') {
-    const run = await getTrainingRun(userId, Number(match[1]));
+    if (!uid) { sendJson(res, 401, { error: 'Unauthorized' }); return true; }
+    const run = await getTrainingRun(uid, Number(match[1]));
     if (!run) {
       sendJson(res, 404, { error: 'run not found' });
       return true;

@@ -57,6 +57,30 @@ describe('SignalingRooms', () => {
     const rooms = new SignalingRooms();
     expect(() => rooms.relay('NOPE', 'a', {})).not.toThrow();
   });
+
+  it('refuses a THIRD peer so an eavesdropper cannot join a pairing room', () => {
+    const rooms = new SignalingRooms();
+    const a = fakePeer('a');
+    const b = fakePeer('b');
+    const c = fakePeer('c');
+    expect(rooms.join('R1', a)).toBe(true);
+    expect(rooms.join('R1', b)).toBe(true);
+    // The third peer is rejected and gets a room-full notice; room stays at 2.
+    expect(rooms.join('R1', c)).toBe(false);
+    expect(c.sent).toContainEqual({ type: 'room-full', room: 'R1' });
+    expect(rooms.size('R1')).toBe(2);
+    // And a relay never reaches the rejected peer.
+    rooms.relay('R1', 'a', { sdp: 'secret' });
+    expect(c.sent.some((m) => m.type === 'signal')).toBe(false);
+  });
+
+  it('re-joining as the same peer id is allowed (reconnect), not counted twice', () => {
+    const rooms = new SignalingRooms();
+    const a = fakePeer('a');
+    expect(rooms.join('R1', a)).toBe(true);
+    expect(rooms.join('R1', a)).toBe(true);
+    expect(rooms.size('R1')).toBe(1);
+  });
 });
 
 describe('generateRoomCode', () => {
@@ -71,5 +95,11 @@ describe('generateRoomCode', () => {
     const a = generateRoomCode(() => 0);
     const b = generateRoomCode(() => 0.99);
     expect(a).not.toBe(b);
+  });
+
+  it('defaults to an 8-char code (≈40 bits) when no length is given', () => {
+    const code = generateRoomCode(() => 0.5);
+    expect(code).toHaveLength(8);
+    expect(code).toMatch(/^[A-Z2-9]+$/);
   });
 });

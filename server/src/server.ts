@@ -3,7 +3,8 @@
 //   - WS:   /ai-live — the Gemini Live relay (one LiveSession per connection)
 // The Gemini API key lives only here, never in the browser.
 
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI } from '@google/genai';
 import jwt from 'jsonwebtoken';
@@ -25,6 +26,7 @@ import { SignalingRooms } from './rtc/signalingRoom.js';
 import type { SessionConfig } from './types.js';
 
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey }) as unknown as GenAILike;
+const IS_PROD = config.nodeEnv === 'production';
 
 /** Verify a client-supplied JWT and return its userId (sub), or null if invalid. */
 function userIdFromToken(token: unknown): string | null {
@@ -34,6 +36,24 @@ function userIdFromToken(token: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Send a 500 WITHOUT leaking internals to the client. The real error is logged
+ * server-side; the client gets a generic message (in production) so stack traces,
+ * DB errors, and internal paths never reach an attacker. A short request id ties
+ * the client message to the server log line.
+ */
+function sendServerError(res: ServerResponse, err: unknown, where: string): void {
+  const reqId = randomUUID().slice(0, 8);
+  // eslint-disable-next-line no-console
+  console.error(`[server:${where}] (${reqId})`, err instanceof Error ? err.stack ?? err.message : err);
+  if (res.headersSent) return;
+  res.writeHead(500, { 'Content-Type': 'application/json' });
+  const body = IS_PROD
+    ? { error: 'Internal server error', reqId }
+    : { error: String((err as { message?: unknown })?.message ?? err), reqId };
+  res.end(JSON.stringify(body));
 }
 
 const httpServer = createServer((req, res) => {
@@ -46,58 +66,37 @@ const httpServer = createServer((req, res) => {
   }
 
   if (url.pathname.startsWith('/api/auth')) {
-    void handleAuthRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleAuthRoute(req, res).catch((err) => sendServerError(res, err, 'auth'));
     return;
   }
 
   if (url.pathname.startsWith('/api/memory')) {
-    void handleMemoryRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleMemoryRoute(req, res).catch((err) => sendServerError(res, err, 'memory'));
     return;
   }
 
   if (url.pathname.startsWith('/api/training')) {
-    void handleTrainingRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleTrainingRoute(req, res).catch((err) => sendServerError(res, err, 'training'));
     return;
   }
 
   if (url.pathname.startsWith('/api/session')) {
-    void handleSessionRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleSessionRoute(req, res).catch((err) => sendServerError(res, err, 'session'));
     return;
   }
 
   if (url.pathname.startsWith('/api/integrations')) {
-    void handleIntegrationsRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleIntegrationsRoute(req, res).catch((err) => sendServerError(res, err, 'integrations'));
     return;
   }
 
   if (url.pathname === '/api/brief') {
-    void handleBriefRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleBriefRoute(req, res).catch((err) => sendServerError(res, err, 'brief'));
     return;
   }
 
   if (url.pathname === '/api/weather') {
-    void handleWeatherRoute(req, res).catch((err) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(err?.message ?? err) }));
-    });
+    void handleWeatherRoute(req, res).catch((err) => sendServerError(res, err, 'weather'));
     return;
   }
 
@@ -105,10 +104,12 @@ const httpServer = createServer((req, res) => {
   res.end(JSON.stringify({ error: 'not found' }));
 });
 
-// WebSocket relay on /ai-live.
-const wss = new WebSocketServer({ noServer: true });
-// WebRTC signaling on /rtc-signal (phone <-> PC handshake; no media).
-const rtcWss = new WebSocketServer({ noServer: true });
+// WebSocket relay on /ai-live. maxPayload caps a single frame so a client can't
+// send a giant message to exhaust memory; audio frames are small (~a few KB).
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+// WebRTC signaling on /rtc-signal (phone <-> PC handshake; no media). SDP/ICE
+// payloads are small, so cap tightly.
+const rtcWss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
 const rtcRooms = new SignalingRooms();
 let rtcPeerSeq = 0;
 
@@ -142,8 +143,16 @@ function handleRtcSignal(ws: WebSocket): void {
       return;
     }
     if (msg.type === 'join' && typeof msg.room === 'string') {
-      room = msg.room;
-      rtcRooms.join(msg.room, peer);
+      // Validate the room code shape (the generator emits 4–16 chars from a fixed
+      // alphabet). Rejecting anything else stops junk/oversized codes from
+      // allocating rooms. join() itself caps peers-per-room and total rooms.
+      if (!/^[A-Z2-9]{4,16}$/.test(msg.room)) {
+        peer.send({ type: 'error', message: 'Invalid room code' });
+        return;
+      }
+      if (room) return; // already joined a room on this socket — ignore re-joins
+      const ok = rtcRooms.join(msg.room, peer);
+      if (ok) room = msg.room;
     } else if (msg.type === 'signal') {
       const r = room;
       if (r) rtcRooms.relay(r, id, msg.payload);
@@ -189,8 +198,18 @@ function handleAiLive(ws: WebSocket): void {
     }
 
     if (msg.type === 'connect' && !connected) {
+      const tokenUserId = userIdFromToken(msg.authToken);
+      // In production a valid JWT is REQUIRED before we open a (paid) Gemini Live
+      // session — otherwise an anonymous client could burn Gemini credits at will
+      // and run as the shared default user. In dev we fall back to config.userId
+      // so local testing needs no login.
+      if (IS_PROD && !tokenUserId) {
+        client.send({ type: 'error', message: 'Unauthorized' });
+        client.close();
+        return;
+      }
       connected = true;
-      const userId = userIdFromToken(msg.authToken) ?? config.userId;
+      const userId = tokenUserId ?? config.userId;
       session = new LiveSession({ ai, model: config.liveModel, userId, client });
       const cfg: SessionConfig = {
         voiceName: msg.config?.voiceName ?? 'Aoede',
@@ -199,9 +218,18 @@ function handleAiLive(ws: WebSocket): void {
         stylePrompt: msg.config?.stylePrompt,
       };
       void session.connect(cfg).catch((err) => {
-        client.send({ type: 'error', message: String(err?.message ?? err) });
+        // eslint-disable-next-line no-console
+        console.error('[server:ai-live] connect failed', err instanceof Error ? err.stack ?? err.message : err);
+        client.send({ type: 'error', message: 'Could not start the session.' });
         client.close();
       });
+      return;
+    }
+
+    // A second connect on an already-established socket is a client bug — tell it
+    // rather than silently ignoring (which left the client waiting forever).
+    if (msg.type === 'connect' && connected) {
+      client.send({ type: 'error', message: 'Session already started.' });
       return;
     }
 

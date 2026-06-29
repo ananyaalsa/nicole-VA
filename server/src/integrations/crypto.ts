@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 
 const ALGO = 'aes-256-gcm';
 
-/** Resolve a 32-byte key from env, deriving a stable fallback for dev. */
+/** Resolve a 32-byte key from env, deriving a stable fallback for dev only. */
 function resolveKey(): Buffer {
   const raw = process.env.INTEGRATIONS_ENC_KEY;
   if (raw && raw.trim()) {
@@ -18,6 +18,15 @@ function resolveKey(): Buffer {
     const b64 = Buffer.from(raw.trim(), 'base64');
     if (b64.length === 32) return b64;
     return crypto.createHash('sha256').update(raw.trim()).digest();
+  }
+  // In production a dedicated key is REQUIRED: deriving the at-rest encryption key
+  // from a (possibly defaulted, source-visible) JWT secret would mean anyone who
+  // can read this repo could decrypt every user's stored OAuth tokens. Fail closed.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'INTEGRATIONS_ENC_KEY must be set in production (32 bytes, hex or base64). ' +
+        'Refusing to derive the token-encryption key from the JWT secret.',
+    );
   }
   // Dev fallback: derive from JWT secret so tokens are still encrypted locally.
   const seed = process.env.JWT_SECRET ?? 'nicole-dev-secret';

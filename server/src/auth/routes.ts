@@ -4,6 +4,14 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../memory/db.js';
 import { requireAuth, JWT_SECRET } from './middleware.js';
 import { config } from '../config.js';
+import { readJsonBody } from '../http/readBody.js';
+
+/** bcrypt work factor. 12 is the 2025 baseline for password hashing. */
+const BCRYPT_ROUNDS = 12;
+/** A throwaway bcrypt hash compared against when a login email doesn't exist, so
+ *  the response time matches the real-user path and emails can't be enumerated
+ *  via timing. (Hash of a random string; the value is irrelevant.) */
+const DUMMY_HASH = '$2b$12$I0kDR7ryvZ1N2umpZ3.0ieuZHb5Tgg.3iEXdfPRkwBr6.2p7RZxyS';
 
 interface UserRow {
   id: string;
@@ -36,17 +44,6 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(text);
 }
 
-function readBody(req: IncomingMessage): Promise<any> {
-  return new Promise((resolve) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => {
-      try { resolve(data ? JSON.parse(data) : {}); } catch { resolve({}); }
-    });
-    req.on('error', () => resolve({}));
-  });
-}
-
 function makeToken(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '30d' });
 }
@@ -65,18 +62,22 @@ export async function handleAuthRoute(
 
   // POST /api/auth/signup
   if (url.pathname === '/api/auth/signup' && req.method === 'POST') {
-    const body = await readBody(req);
+    const body = await readJsonBody(req);
     const { email, password, displayName } = body;
     if (!email || !password || !displayName) {
       sendJson(res, 400, { error: 'email, password, and displayName are required' });
       return true;
     }
-    if (password.length < 8) {
-      sendJson(res, 400, { error: 'Password must be at least 8 characters' });
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
+      sendJson(res, 400, { error: 'Password must be 8–200 characters' });
+      return true;
+    }
+    if (typeof email !== 'string' || email.length > 320 || !email.includes('@')) {
+      sendJson(res, 400, { error: 'A valid email is required' });
       return true;
     }
     try {
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
       const { rows } = await pool.query<UserRow>(
         `INSERT INTO nicole2_users (email, password_hash, display_name)
          VALUES ($1, $2, $3)
@@ -98,9 +99,9 @@ export async function handleAuthRoute(
 
   // POST /api/auth/login
   if (url.pathname === '/api/auth/login' && req.method === 'POST') {
-    const body = await readBody(req);
+    const body = await readJsonBody(req);
     const { email, password } = body;
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       sendJson(res, 400, { error: 'email and password are required' });
       return true;
     }
@@ -109,12 +110,11 @@ export async function handleAuthRoute(
       [email.toLowerCase().trim()],
     );
     const row = rows[0];
-    if (!row) {
-      sendJson(res, 401, { error: 'Invalid email or password' });
-      return true;
-    }
-    const valid = await bcrypt.compare(password, row.password_hash);
-    if (!valid) {
+    // Always run a bcrypt compare — against a dummy hash when the email doesn't
+    // exist — so the response time is the same whether or not the account exists.
+    // Otherwise an attacker can enumerate registered emails by timing the reply.
+    const valid = await bcrypt.compare(password, row?.password_hash ?? DUMMY_HASH);
+    if (!row || !valid) {
       sendJson(res, 401, { error: 'Invalid email or password' });
       return true;
     }
@@ -144,7 +144,7 @@ export async function handleAuthRoute(
   if (url.pathname === '/api/auth/me' && req.method === 'PATCH') {
     const userId = await requireAuth(req, res);
     if (!userId) return true;
-    const body = await readBody(req);
+    const body = await readJsonBody(req);
     const sets: string[] = [];
     const vals: any[] = [];
     let idx = 1;

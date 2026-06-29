@@ -90,6 +90,16 @@ export interface LiveSessionDeps {
   /** Called when a training_mark_progress tool fires (frontend relays it). */
 }
 
+/** Max length of a single client text directive forwarded to Gemini (chars).
+ *  Bounds prompt-token cost / API errors from an oversized injected string. */
+const MAX_TEXT_LEN = 8_000;
+/** Max queued texts before the Gemini session is ready (prevents a pre-connect
+ *  flood from growing the pending queue without bound). */
+const MAX_PENDING_TEXTS = 50;
+/** Max length of the client-supplied systemOverlay / stylePrompt (chars). A
+ *  malicious client could otherwise embed a multi-MB prompt and blow up tokens. */
+const MAX_OVERLAY_LEN = 16_000;
+
 /**
  * Owns ONE browser<->Gemini bridge for its lifetime, surviving Gemini socket
  * drops, proactive refreshes, and summary-driven reconnects transparently.
@@ -115,6 +125,9 @@ export class LiveSession {
   // Guards against overlapping reconnect/summarize operations.
   private busy = false;
   private closed = false;
+  // Consecutive failed drop-reconnects, for exponential backoff so a flapping
+  // Gemini connection can't trigger a tight reconnect storm (cost + rate-limit).
+  private reconnectFailures = 0;
 
   private watchdog: ReturnType<typeof setInterval> | null = null;
 
@@ -125,7 +138,13 @@ export class LiveSession {
 
   /** Open the first Gemini session for this client's chosen voice/mode. */
   async connect(cfg: SessionConfig): Promise<void> {
-    this.sessionConfig = cfg;
+    // Bound client-supplied prompt overlays so an oversized string can't blow up
+    // the Gemini system prompt (token cost / API rejection).
+    this.sessionConfig = {
+      ...cfg,
+      systemOverlay: cfg.systemOverlay?.slice(0, MAX_OVERLAY_LEN),
+      stylePrompt: cfg.stylePrompt?.slice(0, MAX_OVERLAY_LEN),
+    };
     await this.openGemini();
     this.startWatchdog();
   }
@@ -157,20 +176,27 @@ export class LiveSession {
    * proper turns structure (sendRealtimeInput is audio-only).
    */
   sendText(text: string): void {
-    if (!text) return;
+    if (!text || this.closed) return;
+    // Cap a single directive's length so a malicious client can't blow up the
+    // Gemini prompt (token cost / API errors) with a multi-MB string.
+    const capped = text.length > MAX_TEXT_LEN ? text.slice(0, MAX_TEXT_LEN) : text;
     // The browser may fire an opener ([OPEN]/[STATUS]/[WEATHER]) right after our
     // `ready` signal, but the Gemini session object isn't assigned until
     // ai.live.connect() resolves — which can be slower than the client's delay
     // (this stranded the coach's [OPEN] and stuck the training room). If the
     // session isn't ready yet, QUEUE the text and flush it once setup completes.
     if (!this.session) {
-      this.pendingTexts.push(text);
+      // Bound the queue so a client spamming text before the session is ready
+      // can't grow it without limit (OOM). Drop oldest beyond the cap.
+      if (this.pendingTexts.length >= MAX_PENDING_TEXTS) this.pendingTexts.shift();
+      this.pendingTexts.push(capped);
       return;
     }
-    this.dispatchText(text);
+    this.dispatchText(capped);
   }
 
-  /** Texts requested before the Gemini session was ready, flushed on setup. */
+  /** Texts requested before the Gemini session was ready, flushed on setup.
+   *  Bounded by MAX_PENDING_TEXTS so a pre-connect flood can't exhaust memory. */
   private pendingTexts: string[] = [];
 
   private dispatchText(text: string): void {
@@ -327,6 +353,8 @@ export class LiveSession {
       },
     });
     this.sessionOpenedAt = this.now();
+    // A successful open clears the backoff counter (the connection recovered).
+    this.reconnectFailures = 0;
     // The session object now exists — flush any text queued before it was ready.
     this.flushPendingTexts();
   }
@@ -500,12 +528,24 @@ export class LiveSession {
       return;
     }
     this.deps.client.send({ type: 'reconnecting' });
-    void this.reconnect('drop').catch(() => {
-      if (this.deps.client.isOpen()) {
-        this.deps.client.send({ type: 'gemini-close', code, reason });
-        this.deps.client.close();
-      }
-    });
+    // Exponential backoff with jitter on consecutive drops, capped at 30s, so a
+    // flapping Gemini connection can't spin a tight reconnect loop (cost + getting
+    // rate-limited). The first reconnect is immediate; only repeats back off.
+    const attempt = this.reconnectFailures;
+    const delayMs = attempt === 0 ? 0 : Math.min(30_000, 1000 * 2 ** (attempt - 1)) + Math.floor(jitterFor(attempt) * 250);
+    const run = () => {
+      if (this.closed) return;
+      void this.reconnect('drop').catch(() => {
+        // The reconnect failed — bump the backoff so the NEXT drop waits longer.
+        this.reconnectFailures += 1;
+        if (this.deps.client.isOpen()) {
+          this.deps.client.send({ type: 'gemini-close', code, reason });
+          this.deps.client.close();
+        }
+      });
+    };
+    if (delayMs <= 0) run();
+    else setTimeout(run, delayMs);
   }
 
   /** Close the current Gemini session and open a fresh one (handle reused).
@@ -572,4 +612,12 @@ export function isTerminalClose(code: number | undefined, reason: string): boole
       reason,
     )
   );
+}
+
+/** Deterministic [0,1) jitter keyed on the attempt number (no Math.random, which
+ *  is unavailable/forbidden in some runtimes and would make tests flaky). Spreads
+ *  reconnect timing so concurrent sessions don't retry in lockstep. */
+function jitterFor(attempt: number): number {
+  const x = Math.sin(attempt * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
 }

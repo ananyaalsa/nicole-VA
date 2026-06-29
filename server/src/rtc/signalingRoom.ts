@@ -21,15 +21,34 @@ interface Room {
 /**
  * Holds all active rooms and routes signaling between the two peers in a room.
  */
+/** A signaling room only ever holds the two intended peers (PC + phone). */
+const MAX_PEERS_PER_ROOM = 2;
+/** Hard cap on concurrent rooms so an attacker can't open unbounded rooms and
+ *  exhaust server memory. Far above any realistic concurrent-pairing load. */
+const MAX_ROOMS = 10_000;
+
 export class SignalingRooms {
   private rooms = new Map<string, Room>();
 
-  /** Add a peer to a room (creating it if needed). */
-  join(roomCode: string, peer: SignalPeer): void {
+  /** Add a peer to a room (creating it if needed). Returns false if rejected
+   *  (room already has both peers, or the global room cap is hit). */
+  join(roomCode: string, peer: SignalPeer): boolean {
     let room = this.rooms.get(roomCode);
     if (!room) {
+      if (this.rooms.size >= MAX_ROOMS) {
+        peer.send({ type: 'error', message: 'Too many active rooms' });
+        return false;
+      }
       room = { peers: new Map() };
       this.rooms.set(roomCode, room);
+    }
+    // Refuse a third peer: only the PC and the phone belong in a room. Without
+    // this, anyone who guesses the code could join and receive the WebRTC
+    // signaling (offer/answer/ICE) for someone else's camera handshake.
+    if (!room.peers.has(peer.id) && room.peers.size >= MAX_PEERS_PER_ROOM) {
+      peer.send({ type: 'room-full', room: roomCode });
+      if (room.peers.size === 0) this.rooms.delete(roomCode);
+      return false;
     }
     room.peers.set(peer.id, peer);
     // Tell the joining peer how many others are already here, and notify the
@@ -39,6 +58,7 @@ export class SignalingRooms {
     for (const other of others) {
       other.send({ type: 'peer-joined', room: roomCode });
     }
+    return true;
   }
 
   /**
@@ -75,12 +95,29 @@ export class SignalingRooms {
   }
 }
 
-/** Generate a short, URL-safe, unambiguous room code (no 0/O/1/I/l). */
+/** Generate a short, URL-safe, unambiguous room code (no 0/O/1/I/l).
+ *  Defaults to a CRYPTO-secure RNG and length 8 (~40 bits) so an unauthenticated
+ *  room code can't be brute-forced before the short-lived pairing completes. A
+ *  custom `rand` (e.g. a seeded fn) can still be injected for deterministic tests. */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-export function generateRoomCode(rand: () => number = Math.random, length = 6): string {
+export function generateRoomCode(rand?: () => number, length = 8): string {
+  const next =
+    rand ??
+    (() => cryptoRandomInt() / 0xffffffff);
   let code = '';
   for (let i = 0; i < length; i++) {
-    code += CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)];
+    code += CODE_ALPHABET[Math.floor(next() * CODE_ALPHABET.length) % CODE_ALPHABET.length];
   }
   return code;
+}
+
+/** A 32-bit unsigned int from the crypto RNG (Node + browser both expose it). */
+function cryptoRandomInt(): number {
+  const g = globalThis as unknown as { crypto?: { getRandomValues?: (a: Uint32Array) => Uint32Array } };
+  if (g.crypto?.getRandomValues) {
+    return g.crypto.getRandomValues(new Uint32Array(1))[0];
+  }
+  // Node without global crypto (older): fall back to node:crypto.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  return require('node:crypto').randomBytes(4).readUInt32BE(0);
 }
