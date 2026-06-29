@@ -3,7 +3,12 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 const fetchHistory = vi.fn();
 vi.mock('../training/trainingApi', () => ({
-  fetchHistory: () => fetchHistory(),
+  fetchHistory: (token?: string | null) => fetchHistory(token),
+}));
+
+// HistoryPanel reads the auth token via useAuth; stub it (no provider needed).
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ token: 'test-token', user: null }),
 }));
 
 import { HistoryPanel } from './HistoryPanel';
@@ -64,6 +69,20 @@ describe('HistoryPanel', () => {
     // Scorecard summary present (1 of 2 hit on the roleplay run).
     const summaries = screen.getAllByTestId('history-summary').map((n) => n.textContent);
     expect(summaries[0]).toContain('1/2');
+  });
+
+  it('reopens a past report when a row is clicked (score + transcript + back)', async () => {
+    fetchHistory.mockResolvedValueOnce(RUNS);
+    render(<HistoryPanel />);
+    const row = await screen.findByText('Grant · Cold call');
+    fireEvent.click(row);
+    // The full report detail appears...
+    expect(await screen.findByTestId('history-report')).toBeInTheDocument();
+    expect(screen.getByText('Strong open', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('hi')).toBeInTheDocument(); // saved transcript line
+    // ...and Back returns to the list.
+    fireEvent.click(screen.getByTestId('history-back'));
+    expect(screen.getByTestId('history-list')).toBeInTheDocument();
   });
 
   it('shows the empty message when there are no runs', async () => {
