@@ -592,10 +592,29 @@
   .lesson-card, .picker-cta-bar__btn, .session-aura, .session-coach-avatar { transition: none; }
 }
 
+/* ── LiveRoom rail: even vertical rhythm ─────────────────────────────────────
+   The rail stacks: "Step N of 7" header, the phase stepper card, the one-line
+   goal caption, then the Skip-to-live-rep button. Give it ONE consistent gap so
+   the pieces breathe evenly instead of bunching with ad-hoc margins. */
+.live-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
 /* ── "Where you are" header in the LiveRoom rail ─────────────────────────── */
-.phase-now { display: flex; flex-direction: column; gap: 1px; padding: 2px 2px 8px; }
-.phase-now__step { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
-.phase-now__name { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.phase-now { display: flex; flex-direction: column; gap: 2px; padding: 0; }
+.phase-now__step { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.phase-now__name { font-size: 1.15rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+
+/* The goal caption sits between the stepper and the CTA; keep it readable but
+   visually secondary, with a touch of leading so the two lines don't crowd. */
+.live-rail .session-goal { margin: 0; line-height: 1.55; }
+
+/* Skip-to-live-rep button: don't stretch full width edge-to-edge — let it size to
+   its label and sit left-aligned under the caption for a calmer rail. */
+.live-rail .picker-cta-bar__btn { align-self: flex-start; }
 
 /* ── Debrief report: own scroll area ─────────────────────────────────────────
    .training--session is 100dvh + overflow:hidden, so the full-length report has
