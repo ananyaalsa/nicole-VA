@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
 
 process.env.GEMINI_API_KEY ??= 'test-key';
 process.env.DATABASE_URL ??= 'postgres://x';
@@ -14,22 +15,31 @@ vi.mock('./db.js', () => ({ loadFacts, saveFact, forgetFact }));
 
 import { handleMemoryRoute } from './routes.js';
 
+// The route now requires a valid JWT (Authorization: Bearer <token>); mint one
+// with the same default dev secret the middleware uses.
+const TEST_TOKEN = jwt.sign({ sub: 'test-user' }, process.env.JWT_SECRET ?? 'nicole-dev-secret');
+
 /** Build a fake req/res pair; res captures status + body. */
 function makeReqRes(method: string, path: string, body?: any) {
   const listeners: Record<string, (arg?: any) => void> = {};
   const req: any = {
     method,
     url: path,
+    headers: { authorization: `Bearer ${TEST_TOKEN}` },
     on: (ev: string, cb: (arg?: any) => void) => {
       listeners[ev] = cb;
+      // Emit the body only once the consumer has registered its 'end' listener.
+      // The route now awaits auth before readBody(), so a one-shot microtask
+      // could fire before the listeners exist — drive it off 'end' registration.
+      if (ev === 'end') {
+        queueMicrotask(() => {
+          if (body !== undefined) listeners['data']?.(JSON.stringify(body));
+          listeners['end']?.();
+        });
+      }
       return req;
     },
   };
-  // Drive body emission on next tick.
-  queueMicrotask(() => {
-    if (body !== undefined) listeners['data']?.(JSON.stringify(body));
-    listeners['end']?.();
-  });
   const res: any = {
     statusCode: 0,
     headers: {} as Record<string, string>,

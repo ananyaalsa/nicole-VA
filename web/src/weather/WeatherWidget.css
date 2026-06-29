@@ -1,0 +1,118 @@
+/* Ambient weather chip + expandable card + voice dialog. Teal glass, premium. */
+
+.weather-widget {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: 6;
+}
+
+/* The always-on chip. */
+.weather-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  color: var(--text);
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+.weather-chip:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15, 118, 110, 0.14); border-color: var(--border-strong); }
+.weather-chip__icon { font-size: 1.1rem; line-height: 1; }
+.weather-chip__temp { font-weight: 700; font-size: 0.95rem; }
+.weather-chip__place { font-size: 0.8rem; color: var(--text-2); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.weather-widget__pop { position: absolute; left: 0; bottom: calc(100% + 10px); }
+
+/* Inline mode: the chip lives inside the left panel, pushed to the BOTTOM of
+   the panel column (margin-top:auto) and full-width, in normal flow. */
+.weather-widget--inline { position: static; margin-top: auto; width: 100%; }
+.weather-chip--inline {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+.weather-chip--inline .weather-chip__cond { font-size: 0.78rem; color: var(--text-2); margin-left: auto; }
+.weather-chip--inline .weather-chip__place { max-width: none; }
+/* Inline expanded card opens BELOW the chip, in normal flow (so the panel never
+   clips it), pushing the panel content down rather than overlaying. */
+.weather-widget__pop--inline { position: static; margin-top: 10px; }
+.weather-widget__pop--inline .weather-card { width: 100%; }
+
+/* The full card. */
+.weather-card {
+  position: relative;
+  width: 280px;
+  padding: 18px 18px 14px;
+  border-radius: 20px;
+  /* Teal frosted glass. */
+  background: linear-gradient(160deg, rgba(15, 118, 110, 0.16), rgba(251, 248, 243, 0.6));
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 18px 50px rgba(15, 118, 110, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: #0B3D38;
+  animation: weather-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes weather-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+.weather-card__close {
+  position: absolute; top: 8px; right: 8px;
+  width: 30px; height: 30px; border: none; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6); color: #0B3D38; cursor: pointer;
+  font-size: 1.15rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  z-index: 3; /* above the card body so the hit target is never covered */
+}
+.weather-card__close:hover { background: rgba(255, 255, 255, 0.95); }
+
+.weather-card__place { font-size: 0.82rem; font-weight: 600; opacity: 0.85; margin-bottom: 6px; padding-right: 26px; }
+.weather-card__now { display: flex; align-items: center; gap: 12px; }
+.weather-card__icon { font-size: 2.6rem; line-height: 1; }
+.weather-card__temp { font-size: 2.6rem; font-weight: 700; line-height: 1; font-family: 'Space Grotesk', system-ui, sans-serif; }
+.weather-card__cond { font-size: 0.84rem; font-weight: 600; line-height: 1.25; }
+.weather-card__cond small { font-weight: 500; opacity: 0.7; font-size: 0.74rem; }
+
+.weather-card__meta { display: flex; gap: 14px; margin: 12px 0 14px; font-size: 0.78rem; opacity: 0.8; }
+
+.weather-card__forecast {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  padding-top: 12px; border-top: 1px solid rgba(11, 61, 56, 0.12);
+}
+.weather-card__day { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.weather-card__day-name { font-size: 0.7rem; font-weight: 600; opacity: 0.8; }
+.weather-card__day-icon { font-size: 1.15rem; }
+.weather-card__day-temp { font-size: 0.74rem; font-weight: 700; }
+.weather-card__day-temp small { font-weight: 500; opacity: 0.6; margin-left: 3px; }
+
+/* Voice-opened dialog: centered, dim backdrop. */
+.weather-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(11, 61, 56, 0.18);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  animation: weather-overlay-in 160ms ease;
+}
+@keyframes weather-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+.weather-overlay .weather-card { width: 320px; }
+
+/* Mobile: chip sits above the bottom tab bar; dialog scales. */
+@media (max-width: 640px) {
+  .weather-widget { left: 12px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+  .weather-chip__place { max-width: 80px; }
+  .weather-overlay .weather-card { width: min(340px, calc(100vw - 32px)); }
+  /* The INLINE weather chip lives in the left panel, which becomes the cramped
+     top header row on mobile — it collides with the voice selector there. Hide
+     it on mobile; the voice-opened weather dialog still works. */
+  .weather-widget--inline { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-card, .weather-overlay, .weather-chip { animation: none; transition: none; }
+}

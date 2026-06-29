@@ -17,4 +17,6 @@ export interface TranscriptLine {
   speaker: Speaker;
   /** The (possibly still-streaming) text of the line. */
   text: string;
+  /** True while this line is still being streamed (drives the typing caret). */
+  streaming?: boolean;
 }

@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 420, height: 700 } });
+const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+await p.goto('http://127.0.0.1:5175/preview.html', { waitUntil:'networkidle' });
+await p.waitForSelector('.weather-chip', { timeout: 8000 }).catch(()=>{});
+await p.click('.weather-chip').catch(e=>console.log('chip click fail',e.message));
+await p.waitForTimeout(400);
+const before = await p.evaluate(()=>!!document.querySelector('.weather-widget__pop'));
+await p.click('.weather-card__close').catch(e=>console.log('close click fail',e.message));
+await p.waitForTimeout(400);
+const after = await p.evaluate(()=>!!document.querySelector('.weather-widget__pop'));
+console.log('CLOSE TEST → expanded before X:', before, '| still open after X:', after, after?'(BROKEN)':'(FIXED ✓)');
+console.log('errors:', errs.length?errs.join(' | '):'none');
+await b.close();

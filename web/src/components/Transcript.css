@@ -1,48 +1,69 @@
 .transcript {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   overflow-y: auto;
+  height: 100%;
   max-height: 100%;
-  padding: 12px 14px;
+  padding: 12px 16px;
   scroll-behavior: smooth;
 }
 
 .transcript-line {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-width: 78%;
-  padding: 8px 12px;
-  border-radius: 14px;
-  line-height: 1.4;
-  font-size: 0.95rem;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 7px 8px 7px 10px;
+  border-left: 2px solid transparent;
+  font-size: 0.9rem;
+  line-height: 1.5;
   word-break: break-word;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 .transcript-line--you {
-  align-self: flex-end;
-  background: linear-gradient(135deg, #6d5efc 0%, #8b7bff 100%);
-  color: #fff;
-  border-bottom-right-radius: 4px;
+  border-left-color: var(--accent);
+  background: var(--accent-light);
 }
-
 .transcript-line--nicole {
-  align-self: flex-start;
-  background: rgba(255, 255, 255, 0.08);
-  color: #e9e9f2;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-bottom-left-radius: 4px;
+  border-left-color: var(--border-strong);
 }
 
 .transcript-speaker {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.7;
+  padding-top: 3px;
+  color: var(--text-3);
 }
+.transcript-line--you .transcript-speaker { color: var(--accent); }
+.transcript-line--nicole .transcript-speaker { color: var(--text-2); }
 
 .transcript-text {
   white-space: pre-wrap;
+  color: var(--text);
+}
+
+.transcript-line:last-child .transcript-text::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  opacity: 0.6;
+  animation: transcript-caret 1.1s steps(1) infinite;
+}
+
+@keyframes transcript-caret {
+  0%, 50% { opacity: 0.6; }
+  51%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transcript { scroll-behavior: auto; }
+  .transcript-line:last-child .transcript-text::after { animation: none; opacity: 0.3; }
 }

@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nicole — Reliability: Memory, Stability & Long Sessions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --surface-2: #F2F1ED;
+    --accent: #5046E5;
+    --accent-soft: rgba(80, 70, 229, 0.08);
+    --text: #1A1A2E;
+    --muted: #5A5A6E;
+    --border: #E5E7EB;
+    --success: #10B981;
+    --success-soft: rgba(16, 185, 129, 0.10);
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(20,20,46,0.04), 0 8px 24px rgba(20,20,46,0.05);
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --display: "Space Grotesk", var(--sans);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Header ─────────────────────────────────────────────────────── */
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(247,246,243,0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .top .wrap { display: flex; align-items: center; gap: 10px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
+  .aura {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--accent);
+    position: relative; flex-shrink: 0;
+  }
+  .aura::after {
+    content: ''; position: absolute; inset: -5px; border-radius: 50%;
+    background: var(--accent); opacity: 0.25;
+    animation: breathe 2.6s ease-in-out infinite;
+  }
+  @keyframes breathe { 0%,100% { transform: scale(0.8); opacity: 0.25; } 50% { transform: scale(1.5); opacity: 0; } }
+  .top nav { margin-left: auto; display: flex; gap: 20px; }
+  .top nav a { color: var(--muted); text-decoration: none; font-size: 0.88rem; font-weight: 500; }
+  .top nav a:hover { color: var(--text); }
+
+  /* ── Hero ───────────────────────────────────────────────────────── */
+  .hero { padding: 72px 0 40px; }
+  .eyebrow {
+    display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--accent);
+    background: var(--accent-soft); padding: 6px 12px; border-radius: 999px; margin-bottom: 22px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 18px;
+  }
+  h1 .hl { color: var(--accent); }
+  .lede { font-size: 1.15rem; color: var(--muted); max-width: 60ch; margin: 0; }
+
+  /* ── Pillars strip ──────────────────────────────────────────────── */
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 36px 0 8px; }
+  .pillar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .pillar .pnum { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); font-weight: 500; }
+  .pillar h3 { font-family: var(--display); font-size: 1.05rem; margin: 8px 0 4px; }
+  .pillar p { font-size: 0.88rem; color: var(--muted); margin: 0; }
+
+  /* ── Sections ───────────────────────────────────────────────────── */
+  section.block { padding: 48px 0; border-top: 1px solid var(--border); }
+  .kicker { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); font-weight: 500; letter-spacing: 0.04em; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: clamp(1.5rem, 3.5vw, 2rem); letter-spacing: -0.015em; margin: 8px 0 10px; }
+  .section-lede { color: var(--muted); font-size: 1.02rem; max-width: 64ch; margin: 0 0 28px; }
+
+  /* mechanism cards */
+  .mech { display: grid; gap: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 24px; box-shadow: var(--shadow);
+  }
+  .card h4 { font-family: var(--display); font-size: 1.05rem; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+  .card h4 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+  .card p + p { margin-top: 8px; }
+  .card .why { margin-top: 10px; font-size: 0.88rem; color: var(--text); background: var(--surface-2); border-radius: 10px; padding: 10px 13px; }
+  .card .why b { color: var(--accent); font-weight: 600; }
+  code, .num { font-family: var(--mono); font-size: 0.86em; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; color: var(--text); }
+
+  /* flow steps */
+  .flow { display: grid; gap: 0; margin-top: 6px; }
+  .step { display: grid; grid-template-columns: 30px 1fr; gap: 14px; padding: 12px 0; position: relative; }
+  .step:not(:last-child)::before { content: ''; position: absolute; left: 14px; top: 34px; bottom: -12px; width: 2px; background: var(--border); }
+  .step .n {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.82rem; font-weight: 500; z-index: 1;
+  }
+  .step .body strong { display: block; font-size: 0.97rem; }
+  .step .body span { font-size: 0.9rem; color: var(--muted); }
+
+  /* VA borrow table */
+  .borrow { display: grid; gap: 12px; margin-top: 6px; }
+  .row {
+    display: grid; grid-template-columns: 200px 1fr; gap: 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 20px; box-shadow: var(--shadow); align-items: start;
+  }
+  .row .src { font-weight: 600; font-size: 0.95rem; }
+  .row .src span { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  .row .take { font-size: 0.93rem; color: var(--muted); }
+  .row .take b { color: var(--text); font-weight: 600; }
+
+  /* callout */
+  .callout {
+    background: var(--success-soft); border: 1px solid rgba(16,185,129,0.3); border-radius: var(--radius);
+    padding: 20px 24px; margin-top: 8px;
+  }
+  .callout h4 { margin: 0 0 6px; font-family: var(--display); font-size: 1rem; color: #047857; }
+  .callout p { margin: 0; color: #065F46; font-size: 0.94rem; }
+
+  footer { border-top: 1px solid var(--border); padding: 30px 0 50px; color: var(--muted); font-size: 0.85rem; }
+  footer .wrap { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+
+  @media (max-width: 720px) {
+    .pillars { grid-template-columns: 1fr; }
+    .top nav { display: none; }
+    .hero { padding: 48px 0 28px; }
+    .row { grid-template-columns: 1fr; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .aura::after { animation: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="aura" aria-hidden="true"></span> Nicole</div>
+    <nav aria-label="Sections">
+      <a href="#memory">Memory</a>
+      <a href="#stability">Stability</a>
+      <a href="#sessions">Long sessions</a>
+      <a href="#borrow">From the best</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Reliability Plan</span>
+      <h1>Built so Nicole <span class="hl">doesn't break</span> —<br />memory that lasts, sessions that don't drop.</h1>
+      <p class="lede">A live voice assistant has two ways to fail: it forgets you, or it crashes mid-conversation. This is how we engineer Nicole so neither happens — durable memory, self-healing connections, and conversations that run for hours — plus the assistant habits we're adopting from the best products out there.</p>
+
+      <div class="pillars">
+        <div class="pillar">
+          <div class="pnum">01</div>
+          <h3>Durable memory</h3>
+          <p>She remembers you across every session — stored safely, reloaded each time.</p>
+        </div>
+        <div class="pillar">
+          <div class="pnum">02</div>
+          <h3>Self-healing stability</h3>
+          <p>Connections drop. Nicole reconnects and resumes without you noticing.</p>
+        </div>
+        <div class="pillar">
+          <div class="pnum">03</div>
+          <h3>Long sessions</h3>
+          <p>Context is compressed before it overflows, so hour-long talks stay alive.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MEMORY ─────────────────────────────────────────────── -->
+  <section class="block" id="memory">
+    <div class="wrap">
+      <span class="kicker">01 — Memory</span>
+      <h2>She remembers you, securely, per person</h2>
+      <p class="section-lede">Memory is what turns a chatbot into an assistant. Nicole keeps durable, per-user memory in the database — so she never makes you repeat yourself, and one person's information never leaks into another's.</p>
+
+      <div class="mech">
+        <div class="card">
+          <h4><span class="dot"></span> Persisted to the database, not the chat window</h4>
+          <p>Facts are written to a dedicated <code>nicole2_memory</code> table in Postgres, keyed by user. Each fact is stored once and updated in place (an UPSERT on user + key), so re-learning something overwrites rather than duplicates.</p>
+          <div class="why"><b>Why it matters:</b> memory survives refreshes, restarts, and new devices — it lives in the database, not in a tab you can close.</div>
+        </div>
+
+        <div class="card">
+          <h4><span class="dot"></span> Reloaded into context at the start of every session</h4>
+          <p>When a conversation begins, Nicole loads everything she knows about that user and injects it as a memory block in her instructions. She treats it as ground truth and never asks you to repeat it.</p>
+        </div>
+
+        <div class="card">
+          <h4><span class="dot"></span> Proactive, two-way, and correctable</h4>
+          <p>She saves things on her own as she learns them — your name, your business, your goals, your preferences — and you can tell her to remember or forget anything. Corrections overwrite the old value cleanly.</p>
+        </div>
+
+        <div class="card">
+          <h4><span class="dot"></span> Per-user and private by design</h4>
+          <p>Every fact, profile field, and connected account is scoped to the logged-in user. The live voice session runs <em>as that user</em>, verified by their sign-in token — so Nicole only ever reads and acts on the data belonging to the person she's talking to. Connected-account tokens are encrypted at rest.</p>
+          <div class="why"><b>Why it matters:</b> when many people use Nicole, each gets their own private memory and their own connected accounts — never shared, never crossed.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── STABILITY ──────────────────────────────────────────── -->
+  <section class="block" id="stability">
+    <div class="wrap">
+      <span class="kicker">02 — Stability</span>
+      <h2>Self-healing — drops repair themselves</h2>
+      <p class="section-lede">Real-time voice runs over a live connection that <em>will</em> drop — networks blip, the provider rotates sessions. The difference between a toy and a product is whether the user ever notices. Nicole is built to recover silently.</p>
+
+      <div class="mech">
+        <div class="card">
+          <h4><span class="dot"></span> Auto-reconnect with seamless resume</h4>
+          <p>If the live connection drops, Nicole immediately reconnects — and reuses a <em>resumption handle</em> so the new session restores the prior conversation state. She picks up exactly where she left off; she never says "Hello" again or re-introduces herself.</p>
+          <div class="why"><b>Why it matters:</b> a dropped socket becomes invisible — the conversation continues as if nothing happened.</div>
+        </div>
+
+        <div class="card">
+          <h4><span class="dot"></span> Knows the difference between a blip and a wall</h4>
+          <p>Ordinary drops are reconnected automatically. But terminal failures — a depleted API key, a quota or billing stop, an unsupported region — are detected and reported once, instead of retried forever. That prevents reconnect storms and surfaces the real cause.</p>
+        </div>
+
+        <div class="card">
+          <h4><span class="dot"></span> Leak-safe by construction</h4>
+          <p>Audio streams, transcript buffers, and timers are torn down deterministically when a session ends or a component unmounts. Nothing keeps running in the background, so memory and CPU stay flat over a long day of use.</p>
+        </div>
+
+        <div class="card">
+          <h4><span class="dot"></span> Never reconnects mid-sentence</h4>
+          <p>The system tracks whether you're currently speaking and holds any reconnect or maintenance until you've finished your thought — so recovery never cuts you off.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── LONG SESSIONS ──────────────────────────────────────── -->
+  <section class="block" id="sessions">
+    <div class="wrap">
+      <span class="kicker">03 — Long sessions</span>
+      <h2>Hour-long conversations that don't overflow</h2>
+      <p class="section-lede">Long live sessions break two ways: context grows until the model overflows, and the provider's session handle expires after a couple of hours. Nicole gets ahead of both — proactively, before either becomes a failure.</p>
+
+      <div class="card" style="margin-bottom:14px;">
+        <h4><span class="dot"></span> Live summarization — the long-talk fix</h4>
+        <p>As a conversation grows, Nicole compresses the older part into a running summary and keeps only the most recent turns verbatim, then reconnects seeded with that summary. Context stays small and bounded no matter how long you talk — nothing important is lost, and the model never overflows.</p>
+        <div class="flow">
+          <div class="step"><div class="n">1</div><div class="body"><strong>Watch</strong><span>Track turns and an estimated token count as the talk grows.</span></div></div>
+          <div class="step"><div class="n">2</div><div class="body"><strong>Trigger</strong><span>Past <span class="num">~40 turns</span> or <span class="num">~12k tokens</span>, summarization kicks in (only when you're not mid-sentence).</span></div></div>
+          <div class="step"><div class="n">3</div><div class="body"><strong>Compress</strong><span>Older turns are summarized; the last <span class="num">8 turns</span> are kept word-for-word for immediate context.</span></div></div>
+          <div class="step"><div class="n">4</div><div class="body"><strong>Continue</strong><span>Reconnect seeded with the summary. Context is light again; the conversation flows on.</span></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4><span class="dot"></span> Proactive reconnect — refresh before expiry</h4>
+        <p>The provider's resume handle is only good for about two hours. A watchdog checks once a minute and, once a session has been open <span class="num">~100 minutes</span>, pre-emptively reconnects on the still-fresh handle. That mints a new handle and resets the clock — comfortably under the <span class="num">~110-minute</span> safety limit — so a session can run indefinitely.</p>
+        <div class="why"><b>Why it matters:</b> the session is refreshed <em>before</em> it can expire, never after it breaks. The 30-minute-crash class of failure is engineered out.</div>
+      </div>
+
+      <div class="callout">
+        <h4>The throughline</h4>
+        <p>Every one of these is <em>proactive</em>, not reactive — context is compressed before it overflows, the connection is refreshed before it expires, and drops are healed before you notice. The goal is simple: Nicole stays up, stays herself, and stays yours, for as long as you want to talk.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── WHAT WE TAKE FROM THE BEST ─────────────────────────── -->
+  <section class="block" id="borrow">
+    <div class="wrap">
+      <span class="kicker">04 — Learning from the best</span>
+      <h2>What we're taking from the top assistants</h2>
+      <p class="section-lede">We studied the leading voice and AI assistants to define what "competition-level" actually means — then adopted the habits that separate a real assistant from a chatbot. Here's what we borrowed, and from whom.</p>
+
+      <div class="borrow">
+        <div class="row">
+          <div class="src">ChatGPT Voice<span>natural spoken AI</span></div>
+          <div class="take"><b>Talk like a person, act in one breath.</b> Fluid, interruptible conversation and concise result read-backs — Nicole reports what she did in a sentence ("Sent to Priya."), never re-reading the whole payload.</div>
+        </div>
+        <div class="row">
+          <div class="src">Google Gemini<span>assistant + daily brief</span></div>
+          <div class="take"><b>The proactive morning brief.</b> An opt-in daily brief that scans your calendar, unread email and due tasks, then delivers a <em>prioritized</em> spoken summary with a single "want me to…" next step — not an inbox dump.</div>
+        </div>
+        <div class="row">
+          <div class="src">Alexa+ / Siri<span>everyday assistant</span></div>
+          <div class="take"><b>Do things on real accounts.</b> The table-stakes that make an assistant useful — calendar, email, tasks, messaging, music — wired as real actions on <em>your</em> connected services, all driven by voice.</div>
+        </div>
+        <div class="row">
+          <div class="src">Martin<span>AI executive assistant</span></div>
+          <div class="take"><b>Confirm before anything irreversible.</b> Before sending an email, posting to Slack, or booking a meeting that invites people, Nicole previews exactly what she'll do and waits for your "yes" — enforced both in her reasoning and in code, so a mis-heard word can't act on its own.</div>
+        </div>
+        <div class="row">
+          <div class="src">Lindy<span>AI workflow assistant</span></div>
+          <div class="take"><b>Draft-then-approve.</b> She drafts email freely (a draft is safe — it isn't sent) and only sends on your go-ahead, so you wake up to things ready to review rather than already gone.</div>
+        </div>
+        <div class="row">
+          <div class="src">Perplexity / Pi<span>answer + presence</span></div>
+          <div class="take"><b>Real-time answers, warm presence.</b> Silent live web grounding for current facts (news, weather, prices), delivered in Nicole's own voice — accurate without sounding like a search engine.</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <h4>The throughline</h4>
+        <p>The common thread across all of them: an assistant isn't a chatbot — it's <em>staff</em>. You talk, it does the work, it confirms before anything risky, and it reports back in a breath. That's the bar we're building Nicole to meet.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="aura" aria-hidden="true"></span>
+    <span><strong>Nicole</strong> — reliability plan: memory, stability, long sessions &amp; what we take from the best.</span>
+  </div>
+</footer>
+
+</body>
+</html>

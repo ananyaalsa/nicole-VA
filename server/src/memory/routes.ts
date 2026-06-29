@@ -1,9 +1,14 @@
 // Minimal memory HTTP API (no framework). Handles GET/POST /api/memory and
-// DELETE /api/memory/:key for the single local user. Returns JSON.
+// DELETE /api/memory/:key. Requires a valid JWT (Authorization: Bearer <token>).
+// Returns JSON.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { config } from '../config.js';
 import { loadFacts, saveFact, forgetFact } from './db.js';
+import { requireAuth } from '../auth/middleware.js';
+
+/** Keys the user sets in their profile/settings — tagged source='settings'. */
+const PROFILE_KEYS = new Set(['user_about', 'user_goals', 'user_phone', 'user_name']);
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
@@ -11,7 +16,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': config.frontendUrl,
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
   });
   res.end(text);
 }
@@ -42,12 +47,13 @@ export async function handleMemoryRoute(
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (!url.pathname.startsWith('/api/memory')) return false;
 
-  const userId = config.userId;
-
   if (req.method === 'OPTIONS') {
     sendJson(res, 204, {});
     return true;
   }
+
+  const userId = await requireAuth(req, res);
+  if (!userId) return true;
 
   // /api/memory  (collection)
   if (url.pathname === '/api/memory') {
@@ -62,11 +68,18 @@ export async function handleMemoryRoute(
         sendJson(res, 400, { error: 'fact is required' });
         return true;
       }
+      const key = body.key ?? slugify(body.fact);
+      // Profile facts the user sets in settings/onboarding are tagged 'settings'
+      // (Nicole KNOWS them but did NOT discuss them). Everything else defaults to
+      // 'inferred'/'explicit'. Honor an explicit body.source if provided.
+      const source =
+        body.source ?? (PROFILE_KEYS.has(key) ? 'settings' : undefined);
       const fact = await saveFact({
         userId,
-        key: body.key ?? slugify(body.fact),
+        key,
         fact: body.fact,
         factType: body.factType,
+        source,
       });
       sendJson(res, 200, { fact });
       return true;

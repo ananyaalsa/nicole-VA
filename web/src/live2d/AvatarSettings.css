@@ -1,0 +1,92 @@
+/* Avatar Settings — choose Nicole's avatar + recolor each element. Lives in the
+   Profile panel. Teal theme. */
+
+.avset { display: flex; flex-direction: column; gap: 14px; }
+.avset__lede { font-size: 0.86rem; color: var(--text-2); line-height: 1.5; margin: 0; }
+
+/* Avatar choice row */
+.avset__choices { display: flex; gap: 10px; }
+.avset__choice {
+  flex: 1;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 10px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 130ms ease, background 130ms ease, transform 100ms ease;
+}
+.avset__choice:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.avset__choice.is-on { border-color: var(--accent); background: var(--accent-light); }
+.avset__choice-name { font-weight: 700; font-size: 0.92rem; }
+.avset__choice.is-on .avset__choice-name { color: var(--accent); }
+.avset__choice-sub { font-size: 0.72rem; color: var(--text-3); }
+
+/* Body: preview + wardrobe side by side (stacks on narrow) */
+.avset__body { display: flex; gap: 16px; align-items: flex-start; }
+
+.avset__preview {
+  position: relative;
+  flex: 0 0 150px;
+  width: 150px; height: 230px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--accent-light), var(--surface-2));
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.avset__preview-canvas { width: 100%; height: 100%; display: block; }
+.avset__preview-tag {
+  position: absolute; bottom: 6px; left: 0; right: 0; text-align: center;
+  font-size: 0.7rem; color: var(--text-3);
+}
+
+.avset__wardrobe { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.avset__wardrobe-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.avset__reset {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  font-size: 0.72rem; font-weight: 600; text-transform: none; letter-spacing: 0;
+  padding: 5px 10px; border-radius: var(--radius-pill); cursor: pointer;
+}
+.avset__reset:hover { border-color: var(--accent); color: var(--accent); }
+
+.avset__row { display: flex; flex-direction: column; gap: 6px; }
+.avset__row-label { font-size: 0.84rem; font-weight: 600; color: var(--text); }
+.avset__row-controls { display: flex; align-items: center; gap: 8px; }
+.avset__presets { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; }
+.avset__swatch {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer; padding: 0;
+  transition: transform 100ms ease, box-shadow 120ms ease;
+}
+.avset__swatch:hover { transform: scale(1.12); }
+.avset__swatch.is-on { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.12); }
+.avset__color {
+  width: 34px; height: 30px; flex-shrink: 0; padding: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-sm, 6px);
+  background: var(--surface); cursor: pointer;
+}
+.avset__hint { font-size: 0.72rem; color: var(--text-3); margin: 2px 0 0; }
+
+/* Save footer */
+.avset__footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding-top: 6px; border-top: 1px solid var(--border); }
+.avset__footer-note { font-size: 0.76rem; color: var(--warning, #D97706); font-weight: 600; }
+.avset__save {
+  padding: 9px 20px; border-radius: var(--radius-pill); border: none;
+  background: var(--accent); color: #fff; font-family: inherit; font-size: 0.86rem; font-weight: 600;
+  cursor: pointer; transition: background 140ms ease, opacity 140ms ease;
+}
+.avset__save:hover:not(:disabled) { background: var(--accent-hover); }
+.avset__save:disabled { background: var(--surface-2); color: var(--text-3); cursor: default; }
+
+@media (max-width: 560px) {
+  .avset__body { flex-direction: column; align-items: stretch; }
+  .avset__preview { flex: none; width: 100%; height: 280px; }
+}

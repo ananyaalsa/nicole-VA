@@ -1,0 +1,70 @@
+/* Bottom-right Live2D companion — a small standing presence, toggleable. It must
+   never block the conversation or controls, so the stage is click-through and
+   only the toggle button is interactive. */
+
+.l2d-companion {
+  position: absolute;
+  right: 16px;
+  bottom: 0; /* down — her lower body tucks behind the controls bar/line */
+  /* Below the controls bar (z-index 5) so the bar's line sits in front of her
+     lower edge, but she sits above the page background. */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none; /* children opt back in */
+}
+
+.l2d-companion__stage {
+  /* Bigger, full body in frame. */
+  width: 240px;
+  height: 420px;
+  pointer-events: none; /* click-through: she doesn't steal taps from the page */
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.l2d-companion__stage.is-hidden {
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  pointer-events: none;
+  height: 0; /* collapse so it doesn't reserve space when hidden */
+  overflow: hidden;
+}
+.l2d-companion__canvas { width: 100%; height: 100%; display: block; }
+
+/* The show/hide toggle lives in the controls bar (.l2d-toggle-btn), as a normal
+   bar item — see TalkScreen.css. No floating button here (it collided with the
+   weather chip / profile button). */
+
+/* Mobile (research-backed): a desktop corner avatar doesn't fit a phone, so on
+   mobile the avatar STEPS BACK while you read the chat (small + dimmed, tucked in
+   the corner above the controls/tab bar) and becomes PROMINENT only while Nicole
+   is speaking (the moment lip-sync/expression actually matter). It never overlaps
+   the controls — it's anchored clear of the bottom bar + safe area. */
+@media (max-width: 640px) {
+  /* Place her in the bottom-right corner, sitting just ABOVE the Start-talking
+     bar + tab bar (clear of the starter chips above). Small/quiet while reading,
+     expands a touch while she speaks. */
+  .l2d-companion {
+    right: 4px;
+    /* The .talk-conversation parent already ends at the controls bar (the Start
+       button sits in its bottom ~72px). Anchor her bottom just above that bar so
+       she stands right above "Start talking", clear of the starter chips. */
+    bottom: 78px;
+  }
+  .l2d-companion__stage {
+    width: 90px;
+    height: 132px;
+    opacity: 0.92;
+    transform-origin: bottom right;
+    transition: width 240ms ease, height 240ms ease, opacity 240ms ease;
+  }
+  .l2d-companion.is-speaking .l2d-companion__stage {
+    width: 116px;
+    height: 178px;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .l2d-companion__stage { transition: none; }
+}

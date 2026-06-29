@@ -62,14 +62,18 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    const s = streamRef.current;
-    if (s) {
-      for (const t of s.getTracks()) t.stop();
-      streamRef.current = null;
-    }
+    // Null out srcObject first so the browser releases the indicator immediately.
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current = null;
+    }
+    const s = streamRef.current;
+    if (s) {
+      for (const t of s.getTracks()) {
+        t.enabled = false;
+        t.stop();
+      }
+      streamRef.current = null;
     }
     canvasRef.current = null;
     setStream(null);

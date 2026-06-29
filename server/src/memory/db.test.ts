@@ -22,6 +22,7 @@ const SAMPLE_ROW = {
   key: 'name',
   fact: 'Sam',
   fact_type: 'identity',
+  source: 'inferred',
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-02T00:00:00.000Z',
 };
@@ -61,7 +62,7 @@ describe('memory/db', () => {
       expect(sql).toMatch(/fact_type\s*=\s*excluded\.fact_type/i);
       expect(sql).toMatch(/updated_at\s*=\s*now\(\)/i);
       expect(sql).toMatch(/returning\s+\*/i);
-      expect(params).toEqual(['u1', 'name', 'Sam', 'identity']);
+      expect(params).toEqual(['u1', 'name', 'Sam', 'identity', 'inferred']);
 
       // snake_case row mapped to camelCase MemoryFact
       expect(result).toEqual({
@@ -70,19 +71,27 @@ describe('memory/db', () => {
         key: 'name',
         fact: 'Sam',
         factType: 'identity',
+        source: 'inferred',
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-02T00:00:00.000Z',
       });
     });
 
-    it('defaults factType to "general" when omitted', async () => {
+    it('defaults factType to "general" and source to "inferred" when omitted', async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ ...SAMPLE_ROW, fact_type: 'general' }],
       });
       const result = await saveFact({ userId: 'u1', key: 'name', fact: 'Sam' });
       const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-      expect(params).toEqual(['u1', 'name', 'Sam', 'general']);
+      expect(params).toEqual(['u1', 'name', 'Sam', 'general', 'inferred']);
       expect(result.factType).toBe('general');
+    });
+
+    it('passes source through when provided', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...SAMPLE_ROW, source: 'settings' }] });
+      await saveFact({ userId: 'u1', key: 'user_about', fact: 'Agent', source: 'settings' });
+      const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['u1', 'user_about', 'Agent', 'general', 'settings']);
     });
   });
 
@@ -117,6 +126,7 @@ describe('memory/db', () => {
           key: 'name',
           fact: 'Sam',
           factType: 'identity',
+          source: 'inferred',
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-02T00:00:00.000Z',
         },

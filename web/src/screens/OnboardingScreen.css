@@ -1,0 +1,219 @@
+.ob-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+
+.ob-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 40px 40px 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ob-dots {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 36px;
+}
+
+.ob-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: background 0.2s ease;
+}
+
+.ob-dot.is-filled {
+  background: var(--accent);
+}
+
+.ob-step {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.ob-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 12%;
+  background: var(--surface-2);
+  margin-bottom: 4px;
+}
+
+.ob-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  letter-spacing: -0.3px;
+}
+
+.ob-sub {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.ob-opening {
+  font-style: italic;
+  color: var(--text-2);
+  background: var(--accent-light);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.ob-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.ob-goal-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.ob-goal-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.ob-goal-card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ob-goal-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  color: #fff;
+}
+
+.ob-goal-card.is-selected .ob-goal-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ob-voice-group {
+  width: 100%;
+}
+
+.ob-voice-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 8px;
+}
+
+.ob-voice-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ob-voice-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 80px;
+}
+
+.ob-voice-pill:hover {
+  border-color: var(--accent);
+}
+
+.ob-voice-pill.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ob-voice-vibe {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.ob-voice-pill.is-selected .ob-voice-vibe {
+  color: var(--accent-bright);
+}
+
+.ob-btn-primary {
+  width: 100%;
+  padding: 13px 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  margin-top: 8px;
+}
+
+.ob-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.ob-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

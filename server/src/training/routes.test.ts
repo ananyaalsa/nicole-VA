@@ -40,6 +40,9 @@ function makeReq(method: string, url: string, body?: unknown): IncomingMessage {
   const req = new EventEmitter() as unknown as IncomingMessage;
   (req as any).method = method;
   (req as any).url = url;
+  // The route reads req.headers.authorization (per-user history); no token here
+  // means it falls back to the server default user, which the tests expect.
+  (req as any).headers = {};
   // Emit the body on next tick so listeners attached inside the handler fire.
   if (body !== undefined) {
     queueMicrotask(() => {

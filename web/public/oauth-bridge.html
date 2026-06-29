@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Connecting…</title>
+  <style>
+    html, body { margin: 0; height: 100%; display: flex; align-items: center; justify-content: center;
+      font-family: Inter, system-ui, sans-serif; background: #FBF8F3; color: #0F766E; }
+    p { font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <p>Finishing up… you can close this window.</p>
+  <script>
+    // This page is served from the SAME origin as the app, so localStorage and
+    // BroadcastChannel are shared with the main window — and unlike window.opener,
+    // they survive the Cross-Origin-Opener-Policy that the provider's OAuth pages
+    // set (which otherwise nulls window.opener). We broadcast the result to the
+    // main window, which flips the card to "Connected" in place (no reload), then
+    // close ourselves.
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var integration = params.get('integration') || '';
+      var payload = { source: 'nicole-oauth', integration: integration, t: Date.now() };
+      try {
+        var bc = new BroadcastChannel('nicole-oauth');
+        bc.postMessage(payload);
+        bc.close();
+      } catch (e) { /* no BroadcastChannel — fall back to storage */ }
+      try {
+        // A storage write fires a 'storage' event in other same-origin tabs.
+        localStorage.setItem('nicole_oauth_result', JSON.stringify(payload));
+      } catch (e) { /* ignore */ }
+      // Best-effort opener post (works when COOP didn't sever it).
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(payload, window.location.origin);
+        }
+      } catch (e) { /* ignore */ }
+      window.close();
+      // If the browser refuses to close a script-opened window, show a hint.
+      setTimeout(function () {
+        document.body.querySelector('p').textContent = 'Connected. You can close this window.';
+      }, 400);
+    })();
+  </script>
+</body>
+</html>

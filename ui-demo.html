@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nicole — Interactive UI Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#F7F6F3; --surface:#FFFFFF; --surface-2:#F3F4F6;
+    --border:#E5E7EB; --border-strong:#D1D5DB;
+    --text:#1A1A2E; --text-2:#6B7280; --text-3:#9CA3AF;
+    --accent:#5046E5; --accent-hover:#4338CA; --accent-light:rgba(80,70,229,0.08);
+    --danger:#E5466C; --danger-light:rgba(229,70,108,0.08);
+    --success:#10B981; --success-light:rgba(16,185,129,0.10);
+    --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-pill:9999px;
+    --shadow-sm:0 1px 2px rgba(20,20,46,0.05);
+    --shadow-md:0 4px 16px rgba(20,20,46,0.08);
+    --sans:"Inter",system-ui,-apple-system,sans-serif;
+    --display:"Space Grotesk",var(--sans);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#E9E8E3;font-family:var(--sans);color:var(--text);-webkit-font-smoothing:antialiased;}
+
+  /* demo chrome */
+  .demobar{display:flex;align-items:center;gap:14px;padding:10px 18px;background:#1A1A2E;color:#fff;font-size:0.85rem;}
+  .demobar .dt{font-family:var(--display);font-weight:700;}
+  .demobar .pill{font-size:0.68rem;background:rgba(255,255,255,0.14);padding:3px 9px;border-radius:999px;letter-spacing:0.04em;}
+  .demobar .sp{flex:1;}
+  .demobar .hint{color:#B9B8C8;font-size:0.78rem;}
+  .demobar a.plan{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;font-size:0.8rem;padding:8px 16px;border-radius:999px;transition:background .15s;}
+  .demobar a.plan:hover{background:var(--accent-hover);}
+
+  /* device frame */
+  .stage{padding:22px;display:flex;justify-content:center;}
+  .device{width:100%;max-width:1080px;height:min(76vh,720px);background:var(--bg);border-radius:18px;box-shadow:0 24px 60px rgba(20,20,46,0.22);overflow:hidden;display:flex;flex-direction:column;border:1px solid rgba(0,0,0,0.06);}
+
+  /* ── shared topbar ── */
+  .topbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:54px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+  .brand{justify-self:start;display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:700;font-size:0.98rem;}
+  .bdot{width:11px;height:11px;border-radius:50%;background:var(--accent);position:relative;}
+  .bdot::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:var(--accent);opacity:.22;animation:breathe 2.6s ease-in-out infinite;}
+  @keyframes breathe{0%,100%{transform:scale(.8);opacity:.22}50%{transform:scale(1.5);opacity:0}}
+  .nav{justify-self:center;display:flex;gap:2px;background:var(--surface-2);border-radius:999px;padding:3px;}
+  .nav button{font:inherit;font-size:0.82rem;font-weight:500;color:var(--text-2);background:none;border:none;padding:6px 16px;border-radius:999px;cursor:pointer;transition:all .14s;}
+  .nav button:hover{color:var(--text);}
+  .nav button.on{background:var(--surface);color:var(--text);font-weight:600;box-shadow:var(--shadow-sm);}
+  .tright{justify-self:end;display:flex;align-items:center;gap:10px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:0.74rem;font-weight:500;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px;}
+  .chip .d{width:6px;height:6px;border-radius:50%;background:var(--text-3);}
+  .chip.listening .d{background:var(--success);} .chip.listening{color:#047857;}
+  .chip.speaking .d{background:var(--accent);animation:pulse 0.8s infinite;} .chip.speaking{color:var(--accent);}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+  .av{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;cursor:pointer;border:none;}
+
+  /* screens */
+  .screen{flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden;}
+  .screen.active{display:flex;}
+
+  /* ── TALK ── */
+  .talk-body{flex:1;min-height:0;display:grid;grid-template-columns:300px 1fr;overflow:hidden;}
+  .presence{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;border-right:1px solid var(--border);background:var(--surface);}
+  .orb{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7C73FF,var(--accent));box-shadow:0 0 0 10px var(--accent-light);position:relative;transition:box-shadow .3s;}
+  .orb.spk{box-shadow:0 0 0 10px var(--accent-light),0 0 40px rgba(80,70,229,.3);}
+  .orb::after{content:'';position:absolute;inset:-12px;border-radius:50%;border:2px solid var(--accent-light);animation:ring 3s ease-out infinite;}
+  @keyframes ring{0%{transform:scale(.85);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+  .presence .pstate{font-size:0.82rem;color:var(--accent);font-weight:600;}
+  .voicebtn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);padding:9px 14px;cursor:pointer;min-width:150px;}
+  .voicebtn .vn{font-weight:600;font-size:0.86rem;} .voicebtn .vl{font-size:0.72rem;color:var(--text-2);}
+  .convo{position:relative;display:flex;flex-direction:column;min-height:0;}
+  .feed{flex:1;min-height:0;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;}
+  .bub{max-width:78%;padding:10px 14px;border-radius:15px;line-height:1.45;font-size:0.9rem;animation:rise .25s ease;}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .bub.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:5px;}
+  .bub.nic{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:5px;}
+  .who{display:block;font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;opacity:.65;margin-bottom:3px;font-weight:600;}
+  .tool{align-self:center;font-size:0.74rem;color:var(--accent);background:var(--accent-light);border:1px solid rgba(80,70,229,.2);border-radius:999px;padding:5px 13px;display:inline-flex;align-items:center;gap:7px;animation:rise .25s ease;}
+  .tool .tw{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+  .typing{align-self:flex-start;display:inline-flex;gap:4px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:15px;}
+  .typing i{width:7px;height:7px;border-radius:50%;background:var(--text-3);animation:td 1.2s infinite;}
+  .typing i:nth-child(2){animation-delay:.2s} .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes td{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+  .controls{flex-shrink:0;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface);display:flex;justify-content:center;gap:10px;}
+  .ctrl{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font:inherit;font-size:0.82rem;font-weight:500;cursor:pointer;}
+  .ctrl--end{background:var(--danger-light);border-color:rgba(229,70,108,.3);color:var(--danger);}
+  .startbtn{display:inline-flex;align-items:center;gap:9px;padding:11px 26px;border-radius:999px;border:none;background:var(--accent);color:#fff;font:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;box-shadow:0 2px 10px rgba(80,70,229,.3);}
+
+  /* ── INTEGRATIONS / PROFILE drawer ── */
+  .panel{flex:1;min-height:0;overflow-y:auto;padding:24px;max-width:680px;margin:0 auto;width:100%;}
+  .ptabs{display:flex;gap:4px;background:var(--surface-2);border-radius:999px;padding:4px;width:fit-content;margin-bottom:18px;}
+  .ptabs button{font:inherit;font-size:0.8rem;font-weight:500;color:var(--text-2);background:none;border:none;padding:6px 16px;border-radius:999px;cursor:pointer;}
+  .ptabs button.on{background:var(--surface);color:var(--text);font-weight:600;box-shadow:var(--shadow-sm);}
+  .ptab{display:none;} .ptab.on{display:block;}
+  .plede{font-size:0.88rem;color:var(--text-2);margin:0 0 14px;line-height:1.5;}
+  .igc{display:flex;flex-direction:column;gap:9px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
+  .igc.on{border-color:rgba(16,185,129,.4);}
+  .igc-h{display:flex;align-items:flex-start;gap:12px;}
+  .igc-ic{width:38px;height:38px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+  .igc-m{flex:1;min-width:0;} .igc-n{font-weight:600;font-size:0.95rem;} .igc-d{font-size:0.78rem;color:var(--text-2);}
+  .igc-s{font-size:0.68rem;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .igc-s.ison{color:#047857;background:var(--success-light);} .igc-s.isoff{color:var(--text-2);background:var(--surface-2);}
+  .igc-caps{margin:0;padding:0 0 0 50px;list-style:none;display:flex;flex-direction:column;gap:3px;}
+  .igc-caps li{position:relative;font-size:0.78rem;color:var(--text-2);padding-left:13px;}
+  .igc-caps li::before{content:'';position:absolute;left:0;top:8px;width:4px;height:4px;border-radius:50%;background:var(--accent);}
+  .igc-act{display:flex;justify-content:flex-end;padding-left:50px;}
+  .igbtn{padding:7px 18px;border-radius:999px;font:inherit;font-size:0.8rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text-2);}
+  .igbtn.connect{border:none;background:var(--accent);color:#fff;}
+
+  .pfield{margin-bottom:14px;} .pfield label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:5px;}
+  .pfield .val{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:11px 14px;font-size:0.9rem;}
+  .goals{display:flex;flex-wrap:wrap;gap:7px;}
+  .goal{font-size:0.8rem;font-weight:500;background:var(--accent-light);color:var(--accent);border:1px solid rgba(80,70,229,.2);border-radius:999px;padding:6px 13px;}
+  .mem{display:flex;align-items:center;gap:11px;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:8px;}
+  .mem .mk{font-weight:600;font-size:0.84rem;min-width:90px;} .mem .mv{font-size:0.84rem;color:var(--text-2);flex:1;}
+
+  /* ── TRAINING ── */
+  .tpick{flex:1;min-height:0;overflow-y:auto;padding:26px;max-width:880px;margin:0 auto;width:100%;}
+  .eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:0.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px;}
+  .h1{font-family:var(--display);font-size:1.5rem;font-weight:700;margin:0 0 4px;letter-spacing:-.02em;}
+  .sub{color:var(--text-2);font-size:0.9rem;margin:0 0 20px;}
+  .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+  .lc{border:1.5px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow-sm);cursor:pointer;transition:all .15s;}
+  .lc:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--border-strong);}
+  .lc.sel{border-color:var(--accent);border-width:2px;box-shadow:0 0 0 1px var(--accent),var(--shadow-md);}
+  .lc-top{display:flex;justify-content:space-between;align-items:center;padding:13px 15px 0;}
+  .lc-fw{font-size:0.62rem;font-weight:700;letter-spacing:.08em;color:#fff;background:var(--accent);border-radius:999px;padding:3px 9px;}
+  .lc-ix{font-size:0.72rem;color:var(--text-3);font-weight:600;}
+  .lc-t{font-weight:600;font-size:0.95rem;padding:9px 15px 3px;}
+  .lc-o{font-size:0.78rem;color:var(--text-2);padding:0 15px 12px;}
+  .lc-moves{display:flex;flex-wrap:wrap;gap:5px;padding:10px 15px;border-top:1px solid var(--border);background:var(--surface-2);}
+  .lc-mv{font-size:0.66rem;color:var(--text-2);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:2px 7px;}
+  .ctabar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 26px;border-top:1px solid var(--border);background:var(--surface);}
+  .ctabar .lbl{font-size:0.88rem;font-weight:600;} .ctabar .lbl.dim{color:var(--text-3);font-weight:500;}
+  .ctabar .go{padding:10px 24px;border-radius:999px;border:none;background:var(--accent);color:#fff;font:inherit;font-weight:700;font-size:0.86rem;cursor:pointer;}
+  .ctabar .go:disabled{opacity:.4;}
+
+  /* training room */
+  .troom{flex:1;min-height:0;display:flex;flex-direction:column;}
+  .stepper{display:flex;align-items:center;padding:12px 22px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .stp{display:flex;align-items:center;gap:7px;flex:1;}
+  .stp .sd{width:10px;height:10px;border-radius:50%;background:var(--border-strong);flex-shrink:0;}
+  .stp.done .sd{background:var(--accent);} .stp.cur .sd{background:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+  .stp .sl{font-size:0.7rem;color:var(--text-3);white-space:nowrap;} .stp.cur .sl{color:var(--accent);font-weight:700;} .stp.done .sl{color:var(--text-2);}
+  .stp .ln{flex:1;height:1.5px;background:var(--border);margin:0 8px;} .stp.done .ln{background:var(--accent);}
+  .tstage{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:22px;text-align:center;}
+  .tref{display:inline-flex;flex-direction:column;gap:3px;padding:12px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-sm);}
+  .tref .tfw{font-size:0.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);}
+  .tref .tmn{font-size:0.95rem;font-weight:600;}
+  .tgoal{color:var(--text-2);font-size:0.92rem;max-width:46ch;margin:0;}
+
+  /* ── ROLEPLAY ── */
+  .rtypes{display:inline-flex;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;margin-bottom:18px;}
+  .rtypes button{font:inherit;font-size:0.84rem;font-weight:500;color:var(--text-2);background:none;border:none;padding:8px 20px;border-radius:999px;cursor:pointer;}
+  .rtypes button.on{background:var(--surface);color:var(--accent);font-weight:700;box-shadow:var(--shadow-sm);}
+  .md{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;}
+  .ghead{font-size:0.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px;display:block;}
+  .pgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr;gap:9px;}
+  .pcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;cursor:pointer;box-shadow:var(--shadow-sm);transition:all .14s;font:inherit;}
+  .pcard:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);} .pcard.sel{border-color:var(--accent);border-width:2px;}
+  .pcav{width:38px;height:38px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
+  .pcb{min-width:0;} .pcn{font-weight:600;font-size:0.9rem;} .pct{font-size:0.76rem;color:var(--text-2);}
+  .detail{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow-sm);}
+  .srow{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:10px 12px;background:var(--surface-2);border:1.5px solid transparent;border-radius:10px;cursor:pointer;margin-bottom:6px;font:inherit;}
+  .srow.sel{border-color:var(--accent);background:var(--accent-light);} .srow .srn{font-weight:600;font-size:0.84rem;} .srow .srd{font-size:0.74rem;color:var(--text-2);}
+  .diff{display:inline-flex;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;}
+  .diff button{font:inherit;font-size:0.8rem;font-weight:500;color:var(--text-2);background:none;border:none;padding:6px 16px;border-radius:999px;cursor:pointer;}
+  .diff button.on{background:var(--accent);color:#fff;font-weight:600;}
+  .turn{display:inline-flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:600;border:1px solid rgba(16,185,129,.4);color:#047857;background:var(--success-light);border-radius:999px;padding:7px 15px;}
+  .turn.spk{border-color:rgba(80,70,229,.3);color:var(--accent);background:var(--accent-light);}
+  .turn .p{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 1.3s infinite;} .turn.spk .p{background:var(--accent);}
+  .raura{width:140px;height:140px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:3rem;font-weight:700;}
+
+  @media (max-width:820px){
+    .talk-body{grid-template-columns:1fr;} .presence{display:none;}
+    .md{grid-template-columns:1fr;} .nav button{padding:6px 11px;}
+    .device{height:84vh;}
+  }
+  @media (prefers-reduced-motion:reduce){.bdot::after,.orb::after,.chip .d,.turn .p,.typing i{animation:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="demobar">
+  <span class="dt">Nicole</span>
+  <span class="pill">INTERACTIVE UI DEMO</span>
+  <span class="sp"></span>
+  <span class="hint">Mock data · click the tabs · watch the conversation play</span>
+  <a class="plan" href="./index.html">View the planned demo →</a>
+</div>
+
+<div class="stage">
+  <div class="device">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="brand"><span class="bdot"></span> Nicole</div>
+      <div class="nav">
+        <button data-go="talk" class="on">Talk</button>
+        <button data-go="training">Training</button>
+        <button data-go="roleplay">Roleplay</button>
+      </div>
+      <div class="tright">
+        <span id="statusChip" class="chip"><span class="d"></span><span class="status-text">Ready</span></span>
+        <button class="av" data-go="profile" title="Profile">M</button>
+      </div>
+    </div>
+
+    <!-- ── TALK ── -->
+    <section class="screen active" id="screen-talk">
+      <div class="talk-body">
+        <aside class="presence">
+          <div class="orb" id="orb"></div>
+          <div class="pstate" id="pstate">Your Personal VA</div>
+          <div class="voicebtn"><span class="vn">Aoede</span><span class="vl">Warm · expressive</span></div>
+        </aside>
+        <div class="convo">
+          <div class="feed" id="feed"></div>
+          <div class="controls" id="controls">
+            <button class="startbtn" id="startBtn">▶ Start talking</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TRAINING ── -->
+    <section class="screen" id="screen-training">
+      <div class="tpick" id="tpick">
+        <div class="eyebrow"><span class="bdot" style="width:8px;height:8px"></span> Drill Room</div>
+        <div class="h1">Pick one skill to drill today</div>
+        <div class="sub">One focused rep beats ten scattered ones. Nicole takes you from teach to live practice.</div>
+        <div class="lgrid">
+          <div class="lc" data-lesson="Opening a Cold Call"><div class="lc-top"><span class="lc-fw">PIN</span><span class="lc-ix">01</span></div><div class="lc-t">Opening a Cold Call</div><div class="lc-o">Earn the first 30 seconds without getting hung up on.</div><div class="lc-moves"><span class="lc-mv">Pattern-interrupt</span><span class="lc-mv">Interest</span><span class="lc-mv">Next-step</span></div></div>
+          <div class="lc" data-lesson="Discovery: Ask Before You Pitch"><div class="lc-top"><span class="lc-fw">ASK</span><span class="lc-ix">02</span></div><div class="lc-t">Discovery: Ask Before You Pitch</div><div class="lc-o">Surface the real problem before pitching anything.</div><div class="lc-moves"><span class="lc-mv">Ask open</span><span class="lc-mv">Stay quiet</span><span class="lc-mv">Keep digging</span></div></div>
+          <div class="lc" data-lesson="Handling the Price Objection"><div class="lc-top"><span class="lc-fw">AER</span><span class="lc-ix">03</span></div><div class="lc-t">Handling the Price Objection</div><div class="lc-o">Handle "too expensive" without dropping the price.</div><div class="lc-moves"><span class="lc-mv">Acknowledge</span><span class="lc-mv">Explore</span><span class="lc-mv">Reframe</span></div></div>
+          <div class="lc" data-lesson="Answering with STAR"><div class="lc-top"><span class="lc-fw">STAR</span><span class="lc-ix">04</span></div><div class="lc-t">Answering with STAR</div><div class="lc-o">Structure behavioral interview answers cleanly.</div><div class="lc-moves"><span class="lc-mv">Situation</span><span class="lc-mv">Task</span><span class="lc-mv">Action</span><span class="lc-mv">Result</span></div></div>
+        </div>
+      </div>
+      <div class="ctabar" id="tcta"><span class="lbl dim" id="tctaLbl">Select a skill to begin</span><button class="go" id="tctaBtn" disabled>Start drill →</button></div>
+
+      <!-- training room (hidden until start) -->
+      <div class="troom" id="troom" style="display:none">
+        <div class="stepper">
+          <div class="stp done"><span class="sd"></span><span class="sl">Intro</span><span class="ln"></span></div>
+          <div class="stp done"><span class="sd"></span><span class="sl">Teach</span><span class="ln"></span></div>
+          <div class="stp cur"><span class="sd"></span><span class="sl">Model</span><span class="ln"></span></div>
+          <div class="stp"><span class="sd"></span><span class="sl">Practice</span><span class="ln"></span></div>
+          <div class="stp"><span class="sd"></span><span class="sl">Rep</span><span class="ln"></span></div>
+          <div class="stp"><span class="sd"></span><span class="sl">Debrief</span></div>
+        </div>
+        <div class="tstage">
+          <div class="orb" style="width:110px;height:110px"></div>
+          <div class="tref"><span class="tfw" id="troomFw">PIN</span><span class="tmn" id="troomMn">Pattern-interrupt · Interest · Next-step</span></div>
+          <p class="tgoal">Watch — Nicole demonstrates a strong example out loud, then it's your turn.</p>
+        </div>
+        <div class="controls"><button class="ctrl" id="troomExit">← Back to skills</button><button class="startbtn" style="padding:10px 22px">Continue →</button></div>
+      </div>
+    </section>
+
+    <!-- ── ROLEPLAY ── -->
+    <section class="screen" id="screen-roleplay">
+      <div class="tpick" id="rpick">
+        <div class="eyebrow"><span class="bdot" style="width:8px;height:8px"></span> Live Rep</div>
+        <div class="h1">Who do you want to practice against?</div>
+        <div class="rtypes"><button class="on">Sales</button><button>Interview</button><button>Custom</button></div>
+        <div class="md">
+          <div>
+            <span class="ghead">Who you'll face</span>
+            <ul class="pgrid">
+              <li><button class="pcard sel" data-persona="Grant"><span class="pcav">G</span><span class="pcb"><span class="pcn">Grant</span><span class="pct">A blunt, time-poor VP of Ops who hates cold calls.</span></span></button></li>
+              <li><button class="pcard" data-persona="Dana"><span class="pcav">D</span><span class="pcb"><span class="pcn">Dana</span><span class="pct">A skeptical CFO who thinks everything is overpriced.</span></span></button></li>
+              <li><button class="pcard" data-persona="Maria"><span class="pcav">M</span><span class="pcb"><span class="pcn">Maria</span><span class="pct">A friendly champion who needs ammo to sell internally.</span></span></button></li>
+            </ul>
+          </div>
+          <div class="detail">
+            <span class="ghead">Pick the situation</span>
+            <button class="srow sel"><span class="srn">Cold call</span><span class="srd">You called out of the blue. First 30 seconds.</span></button>
+            <button class="srow"><span class="srn">Renewal at risk</span><span class="srd">They're about to churn over price.</span></button>
+            <button class="srow"><span class="srn">Post-demo objection</span><span class="srd">The demo went well, now the pushback starts.</span></button>
+            <span class="ghead" style="margin-top:16px">Difficulty</span>
+            <div class="diff"><button class="on">Easy</button><button>Medium</button><button>Hard</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="ctabar"><span class="lbl">Grant · Cold call · Easy</span><button class="go" id="rgo">Start roleplay →</button></div>
+
+      <!-- roleplay room -->
+      <div class="troom" id="rroom" style="display:none">
+        <div class="tstage">
+          <div class="raura">G</div>
+          <div class="turn" id="rturn"><span class="p"></span><span id="rturnTxt">Grant is speaking</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:520px" id="rfeed"></div>
+        </div>
+        <div class="controls"><button class="ctrl" id="rexit">← Leave</button><button class="ctrl ctrl--end">End &amp; score</button></div>
+      </div>
+    </section>
+
+    <!-- ── PROFILE / INTEGRATIONS / MEMORY ── -->
+    <section class="screen" id="screen-profile">
+      <div class="panel">
+        <div class="ptabs"><button class="on" data-ptab="integrations">Integrations</button><button data-ptab="profile">Profile</button><button data-ptab="memory">Memory</button></div>
+
+        <div class="ptab on" id="ptab-integrations">
+          <p class="plede">Connect your tools so Nicole can act for you — book meetings, draft email, capture tasks and post to Slack, all by voice.</p>
+          <div class="igc on"><div class="igc-h"><div class="igc-ic">📅</div><div class="igc-m"><div class="igc-n">Google</div><div class="igc-d">Calendar, Gmail &amp; Meet</div></div><span class="igc-s ison">Connected</span></div><ul class="igc-caps"><li>Check &amp; book calendar events</li><li>Read inbox, draft &amp; send email</li><li>Add Google Meet links</li></ul><div class="igc-act"><button class="igbtn">Disconnect</button></div></div>
+          <div class="igc on"><div class="igc-h"><div class="igc-ic">📝</div><div class="igc-m"><div class="igc-n">Notion</div><div class="igc-d">Search &amp; capture notes</div></div><span class="igc-s ison">Connected</span></div><ul class="igc-caps"><li>Search your notes &amp; docs</li><li>Capture new pages by voice</li></ul><div class="igc-act"><button class="igbtn">Disconnect</button></div></div>
+          <div class="igc on"><div class="igc-h"><div class="igc-ic">✅</div><div class="igc-m"><div class="igc-n">Todoist</div><div class="igc-d">Capture tasks by voice</div></div><span class="igc-s ison">Connected</span></div><ul class="igc-caps"><li>Add tasks by voice</li><li>Check what's due</li></ul><div class="igc-act"><button class="igbtn">Disconnect</button></div></div>
+          <div class="igc on"><div class="igc-h"><div class="igc-ic">💬</div><div class="igc-m"><div class="igc-n">Slack</div><div class="igc-d">Post &amp; check messages</div></div><span class="igc-s ison">Connected</span></div><ul class="igc-caps"><li>Post messages to channels</li><li>Read recent messages</li></ul><div class="igc-act"><button class="igbtn">Disconnect</button></div></div>
+        </div>
+
+        <div class="ptab" id="ptab-profile">
+          <div class="pfield"><label>Display name</label><div class="val">Maya Chen</div></div>
+          <div class="pfield"><label>Email</label><div class="val">maya.chen@brightwork.io</div></div>
+          <div class="pfield"><label>Phone</label><div class="val">🇺🇸 +1 415 555 0182</div></div>
+          <div class="pfield"><label>About you</label><div class="val">Account executive at a SaaS startup in San Francisco. Selling into mid-market ops teams. Working on staying calm on price pushback.</div></div>
+          <div class="pfield"><label>Goals</label><div class="goals"><span class="goal">Cold calling</span><span class="goal">Objection handling</span><span class="goal">Closing techniques</span></div></div>
+        </div>
+
+        <div class="ptab" id="ptab-memory">
+          <p class="plede">What Nicole remembers about you — saved across every session, securely and privately.</p>
+          <div class="mem"><span class="mk">Name</span><span class="mv">Maya Chen</span></div>
+          <div class="mem"><span class="mk">Role</span><span class="mv">Account executive, mid-market SaaS</span></div>
+          <div class="mem"><span class="mk">Focus</span><span class="mv">Staying composed during price objections</span></div>
+          <div class="mem"><span class="mk">Preference</span><span class="mv">Likes a quick morning brief before 9am</span></div>
+          <div class="mem"><span class="mk">Recent win</span><span class="mv">Closed the Lakeside renewal last week</span></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ── tab navigation ──
+  var navBtns = document.querySelectorAll('.nav button, .av[data-go]');
+  function go(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('active', s.id === 'screen-'+id); });
+    document.querySelectorAll('.nav button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-go') === id); });
+  }
+  navBtns.forEach(function(b){ b.addEventListener('click', function(){ go(b.getAttribute('data-go')); }); });
+
+  // ── profile sub-tabs ──
+  document.querySelectorAll('.ptabs button').forEach(function(b){
+    b.addEventListener('click', function(){
+      var t = b.getAttribute('data-ptab');
+      document.querySelectorAll('.ptabs button').forEach(function(x){ x.classList.toggle('on', x===b); });
+      document.querySelectorAll('.ptab').forEach(function(p){ p.classList.toggle('on', p.id==='ptab-'+t); });
+    });
+  });
+
+  // ── scripted Talk conversation ──
+  var feed = document.getElementById('feed');
+  var orb = document.getElementById('orb');
+  var pstate = document.getElementById('pstate');
+  var statusChip = document.getElementById('statusChip');
+  var controls = document.getElementById('controls');
+
+  var SCRIPT = [
+    {who:'nic', text:"Morning, Maya. Want your daily brief?"},
+    {who:'user', text:"Yeah, what's my day look like?"},
+    {tool:"Checking your calendar & inbox…"},
+    {who:'nic', text:"Three things today: a 9:30 with the lender, a demo at 2, and two emails that want replies — one's from your title company. Want me to handle any of it?"},
+    {who:'user', text:"Book a 30-minute follow-up with the Lakeside team tomorrow at 3."},
+    {tool:"book_meeting · Google Calendar"},
+    {who:'nic', text:"Booked — tomorrow 3pm, Meet link's in the invite. Want a reminder the day before?"},
+    {who:'user', text:"Draft an email to dana@lakeside.co about the renewal."},
+    {tool:"draft_email · Gmail"},
+    {who:'nic', text:"Drafted it in your voice — it's in your Gmail drafts to review. Want me to send it?"},
+    {who:'user', text:"Send it."},
+    {who:'nic', text:"I'll send the renewal note to Dana at Lakeside — go ahead?"},
+    {who:'user', text:"Yes, send it."},
+    {tool:"send_email · Gmail"},
+    {who:'nic', text:"Sent to Dana. Also added 'prep Lakeside renewal' to your tasks for tomorrow."}
+  ];
+
+  var idx = 0, running = false;
+  function setState(s){
+    orb.classList.toggle('spk', s==='speaking');
+    pstate.textContent = s==='speaking' ? 'Speaking' : s==='listening' ? 'Listening…' : 'Your Personal VA';
+    statusChip.className = 'chip ' + (s==='idle'?'':s);
+    statusChip.querySelector('.status-text').textContent = s==='speaking'?'Speaking':s==='listening'?'Listening':'Ready';
+  }
+  function bubble(cls, who, text){
+    var d = document.createElement('div'); d.className='bub '+cls;
+    d.innerHTML = '<span class="who">'+who+'</span>'+text;
+    feed.appendChild(d); feed.scrollTop = feed.scrollHeight;
+  }
+  function toolChip(text){
+    var d = document.createElement('div'); d.className='tool';
+    d.innerHTML = '<span class="tw"></span>'+text;
+    feed.appendChild(d); feed.scrollTop = feed.scrollHeight;
+  }
+  function typing(){
+    var d = document.createElement('div'); d.className='typing'; d.id='typing';
+    d.innerHTML = '<i></i><i></i><i></i>';
+    feed.appendChild(d); feed.scrollTop = feed.scrollHeight; return d;
+  }
+  function step(){
+    if(idx >= SCRIPT.length){ setState('idle'); return; }
+    var item = SCRIPT[idx++];
+    if(item.tool){ toolChip(item.tool); setTimeout(step, 900); return; }
+    if(item.who==='user'){ setState('listening'); bubble('user','You',item.text); setTimeout(step, 1100); return; }
+    // nicole: show typing, then bubble
+    setState('speaking');
+    var t = typing();
+    setTimeout(function(){
+      t.remove();
+      bubble('nic','Nicole',item.text);
+      setTimeout(step, Math.min(2600, 900 + item.text.length*22));
+    }, 700);
+  }
+  document.getElementById('startBtn').addEventListener('click', function(){
+    if(running) return; running = true;
+    controls.innerHTML = '<button class="ctrl">🎤 Mute</button><button class="ctrl">📷 Camera</button><button class="ctrl ctrl--end">⏹ End</button>';
+    step();
+  });
+
+  // ── training picker → room ──
+  var selLesson = null;
+  var moves = {
+    "Opening a Cold Call":["PIN","Pattern-interrupt · Interest · Next-step"],
+    "Discovery: Ask Before You Pitch":["ASK","Ask open · Stay quiet · Keep digging"],
+    "Handling the Price Objection":["AER","Acknowledge · Explore · Reframe"],
+    "Answering with STAR":["STAR","Situation · Task · Action · Result"]
+  };
+  document.querySelectorAll('.lc').forEach(function(c){
+    c.addEventListener('click', function(){
+      document.querySelectorAll('.lc').forEach(function(x){ x.classList.remove('sel'); });
+      c.classList.add('sel'); selLesson = c.getAttribute('data-lesson');
+      document.getElementById('tctaLbl').textContent = selLesson;
+      document.getElementById('tctaLbl').classList.remove('dim');
+      document.getElementById('tctaBtn').disabled = false;
+    });
+  });
+  document.getElementById('tctaBtn').addEventListener('click', function(){
+    if(!selLesson) return;
+    document.getElementById('troomFw').textContent = moves[selLesson][0];
+    document.getElementById('troomMn').textContent = moves[selLesson][1];
+    document.getElementById('tpick').style.display='none';
+    document.getElementById('tcta').style.display='none';
+    document.getElementById('troom').style.display='flex';
+  });
+  document.getElementById('troomExit').addEventListener('click', function(){
+    document.getElementById('troom').style.display='none';
+    document.getElementById('tpick').style.display='block';
+    document.getElementById('tcta').style.display='flex';
+  });
+
+  // ── roleplay picker selections + room ──
+  document.querySelectorAll('#rpick .pcard').forEach(function(c){
+    c.addEventListener('click', function(){
+      document.querySelectorAll('#rpick .pcard').forEach(function(x){ x.classList.remove('sel'); });
+      c.classList.add('sel');
+    });
+  });
+  document.querySelectorAll('#rpick .srow').forEach(function(c){
+    c.addEventListener('click', function(){
+      document.querySelectorAll('#rpick .srow').forEach(function(x){ x.classList.remove('sel'); });
+      c.classList.add('sel');
+    });
+  });
+  document.querySelectorAll('#rpick .diff button, #rpick .rtypes button').forEach(function(b){
+    b.addEventListener('click', function(){
+      b.parentNode.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+    });
+  });
+
+  var RP = [
+    {who:'character', text:"Grant here — make it quick, I've got a hard stop in two minutes."},
+    {who:'you', text:"Totally fair — twenty seconds and you decide if it's worth more."},
+    {who:'character', text:"...fine. Go."},
+    {who:'you', text:"We cut onboarding time in half for ops teams like yours. Worth two minutes now, or should I send something first?"},
+    {who:'character', text:"Send it over. I'll look."}
+  ];
+  document.getElementById('rgo').addEventListener('click', function(){
+    document.getElementById('rpick').style.display='none';
+    this.parentNode.style.display='none';
+    var room = document.getElementById('rroom'); room.style.display='flex';
+    var rfeed = document.getElementById('rfeed'); rfeed.innerHTML='';
+    var rturn = document.getElementById('rturn'), rturnTxt=document.getElementById('rturnTxt');
+    var i=0;
+    (function rstep(){
+      if(i>=RP.length){ rturn.className='turn'; rturnTxt.textContent='Your turn'; return; }
+      var m = RP[i++];
+      var isChar = m.who==='character';
+      rturn.className = isChar ? 'turn spk' : 'turn';
+      rturnTxt.textContent = isChar ? 'Grant is speaking' : 'Your turn';
+      var d=document.createElement('div');
+      d.className='bub '+(isChar?'nic':'user'); d.style.maxWidth='100%';
+      d.innerHTML='<span class="who">'+(isChar?'Grant':'You')+'</span>'+m.text;
+      rfeed.appendChild(d); rfeed.scrollTop=rfeed.scrollHeight;
+      setTimeout(rstep, isChar?1900:1500);
+    })();
+  });
+  document.getElementById('rexit').addEventListener('click', function(){
+    document.getElementById('rroom').style.display='none';
+    document.getElementById('rpick').style.display='block';
+    document.querySelector('#screen-roleplay .ctabar').style.display='flex';
+  });
+})();
+</script>
+</body>
+</html>

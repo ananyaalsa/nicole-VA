@@ -23,14 +23,14 @@ export const VOICES: Voice[] = [
     label: 'warm',
     gender: 'female',
     stylePrompt:
-      "Warm, friendly, and expressive — like a close friend who's genuinely happy to talk.",
+      "Warm, friendly, and expressive, like a close friend who's genuinely happy to talk.",
   },
   {
     name: 'Kore',
     label: 'clear',
     gender: 'female',
     stylePrompt:
-      'Calm, clear, and articulate — confident and reassuring, never rushed.',
+      'Calm, clear, and articulate. Confident and reassuring, never rushed.',
   },
   {
     name: 'Leda',
@@ -44,7 +44,7 @@ export const VOICES: Voice[] = [
     label: 'smooth',
     gender: 'female',
     stylePrompt:
-      'Smooth, gentle, and easygoing — a relaxed tone that feels effortless.',
+      'Smooth, gentle, and easygoing. A relaxed tone that feels effortless.',
   },
   // --- Male ---------------------------------------------------------------
   {
@@ -52,28 +52,28 @@ export const VOICES: Voice[] = [
     label: 'deep',
     gender: 'male',
     stylePrompt:
-      'Deep, steady, and grounded — calm authority that puts people at ease.',
+      'Deep, steady, and grounded. Calm authority that puts people at ease.',
   },
   {
     name: 'Fenrir',
     label: 'strong',
     gender: 'male',
     stylePrompt:
-      'Strong and decisive — bold, motivating, and full of forward drive.',
+      'Strong and decisive. Bold, motivating, and full of forward drive.',
   },
   {
     name: 'Orus',
     label: 'firm',
     gender: 'male',
     stylePrompt:
-      'Firm and measured — direct and dependable, leaving no room for doubt.',
+      'Firm and measured. Direct and dependable, leaving no room for doubt.',
   },
   {
     name: 'Puck',
     label: 'playful',
     gender: 'male',
     stylePrompt:
-      'Playful, witty, and lighthearted — a spark of fun that keeps things lively.',
+      'Playful, witty, and lighthearted. A spark of fun that keeps things lively.',
   },
 ];
 

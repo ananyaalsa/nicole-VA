@@ -8,8 +8,18 @@ describe('UI_CONTROL_TOOL_DECLS', () => {
       [
         'end_session', 'mute_ai', 'mute_mic', 'set_camera', 'set_voice', 'switch_mode',
         'set_about', 'set_goal', 'set_display_name',
+        'set_volume', 'adjust_volume', 'set_mute', 'get_weather',
       ].sort(),
     );
+  });
+
+  it('declares the volume tools with the right params', () => {
+    const setVolume = UI_CONTROL_TOOL_DECLS.find((d) => d.name === 'set_volume')!;
+    expect(setVolume.parameters.required).toEqual(['level']);
+    const adjust = UI_CONTROL_TOOL_DECLS.find((d) => d.name === 'adjust_volume')!;
+    expect(adjust.parameters.properties.direction.enum).toEqual(['up', 'down']);
+    const setMute = UI_CONTROL_TOOL_DECLS.find((d) => d.name === 'set_mute')!;
+    expect(setMute.parameters.required).toContain('muted');
   });
 
   it('set_goal takes an add/remove action + a goal', () => {

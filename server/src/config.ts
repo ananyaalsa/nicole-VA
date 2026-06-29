@@ -21,6 +21,35 @@ export const config = {
   summarizerModel: process.env.GEMINI_SUMMARIZER_MODEL ?? 'gemini-2.5-flash',
   databaseUrl: required('DATABASE_URL'),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  /** Public base URL of THIS server, used to build OAuth redirect URIs. */
+  serverUrl: process.env.SERVER_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 4000}`,
 } as const;
 
 export type Config = typeof config;
+
+/**
+ * Integration credentials are OPTIONAL — absent values leave that provider
+ * "not configured" so the whole stack degrades gracefully until the operator
+ * adds keys. Never use required() here. See MORNING-SETUP.md for where each
+ * value comes from.
+ */
+export const integrationsConfig = {
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  },
+  notion: {
+    clientId: process.env.NOTION_CLIENT_ID ?? '',
+    clientSecret: process.env.NOTION_CLIENT_SECRET ?? '',
+  },
+  todoist: {
+    clientId: process.env.TODOIST_CLIENT_ID ?? '',
+    clientSecret: process.env.TODOIST_CLIENT_SECRET ?? '',
+  },
+  slack: {
+    clientId: process.env.SLACK_CLIENT_ID ?? '',
+    clientSecret: process.env.SLACK_CLIENT_SECRET ?? '',
+  },
+} as const;
+
+export type IntegrationsConfig = typeof integrationsConfig;

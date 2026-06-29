@@ -20,17 +20,22 @@ export function CameraPreview({ stream, onFlip, onClose }: CameraPreviewProps): 
 
   useEffect(() => {
     const v = videoRef.current;
-    if (v && stream) {
+    if (!v) return;
+    if (stream) {
       v.srcObject = stream;
       void v.play().catch(() => {});
+    } else {
+      v.pause();
+      v.srcObject = null;
     }
     return () => {
-      if (v) v.srcObject = null;
+      v.pause();
+      v.srcObject = null;
     };
   }, [stream]);
 
   return (
-    <div className="camera-preview hud-panel" data-testid="camera-preview">
+    <div className="camera-preview" data-testid="camera-preview">
       <video ref={videoRef} className="camera-preview__video" muted playsInline />
       <div className="camera-preview__bar">
         <span className="camera-preview__live">

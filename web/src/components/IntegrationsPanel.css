@@ -1,0 +1,123 @@
+/* Integrations panel — its own module (rendered inside the Profile drawer's
+   Integrations tab). Light theme, matches the app tokens. */
+
+.intg-panel { display: flex; flex-direction: column; gap: 14px; }
+
+.intg-panel__lede {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.intg-panel__loading,
+.intg-panel__error {
+  padding: 24px 4px;
+  font-size: 0.88rem;
+  color: var(--text-2);
+}
+.intg-panel__error { color: var(--danger); }
+
+.intg-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.intg-card.is-connected { border-color: rgba(16, 185, 129, 0.4); }
+.intg-card.is-unavailable { opacity: 0.7; }
+
+.intg-card__head { display: flex; align-items: flex-start; gap: 12px; }
+.intg-card__icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.intg-svg { width: 22px; height: 22px; }
+.intg-card__title-wrap { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.intg-card__name { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.intg-card__desc { font-size: 0.78rem; color: var(--text-2); line-height: 1.4; }
+
+.intg-card__status {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.intg-card__status--on { color: #047857; background: rgba(16, 185, 129, 0.12); }
+.intg-card__status--off { color: var(--text-2); background: var(--surface-2); }
+.intg-card__status--na { color: var(--text-3); background: var(--surface-2); }
+
+.intg-card__caps {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.intg-card__caps li {
+  position: relative;
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.45;
+  padding-left: 14px;
+}
+.intg-card__caps li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.intg-card__actions { display: flex; align-items: center; justify-content: flex-end; padding-left: 50px; }
+.intg-card__note { font-size: 0.76rem; color: var(--text-3); font-style: italic; }
+
+.intg-btn {
+  padding: 7px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.intg-btn:disabled { opacity: 0.6; cursor: default; }
+.intg-btn--connect {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.28);
+}
+.intg-btn--connect:hover:not(:disabled) { background: var(--accent-hover); }
+.intg-btn--ghost {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+}
+.intg-btn--ghost:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }

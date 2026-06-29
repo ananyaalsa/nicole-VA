@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nicole — Product Demo & Technical Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --surface-2: #F2F1ED;
+    --accent: #5046E5;
+    --accent-2: #7C73FF;
+    --accent-soft: rgba(80, 70, 229, 0.08);
+    --text: #1A1A2E;
+    --muted: #5A5A6E;
+    --faint: #9A9AAB;
+    --border: #E5E7EB;
+    --success: #10B981;
+    --success-soft: rgba(16, 185, 129, 0.10);
+    --warn: #D97706;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(20,20,46,0.04), 0 8px 28px rgba(20,20,46,0.06);
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --display: "Space Grotesk", var(--sans);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent); }
+
+  /* ── Header ─────────────────────────────────────── */
+  header.top {
+    position: sticky; top: 0; z-index: 40;
+    background: rgba(247,246,243,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .top .wrap { display: flex; align-items: center; gap: 10px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
+  .aura { width: 13px; height: 13px; border-radius: 50%; background: var(--accent); position: relative; flex-shrink: 0; }
+  .aura::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; background: var(--accent); opacity: 0.25; animation: breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(0.8); opacity: 0.25; } 50% { transform: scale(1.5); opacity: 0; } }
+  .top nav { margin-left: auto; display: flex; gap: 18px; }
+  .top nav a { color: var(--muted); text-decoration: none; font-size: 0.86rem; font-weight: 500; }
+  .top nav a:hover { color: var(--text); }
+
+  /* ── Hero ───────────────────────────────────────── */
+  .hero { padding: 70px 0 36px; text-align: center; }
+  .eyebrow { display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 6px 12px; border-radius: 999px; margin-bottom: 22px; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(2.1rem, 5.5vw, 3.4rem); line-height: 1.06; letter-spacing: -0.025em; margin: 0 0 18px; }
+  h1 .hl { background: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; margin: 0 auto; }
+  .tags { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+  .tag { font-size: 0.8rem; font-weight: 500; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; }
+
+  /* ── Section scaffolding ────────────────────────── */
+  section.feat { padding: 46px 0; border-top: 1px solid var(--border); }
+  .feat-head { max-width: 64ch; margin-bottom: 26px; }
+  .kicker { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 500; letter-spacing: 0.04em; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: clamp(1.5rem, 3.6vw, 2.1rem); letter-spacing: -0.018em; margin: 8px 0 8px; }
+  .feat-head p { color: var(--muted); font-size: 1.02rem; margin: 0; }
+
+  /* split: mockup + technical */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .split.rev { direction: rtl; } .split.rev > * { direction: ltr; }
+  @media (max-width: 880px) { .split, .split.rev { grid-template-columns: 1fr; } }
+
+  /* ── Mockup frame (fake app UI) ─────────────────── */
+  .mock {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    box-shadow: var(--shadow); overflow: hidden; font-size: 0.84rem;
+  }
+  .mock-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 44px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .mock-brand { display: flex; align-items: center; gap: 7px; font-family: var(--display); font-weight: 700; font-size: 0.9rem; }
+  .mb-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+  .mock-nav { justify-self: center; display: flex; gap: 2px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+  .mock-nav span { font-size: 0.74rem; padding: 4px 12px; border-radius: 999px; color: var(--muted); font-weight: 500; }
+  .mock-nav span.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .mock-right { justify-self: end; display: flex; align-items: center; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.7rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; }
+  .chip .d { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; }
+  .mock-body { padding: 22px; min-height: 240px; }
+
+  /* presence avatar */
+  .presence { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 0; }
+  .orb { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--accent-2), var(--accent)); position: relative; box-shadow: 0 0 0 8px var(--accent-soft); }
+  .orb::after { content:''; position:absolute; inset:-10px; border-radius:50%; border:2px solid var(--accent-soft); animation: ring 3s ease-out infinite; }
+  @keyframes ring { 0% { transform: scale(0.85); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+  .presence .state { font-size: 0.78rem; color: var(--accent); font-weight: 600; }
+
+  /* chat bubbles */
+  .bubbles { display: flex; flex-direction: column; gap: 10px; }
+  .bub { max-width: 82%; padding: 9px 13px; border-radius: 14px; line-height: 1.45; }
+  .bub.you { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 5px; }
+  .bub.nic { align-self: flex-start; background: var(--surface-2); color: var(--text); border-bottom-left-radius: 5px; }
+  .who { display: block; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; margin-bottom: 2px; font-weight: 600; }
+
+  /* integration cards in mock */
+  .ig { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; background: var(--surface); }
+  .ig.on { border-color: rgba(16,185,129,0.4); }
+  .ig-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0; }
+  .ig-mid { flex: 1; min-width: 0; }
+  .ig-name { font-weight: 600; font-size: 0.82rem; }
+  .ig-desc { font-size: 0.72rem; color: var(--muted); }
+  .ig-btn { font-size: 0.72rem; font-weight: 600; padding: 5px 12px; border-radius: 999px; border: none; cursor: default; }
+  .ig-btn.connect { background: var(--accent); color: #fff; }
+  .ig-btn.done { background: var(--success-soft); color: #047857; }
+
+  /* training cards */
+  .lessons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lc { border: 1px solid var(--border); border-radius: 12px; padding: 11px; background: var(--surface); }
+  .lc.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .lc-fw { display: inline-block; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 7px; }
+  .lc-t { font-weight: 600; font-size: 0.8rem; margin-top: 7px; }
+  .lc-o { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+  .cta-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .cta-bar .lbl { font-size: 0.78rem; font-weight: 600; }
+  .cta-bar .btn { font-size: 0.76rem; font-weight: 700; color: #fff; background: var(--accent); border: none; border-radius: 999px; padding: 7px 16px; }
+
+  /* turn indicator (roleplay) */
+  .turn { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 600; border: 1px solid rgba(16,185,129,0.4); color: #047857; background: var(--success-soft); border-radius: 999px; padding: 6px 14px; }
+  .turn .p { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 1.3s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.6); opacity: 0.4; } }
+  .stepper { display: flex; align-items: center; gap: 0; margin-bottom: 14px; }
+  .stp { display: flex; align-items: center; gap: 6px; flex: 1; }
+  .stp .sd { width: 9px; height: 9px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .stp.done .sd { background: var(--accent); } .stp.cur .sd { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .stp .sl { font-size: 0.62rem; color: var(--faint); white-space: nowrap; } .stp.cur .sl { color: var(--accent); font-weight: 700; }
+  .stp .line { flex: 1; height: 1.5px; background: var(--border); } .stp.done .line { background: var(--accent); }
+
+  /* ── Technical panel ────────────────────────────── */
+  .tech { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+  .tech h3 { font-family: var(--display); font-size: 1rem; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .tech h3 .d { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .tech p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .tlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .tlist li { position: relative; padding-left: 20px; font-size: 0.9rem; color: var(--text); }
+  .tlist li::before { content: ''; position: absolute; left: 2px; top: 9px; width: 6px; height: 6px; border-radius: 2px; background: var(--accent); }
+  .tlist li b { font-weight: 600; }
+  .tlist li span { color: var(--muted); }
+  code { font-family: var(--mono); font-size: 0.84em; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; color: var(--text); }
+
+  /* flow chips row */
+  .flowrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+  .fc { font-size: 0.78rem; font-weight: 600; background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 5px 10px; }
+  .farrow { color: var(--faint); font-size: 0.9rem; }
+
+  .callout { background: var(--success-soft); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 14px 16px; }
+  .callout b { color: #047857; }
+  .callout p { margin: 0; color: #065F46; font-size: 0.88rem; }
+
+  /* stack / architecture grid */
+  .archgrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  @media (max-width: 760px) { .archgrid { grid-template-columns: 1fr; } }
+  .ac { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .ac .ai { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); }
+  .ac h4 { font-family: var(--display); font-size: 0.98rem; margin: 6px 0 6px; }
+  .ac p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+
+  footer { border-top: 1px solid var(--border); padding: 32px 0 56px; color: var(--muted); font-size: 0.85rem; }
+  footer .wrap { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+
+  @media (max-width: 720px) { .top nav { display: none; } .lessons { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .aura::after, .orb::after, .turn .p { animation: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="aura" aria-hidden="true"></span> Nicole</div>
+    <nav aria-label="Sections">
+      <a href="#talk">Voice</a>
+      <a href="#integrations">Integrations</a>
+      <a href="#training">Training</a>
+      <a href="#memory">Memory</a>
+      <a href="#stack">Architecture</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Product Demo &amp; Technical Walkthrough</span>
+      <h1>Nicole — a voice assistant<br />that <span class="hl">does your work</span>.</h1>
+      <p class="lede">You talk to her, she acts on your real accounts, and she trains you to get better. Below: a look at each screen, and exactly how it works underneath.</p>
+      <div class="tags">
+        <span class="tag">Gemini Live voice</span>
+        <span class="tag">Durable memory</span>
+        <span class="tag">4 integrations</span>
+        <span class="tag">Training &amp; roleplay</span>
+        <span class="tag">Camera vision</span>
+        <span class="tag">React + Node + Postgres</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── VOICE ─────────────────────────────────────── -->
+  <section class="feat" id="talk">
+    <div class="wrap">
+      <div class="feat-head">
+        <span class="kicker">01 — Voice</span>
+        <h2>Real-time conversation that feels human</h2>
+        <p>Talk naturally — interrupt her, change her tone, ask anything. A live transcript runs alongside, and she answers with current facts from the web.</p>
+      </div>
+      <div class="split">
+        <!-- mock -->
+        <div class="mock" aria-label="Talk screen mockup">
+          <div class="mock-bar">
+            <div class="mock-brand"><span class="mb-dot"></span> Nicole</div>
+            <div class="mock-nav"><span class="on">Talk</span><span>Training</span><span>Roleplay</span></div>
+            <div class="mock-right"><span class="chip"><span class="d"></span> Listening</span><span class="avatar">G</span></div>
+          </div>
+          <div class="mock-body">
+            <div class="presence"><div class="orb" aria-hidden="true"></div><div class="state">Listening…</div></div>
+            <div class="bubbles">
+              <div class="bub you"><span class="who">You</span>What's the weather in Dubai right now?</div>
+              <div class="bub nic"><span class="who">Nicole</span>It's 41 and sunny there — proper desert afternoon. Want the week ahead too?</div>
+              <div class="bub you"><span class="who">You</span>Slow down a little.</div>
+              <div class="bub nic"><span class="who">Nicole</span>Of course… taking it easy.</div>
+            </div>
+          </div>
+        </div>
+        <!-- tech -->
+        <div class="tech">
+          <h3><span class="d"></span> Under the hood</h3>
+          <ul class="tlist">
+            <li><b>Gemini Live engine</b> <span>— a single WebSocket relay bridges the browser to Gemini; the API key stays server-side, never in the browser.</span></li>
+            <li><b>Voice-activity detection + barge-in</b> <span>— tuned so one utterance maps to one turn; you can cut her off mid-sentence and she yields.</span></li>
+            <li><b>Live two-way transcript</b> <span>— streamed and DOM-trimmed so long talks stay light.</span></li>
+            <li><b>8 selectable voices</b> <span>— Aoede, Kore, Leda, Zephyr, Charon, Fenrir, Orus, Puck.</span></li>
+            <li><b>Silent web grounding</b> <span>— real-time Google Search for news, weather, prices, flights — woven into her answer, never announced.</span></li>
+            <li><b>Delivery control</b> <span>— "slow down," "be excited," "sound professional" change her tone instantly.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── INTEGRATIONS ──────────────────────────────── -->
+  <section class="feat" id="integrations">
+    <div class="wrap">
+      <div class="feat-head">
+        <span class="kicker">02 — Integrations</span>
+        <h2>She acts on your real accounts</h2>
+        <p>Each person connects their own accounts, privately, over OAuth. Then Nicole books meetings, drafts email, captures tasks and posts to Slack — all by voice, all as <em>you</em>.</p>
+      </div>
+      <div class="split rev">
+        <!-- mock -->
+        <div class="mock" aria-label="Integrations screen mockup">
+          <div class="mock-bar">
+            <div class="mock-brand"><span class="mb-dot"></span> Nicole</div>
+            <div class="mock-nav"><span>Talk</span><span class="on">Profile</span></div>
+            <div class="mock-right"><span class="avatar">G</span></div>
+          </div>
+          <div class="mock-body" style="min-height:auto;">
+            <div class="ig on"><div class="ig-ic">📅</div><div class="ig-mid"><div class="ig-name">Google</div><div class="ig-desc">Calendar, Gmail &amp; Meet</div></div><button class="ig-btn done">Connected</button></div>
+            <div class="ig on"><div class="ig-ic">📝</div><div class="ig-mid"><div class="ig-name">Notion</div><div class="ig-desc">Search &amp; capture notes</div></div><button class="ig-btn done">Connected</button></div>
+            <div class="ig on"><div class="ig-ic">✅</div><div class="ig-mid"><div class="ig-name">Todoist</div><div class="ig-desc">Capture tasks by voice</div></div><button class="ig-btn done">Connected</button></div>
+            <div class="ig on"><div class="ig-ic">💬</div><div class="ig-mid"><div class="ig-name">Slack</div><div class="ig-desc">Post &amp; read messages</div></div><button class="ig-btn done">Connected</button></div>
+          </div>
+        </div>
+        <!-- tech -->
+        <div class="tech">
+          <h3><span class="d"></span> How a connection works</h3>
+          <div class="flowrow">
+            <span class="fc">Connect</span><span class="farrow">→</span>
+            <span class="fc">OAuth consent</span><span class="farrow">→</span>
+            <span class="fc">Callback</span><span class="farrow">→</span>
+            <span class="fc">Encrypt &amp; store</span><span class="farrow">→</span>
+            <span class="fc">Connected</span>
+          </div>
+          <ul class="tlist">
+            <li><b>Adapter-per-provider</b> <span>— Google, Notion, Todoist and Slack each live in one file behind a shared interface; a registry maps tools → provider. Adding one is a single new file.</span></li>
+            <li><b>Per-user &amp; private</b> <span>— tokens are keyed by user, <b>AES-256-GCM encrypted</b> at rest in a <code>nicole2_integrations</code> table. The signed OAuth <code>state</code> binds each consent to the right user.</span></li>
+            <li><b>Key-gated</b> <span>— a provider with no server credentials simply shows "Coming soon." Nothing breaks.</span></li>
+            <li><b>Voice tool-calling, server-side</b> <span>— Nicole calls tools like <code>book_meeting</code>, <code>draft_email</code>, <code>create_task</code>, <code>post_slack</code>; they run on the server (where the tokens are) and she reads the result back in a breath.</span></li>
+          </ul>
+          <div class="callout">
+            <p><b>Safety:</b> irreversible actions — send email, post to Slack, book a meeting with guests — are confirmed before acting, enforced both in her reasoning <em>and</em> in code (<code>confirmed:true</code> gate). A mis-heard word can't auto-send. Reads and drafts run instantly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TRAINING & ROLEPLAY ───────────────────────── -->
+  <section class="feat" id="training">
+    <div class="wrap">
+      <div class="feat-head">
+        <span class="kicker">03 — Training &amp; Roleplay</span>
+        <h2>She doesn't just help — she coaches you</h2>
+        <p>Pick a skill and Nicole teaches it step by step. Or practice live against a different AI voice playing a tough prospect, and get scored at the end.</p>
+      </div>
+      <div class="split">
+        <!-- mock: training picker + room -->
+        <div class="mock" aria-label="Training mockup">
+          <div class="mock-bar">
+            <div class="mock-brand"><span class="mb-dot"></span> Nicole</div>
+            <div class="mock-nav"><span>Talk</span><span class="on">Training</span><span>Roleplay</span></div>
+            <div class="mock-right"><span class="avatar">G</span></div>
+          </div>
+          <div class="mock-body" style="min-height:auto;">
+            <div class="stepper" aria-hidden="true">
+              <div class="stp done"><span class="sd"></span><span class="sl">Teach</span><span class="line"></span></div>
+              <div class="stp done"><span class="sd"></span><span class="sl">Model</span><span class="line"></span></div>
+              <div class="stp cur"><span class="sd"></span><span class="sl">Practice</span><span class="line"></span></div>
+              <div class="stp"><span class="sd"></span><span class="sl">Debrief</span></div>
+            </div>
+            <div class="lessons">
+              <div class="lc sel"><span class="lc-fw">PIN</span><div class="lc-t">Opening a Cold Call</div><div class="lc-o">Earn the first 30 seconds.</div></div>
+              <div class="lc"><span class="lc-fw">AER</span><div class="lc-t">Price Objection</div><div class="lc-o">Handle "too expensive."</div></div>
+              <div class="lc"><span class="lc-fw">ASK</span><div class="lc-t">Discovery</div><div class="lc-o">Surface the real problem.</div></div>
+              <div class="lc"><span class="lc-fw">STAR</span><div class="lc-t">Interview Answers</div><div class="lc-o">Structure your story.</div></div>
+            </div>
+            <div class="cta-bar"><span class="lbl">Opening a Cold Call</span><button class="btn">Start drill →</button></div>
+            <div style="margin-top:14px; display:flex; justify-content:center;"><span class="turn"><span class="p"></span> Your turn</span></div>
+          </div>
+        </div>
+        <!-- tech -->
+        <div class="tech">
+          <h3><span class="d"></span> How the coach works</h3>
+          <ul class="tlist">
+            <li><b>A phase machine</b> <span>— each lesson runs <code>intro → teach → model → practice → readiness → live rep → debrief</code>, advancing as you engage. Scaffolding fades as you go (I-do → we-do → you-do).</span></li>
+            <li><b>Real frameworks</b> <span>— PIN (cold-call open), ASK (discovery), AER (price objection), STAR (interview), each with worked examples and key lines.</span></li>
+            <li><b>Live roleplay</b> <span>— a <em>different</em> voice plays the prospect and opens the scene; you practice, then get an engagement scorecard. An explicit turn indicator shows whose turn it is.</span></li>
+            <li><b>Custom &amp; history</b> <span>— describe your own drill by voice or text and the AI builds it; past sessions and scorecards are saved.</span></li>
+          </ul>
+          <div class="callout">
+            <p><b>Two density modes:</b> during a live rep the screen is near-silent (aura + one cue) so you focus on talking; the rich scorecard and transcript appear only at the debrief.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MEMORY ────────────────────────────────────── -->
+  <section class="feat" id="memory">
+    <div class="wrap">
+      <div class="feat-head">
+        <span class="kicker">04 — Memory &amp; multimodal</span>
+        <h2>She remembers you, and she can see</h2>
+        <p>Durable memory means she never makes you repeat yourself. Camera vision and voice-driven UI control round out the assistant.</p>
+      </div>
+      <div class="split rev">
+        <div class="mock" aria-label="Memory mockup">
+          <div class="mock-bar">
+            <div class="mock-brand"><span class="mb-dot"></span> Nicole</div>
+            <div class="mock-nav"><span class="on">Memory</span></div>
+            <div class="mock-right"><span class="avatar">G</span></div>
+          </div>
+          <div class="mock-body" style="min-height:auto;">
+            <div class="ig"><div class="ig-ic">🧠</div><div class="ig-mid"><div class="ig-name">Name</div><div class="ig-desc">Gaurav</div></div></div>
+            <div class="ig"><div class="ig-ic">🏢</div><div class="ig-mid"><div class="ig-name">Business</div><div class="ig-desc">Real-estate sales, Dubai</div></div></div>
+            <div class="ig"><div class="ig-ic">🎯</div><div class="ig-mid"><div class="ig-name">Goals</div><div class="ig-desc">Cold calling · Objection handling</div></div></div>
+            <div class="bubbles" style="margin-top:10px;"><div class="bub nic"><span class="who">Nicole</span>Got it — I'll remember you're focused on cold calling. Saved.</div></div>
+          </div>
+        </div>
+        <div class="tech">
+          <h3><span class="d"></span> How memory &amp; control work</h3>
+          <ul class="tlist">
+            <li><b>Persisted, not in the tab</b> <span>— facts live in a <code>nicole2_memory</code> Postgres table, UPSERT'd per <code>(user, key)</code>; reloaded into her context at the start of every session.</span></li>
+            <li><b>Proactive &amp; correctable</b> <span>— she saves your name, business, goals and preferences as she learns them; tell her to remember or forget anything.</span></li>
+            <li><b>Per-user</b> <span>— the live session runs as the signed-in user, verified by their token, so memory and connected accounts are private to each person.</span></li>
+            <li><b>Camera vision</b> <span>— turn on the camera, ask "what do you see?" and she describes the live frame in detail.</span></li>
+            <li><b>Voice UI control</b> <span>— "open training," "switch your voice," "mute yourself," "update my goals" — she operates the app and edits your profile by voice.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ARCHITECTURE ──────────────────────────────── -->
+  <section class="feat" id="stack">
+    <div class="wrap">
+      <div class="feat-head">
+        <span class="kicker">05 — Architecture</span>
+        <h2>How it's built to stay up</h2>
+        <p>A clean split: a React voice client, a Node relay that owns the Gemini connection and all secrets, and Postgres for durable state.</p>
+      </div>
+      <div class="archgrid">
+        <div class="ac"><div class="ai">CLIENT</div><h4>React + TypeScript</h4><p>Voice capture, live transcript, animated avatar, the Talk / Training / Roleplay / Integrations screens. Holds no secrets.</p></div>
+        <div class="ac"><div class="ai">RELAY</div><h4>Node + WebSocket</h4><p>One session per user bridges the browser to Gemini Live. Owns the API key, runs tool calls server-side, and orchestrates reconnect + summarization.</p></div>
+        <div class="ac"><div class="ai">DATA</div><h4>Postgres</h4><p>Users, durable memory, training history, and encrypted integration tokens — each row scoped to its user.</p></div>
+        <div class="ac"><div class="ai">STABILITY</div><h4>Self-healing sessions</h4><p>Auto-reconnect with seamless resume, terminal-failure detection (no retry storms), leak-safe teardown, never reconnects mid-sentence.</p></div>
+        <div class="ac"><div class="ai">LONG RUNS</div><h4>Live summarization</h4><p>Older turns are compressed into a running summary (recent turns kept verbatim) before context can overflow — hour-long talks stay alive.</p></div>
+        <div class="ac"><div class="ai">SAFETY</div><h4>Confirm-before-act</h4><p>Irreversible actions are gated in prompt and in code; OAuth tokens encrypted at rest; per-user isolation throughout.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="aura" aria-hidden="true"></span>
+    <span><strong>Nicole</strong> — product demo &amp; technical walkthrough. Voice · memory · integrations · coaching.</span>
+  </div>
+</footer>
+
+</body>
+</html>

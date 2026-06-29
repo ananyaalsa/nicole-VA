@@ -1,0 +1,66 @@
+/* Nicole's presence — the Sophia still, graded into the console.
+   The source render is a full-body figure on a white studio sweep; we mask the
+   bright background away to the void and tint the figure toward cyan so she
+   reads as part of the HUD, not a pasted photo. */
+.nicole-presence {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  width: clamp(180px, 26vmin, 340px);
+  height: clamp(280px, 52vmin, 540px);
+  transition: transform 90ms ease-out, filter 200ms ease;
+  will-change: transform, filter;
+}
+
+.nicole-presence__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  /* Knock out the near-white studio backdrop so she stands on the terrain.
+     `screen` blend drops the white sweep toward invisible against the dark
+     scene, and a tight feathered mask removes the rectangular edges. */
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(
+    ellipse 46% 72% at 50% 44%,
+    #000 42%,
+    rgba(0, 0, 0, 0) 86%
+  );
+  mask-image: radial-gradient(
+    ellipse 46% 72% at 50% 44%,
+    #000 42%,
+    rgba(0, 0, 0, 0) 86%
+  );
+  filter: contrast(1.06) saturate(0.86) brightness(0.96)
+    drop-shadow(0 0 26px rgba(62, 240, 255, 0.28));
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A cyan rim glow that warms to violet while speaking — ties her to the aura. */
+.nicole-presence__rim {
+  position: absolute;
+  inset: 6% 14% 4%;
+  border-radius: 50% / 46%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 38%,
+    rgba(62, 240, 255, 0) 56%,
+    rgba(62, 240, 255, 0.16) 82%,
+    rgba(62, 240, 255, 0) 100%
+  );
+  mix-blend-mode: screen;
+  transition: background 240ms ease;
+}
+.nicole-presence.is-speaking .nicole-presence__rim {
+  background: radial-gradient(
+    ellipse at 50% 38%,
+    rgba(124, 92, 255, 0) 54%,
+    rgba(124, 92, 255, 0.26) 82%,
+    rgba(124, 92, 255, 0) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nicole-presence { transition: filter 200ms ease; }
+}

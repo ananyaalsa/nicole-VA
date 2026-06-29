@@ -13,6 +13,13 @@ export interface MemoryFact {
   key: string;
   fact: string;
   factType: string;
+  /**
+   * Provenance — the key correctness signal. 'settings' = a profile fact the
+   * user set (About / Goals / phone): Nicole KNOWS it but did NOT discuss it.
+   * 'inferred'/'explicit' = learned in conversation (may be referenced as
+   * "we talked about"). Defaults to 'inferred'.
+   */
+  source?: string;
   createdAt?: string;
   updatedAt?: string;
 }

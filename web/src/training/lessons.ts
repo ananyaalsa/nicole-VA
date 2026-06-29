@@ -17,17 +17,17 @@ const COLD_CALL_OPEN: ClientLessonSpec = {
   coreFramework: {
     name: 'PIN',
     moves: [
-      { step: 'Pattern-interrupt', intent: 'break the sales-call script so they pause', keyLine: "Hi — I know this is a cold call, can I have 20 seconds and you decide if it's worth more?" },
+      { step: 'Pattern-interrupt', intent: 'break the sales-call script so they pause', keyLine: "Hi, I know this is a cold call, can I have 20 seconds and you decide if it's worth more?" },
       { step: 'Interest', intent: 'one sharp reason relevant to them', keyLine: 'We help teams like yours cut onboarding time in half.' },
       { step: 'Next-step', intent: 'ask for a small yes, not the meeting yet', keyLine: 'Worth two minutes now, or should I send something first?' },
     ],
   },
-  mnemonic: 'PIN — Pattern-interrupt, Interest, Next-step',
+  mnemonic: 'PIN: Pattern-interrupt, Interest, Next-step',
   workedExamples: [
     {
       label: 'good',
       dialogue: [
-        'You: Hi, I know this is a cold call — can I have 20 seconds and you decide if it is worth more?',
+        'You: Hi, I know this is a cold call, can I have 20 seconds and you decide if it is worth more?',
         'Prospect: ...fine, go.',
         'You: We help ops teams like yours cut onboarding time in half. Worth two minutes now, or should I send something first?',
       ],
@@ -60,11 +60,11 @@ const DISCOVERY_QUESTIONS: ClientLessonSpec = {
     name: 'ASK',
     moves: [
       { step: 'Ask open', intent: 'open-ended question that invites the story', keyLine: 'Walk me through how you handle this today.' },
-      { step: 'Stay quiet', intent: 'let silence pull out the real answer', keyLine: '(let them finish — do not jump in)' },
+      { step: 'Stay quiet', intent: 'let silence pull out the real answer', keyLine: '(let them finish, do not jump in)' },
       { step: 'Keep digging', intent: 'follow the thread to the cost/impact', keyLine: 'And when that breaks, what does it cost you?' },
     ],
   },
-  mnemonic: 'ASK — Ask open, Stay quiet, Keep digging',
+  mnemonic: 'ASK: Ask open, Stay quiet, Keep digging',
   workedExamples: [
     {
       label: 'good',
@@ -75,7 +75,7 @@ const DISCOVERY_QUESTIONS: ClientLessonSpec = {
         'Prospect: ...and it takes us like three weeks per hire.',
         'You: And when it drags like that, what does it cost you?',
       ],
-      whyNotes: ['Open question invites the story.', 'Silence pulls out the real pain.', 'Digging reaches the cost — now you can tie value.'],
+      whyNotes: ['Open question invites the story.', 'Silence pulls out the real pain.', 'Digging reaches the cost, now you can tie value.'],
     },
     {
       label: 'avoid',
@@ -88,7 +88,7 @@ const DISCOVERY_QUESTIONS: ClientLessonSpec = {
   ],
   guidedPracticePrompts: [
     'Open the discovery with one open-ended question.',
-    'They paused — what do you do?',
+    'They paused. What do you do?',
     'Dig one level deeper toward the cost.',
   ],
   expectations: ['asks open-ended, not yes/no', 'tolerates silence', 'digs to the cost/impact before pitching'],
@@ -99,23 +99,23 @@ const PRICE_OBJECTION: ClientLessonSpec = {
   skillId: 'price_objection',
   title: 'Handling the Price Objection',
   objective: 'Handle a price objection without dropping the price or getting defensive.',
-  hook: "A prospect just said 'that's too expensive.' Quick — what's the WORST thing you could say back?",
+  hook: "A prospect just said 'that's too expensive.' Quick, what's the WORST thing you could say back?",
   coreFramework: {
     name: 'AER',
     moves: [
       { step: 'Acknowledge', intent: 'validate the concern without conceding', keyLine: 'Totally fair to ask about price.' },
-      { step: 'Explore', intent: 'find the real concern — budget vs value', keyLine: 'When you say expensive, compared to what exactly?' },
+      { step: 'Explore', intent: 'find the real concern, budget vs value', keyLine: 'When you say expensive, compared to what exactly?' },
       { step: 'Reframe', intent: 'shift from the number to value / cost of inaction', keyLine: "Let's look at what it costs to NOT fix this." },
     ],
   },
-  mnemonic: 'AER — Acknowledge, Explore, Reframe',
+  mnemonic: 'AER: Acknowledge, Explore, Reframe',
   workedExamples: [
     {
       label: 'good',
       dialogue: [
         'Prospect: You are way more expensive than the other quote.',
         'You: Totally fair to bring up price.',
-        'You: When you say expensive — compared to what exactly?',
+        'You: When you say expensive, compared to what exactly?',
         'Prospect: The vendor down the street is 30% less.',
         'You: Got it. If this saved your team 10 hours a week, what would that be worth?',
       ],
@@ -128,13 +128,13 @@ const PRICE_OBJECTION: ClientLessonSpec = {
     {
       label: 'avoid',
       dialogue: ['Prospect: You are too expensive.', 'You: Okay, I can do 15% off.'],
-      whyNotes: ['Dropped price instantly — taught the prospect to push on price every time. Never auto-discount.'],
+      whyNotes: ['Dropped price instantly, which taught the prospect to push on price every time. Never auto-discount.'],
     },
   ],
   guidedPracticePrompts: [
     "Prospect says 'too expensive.' Give me just your Acknowledge line.",
     'Now give me the Explore question.',
-    'Now the Reframe — tie it to value.',
+    'Now the Reframe: tie it to value.',
   ],
   expectations: [
     'Acknowledges before rebutting.',
@@ -159,7 +159,7 @@ const INTERVIEW_STAR: ClientLessonSpec = {
       { step: 'Result', intent: 'the outcome, with a number if you can', keyLine: 'We shipped on time and conversion went up 12%.' },
     ],
   },
-  mnemonic: 'STAR — Situation, Task, Action, Result',
+  mnemonic: 'STAR: Situation, Task, Action, Result',
   workedExamples: [
     {
       label: 'good',
@@ -183,7 +183,7 @@ const INTERVIEW_STAR: ClientLessonSpec = {
   ],
   guidedPracticePrompts: [
     'Set the Situation for a deadline story in one or two sentences.',
-    'Now state your Task — what were YOU responsible for?',
+    'Now state your Task: what were YOU responsible for?',
     'Give the Action you personally took, then the Result with a number.',
   ],
   expectations: ['names all four STAR parts', 'uses "I" for the action, not "we"', 'ends on a concrete result'],

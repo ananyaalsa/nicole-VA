@@ -1,64 +1,14 @@
-.voice-switcher {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+.voice-switcher { display: flex; flex-direction: column; gap: 4px; }
+.voice-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+.voice-group-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); padding: 0 4px; margin-bottom: 2px; }
+.voice-group-options { display: flex; flex-direction: column; gap: 4px; }
+.voice-option { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: transparent; cursor: pointer; font-family: inherit; font-size: 0.82rem; color: var(--text-2); transition: all 140ms ease; text-align: left; }
+.voice-option:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
+.voice-option.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.voice-option-name { font-weight: 500; }
+.voice-option-label { font-size: 0.74rem; opacity: 0.7; }
+.voice-option.is-active .voice-option-label { opacity: 0.85; }
 
-.voice-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.voice-group-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.55;
-}
-
-.voice-group-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.voice-option {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #e9e9f2;
-  cursor: pointer;
-  transition:
-    transform 0.12s ease,
-    border-color 0.12s ease,
-    background 0.12s ease;
-}
-
-.voice-option:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.28);
-}
-
-.voice-option.is-active {
-  border-color: #8b7bff;
-  background: linear-gradient(135deg, rgba(109, 94, 252, 0.35), rgba(139, 123, 255, 0.18));
-  box-shadow: 0 0 0 1px rgba(139, 123, 255, 0.5) inset;
-}
-
-.voice-option-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.voice-option-label {
-  font-size: 0.74rem;
-  opacity: 0.6;
-  text-transform: lowercase;
+@media (prefers-reduced-motion: reduce) {
+  .voice-option { transition: none; }
 }

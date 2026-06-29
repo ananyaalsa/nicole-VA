@@ -1,130 +1,617 @@
+/* TalkScreen — virtual assistant layout.
+   Top nav bar + two-column body: Nicole presence left, conversation right. */
+
 .talk-screen {
-  position: relative;
   width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  color: var(--text, #f0edff);
+  grid-template-rows: 56px auto 1fr;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Top bar, status chip, and pill control buttons now live in TopBar.css
+   (imported by the shared <TopBar> component) so they load on every screen. */
+
+/* Camera error bar */
+.camera-error {
+  grid-row: 2;
+  margin: 0;
+  padding: 8px 24px;
+  font-size: 0.82rem;
+  color: var(--danger);
+  background: var(--danger-light);
+  border-bottom: 1px solid rgba(229, 70, 108, 0.15);
+}
+
+/* ---------------------------------------------------------------- Body */
+.talk-body {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: 0;
   overflow: hidden;
 }
 
-/* Header ------------------------------------------------------------------ */
-.talk-header {
+/* ------------------------------------------------ LEFT: Nicole presence */
+.talk-presence {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px 16px 20px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow: visible;
+  gap: 12px;
+}
+
+/* Avatar — sized to the portrait's aspect ratio so the box hugs the image
+   (no empty space below) and cover-fit fills it edge-to-edge (no edge line). */
+.presence-avatar {
+  width: 100%;
+  flex: 0 0 auto;
+  aspect-ratio: 3 / 4;
+  max-height: 100%;
   position: relative;
-  z-index: 2;
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.presence-avatar--state-listening {
+  border-color: rgba(16,185,129,0.5);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+}
+.presence-avatar--state-speaking {
+  border-color: rgba(var(--accent-rgb),0.4);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.1);
+}
+
+/* Cover-fill the aspect-matched box, anchored to the top (face in frame).
+   Scale slightly past the edges so the image file's baked-in border sliver is
+   cropped away (no faint line on the left). The box clips via overflow:hidden. */
+.presence-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transform: scale(1.05);
+  display: block;
+}
+
+.presence-name {
+  margin-top: 16px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.presence-state {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--text-3);
+  font-weight: 400;
+  transition: color 0.2s ease;
+}
+.talk-screen[data-state='listening'] .presence-state { color: var(--success); }
+.talk-screen[data-state='speaking'] .presence-state { color: var(--accent); }
+
+/* Voice selector — compact chip with dropdown */
+/* Voice selector — sits just under the avatar (the compact picker opens upward). */
+.voice-selector {
+  margin-top: 4px;
+  position: relative;
+  width: 100%;
+}
+
+.voice-current-btn {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 22px 28px;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #c4b1ff, #7c5cff 70%);
-  box-shadow: 0 0 16px rgba(124, 92, 255, 0.8);
+.voice-current-btn:hover { border-color: var(--border-strong); background: var(--surface); }
+.voice-current-name { font-weight: 600; flex: 1; text-align: left; }
+.voice-current-label {
+  font-size: 0.75rem;
+  color: var(--text-3);
+  background: var(--border);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
 }
-.brand-name {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+.voice-current-btn svg { color: var(--text-3); flex-shrink: 0; transition: transform 140ms ease; }
+.voice-selector:has(.voice-pop) .voice-current-btn svg { transform: rotate(180deg); }
+
+/* Compact voice picker — opens downward into the open space below the button. */
+.voice-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: voice-pop-in 140ms ease;
 }
-.talk-header-actions { display: flex; align-items: center; gap: 12px; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4a5170; }
-.status-dot.status-listening { background: #22d3ee; box-shadow: 0 0 10px #22d3ee; }
-.status-dot.status-speaking { background: #9d7bff; box-shadow: 0 0 10px #9d7bff; }
-.status-text {
-  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--muted, #8b93b0);
+@keyframes voice-pop-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
-/* Stage ------------------------------------------------------------------- */
-.talk-stage {
+/* Gender segmented toggle */
+.voice-seg {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+}
+.voice-seg__btn {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.voice-seg__btn.is-on {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Chip grid — 2 columns, the 4 voices fit with no scroll */
+.voice-chips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.voice-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, transform 90ms ease;
+}
+.voice-chip:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.voice-chip.is-active { border-color: var(--accent); background: var(--accent-light); }
+.voice-chip__name { font-size: 0.84rem; font-weight: 600; }
+.voice-chip.is-active .voice-chip__name { color: var(--accent); }
+.voice-chip__label { font-size: 0.68rem; color: var(--text-3); }
+.voice-chip.is-active .voice-chip__label { color: var(--accent); }
+
+/* ----------------------------------------------- RIGHT: conversation */
+.talk-conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+}
+
+/* ---- Animated sound wave canvas (rendered by WaveBackdrop component) ---- */
+.wave-canvas {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 55%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.conversation-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: 1fr minmax(320px, 420px);
-  gap: 24px;
-  padding: 8px 28px 16px;
-  min-height: 0;
 }
-.stage-avatar {
+
+/* Empty state */
+.talk-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 40px 24px;
   position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 0;
+  z-index: 1;
 }
-.stage-avatar svg { width: clamp(180px, 26vmin, 320px); height: auto; }
-
-.stage-side {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 16px;
-  min-height: 0;
-  padding-bottom: 8px;
+.talk-empty__heading {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.02em;
 }
-
-/* Controls ---------------------------------------------------------------- */
-.talk-controls {
+.talk-empty__sub {
+  font-size: 0.95rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  max-width: 38ch;
+  margin: 0;
+}
+.talk-empty__starters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  margin-top: 8px;
   position: relative;
   z-index: 2;
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-  padding: 18px 28px 30px;
 }
 
-.primary-btn,
-.control-btn,
-.ghost-btn {
-  font: inherit;
+/* Starter cards — clean white, float above the waves */
+.starter-card {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  text-align: left;
   cursor: pointer;
+  font-family: inherit;
+  line-height: 1.5;
+  font-weight: 500;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.starter-card::after {
+  content: '→';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  opacity: 0;
+  color: var(--accent);
+  transition: opacity 150ms ease, transform 150ms ease;
+  font-size: 1rem;
+}
+.starter-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--accent); }
+.starter-card:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+/* Chat messages */
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.chat-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 68%;
+}
+.chat-bubble--user { align-self: flex-end; align-items: flex-end; }
+.chat-bubble--nicole { align-self: flex-start; align-items: flex-start; }
+.chat-who {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  font-weight: 500;
+  padding: 0 4px;
+}
+.chat-text {
+  margin: 0;
+  padding: 11px 15px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.chat-bubble--user .chat-text {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-bubble--nicole .chat-text {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  border-bottom-left-radius: 4px;
+}
+
+/* Typing caret on the still-streaming bubble (one bubble grows; no fragments). */
+.chat-bubble.is-streaming .chat-text::after {
+  content: '▍';
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent);
+  animation: nicole-caret 1s steps(1) infinite;
+}
+@keyframes nicole-caret { 50% { opacity: 0; } }
+
+/* Jump-to-latest pill (shown when the user scrolled up from the bottom). */
+.jump-latest {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.4);
+  cursor: pointer;
+  z-index: 3;
+  animation: jump-rise 160ms ease;
+}
+.jump-latest:hover { background: var(--accent-hover); }
+@keyframes jump-rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble.is-streaming .chat-text::after { animation: none; }
+  .jump-latest { animation: none; }
+}
+
+/* Controls bar */
+.talk-controls {
+  padding: 16px 32px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* Render the controls bar (and its top divider line) ABOVE the companion
+     avatar so she stands BEHIND the line — her lower body tucks behind the bar. */
+  position: relative;
+  z-index: 5;
+}
+
+/* Show/hide avatar toggle — sits BELOW THE AVATAR, bottom-right corner.
+   NOTE: `button.` prefix is REQUIRED to beat the global `[data-tooltip]
+   { position: relative }` rule (equal specificity otherwise → it was forcing
+   relative and throwing the button to the left). Higher specificity wins. */
+button.l2d-toggle-btn {
+  position: fixed;
+  right: 120px; /* roughly under the avatar's centre (avatar: right 16px, ~240 wide) */
+  bottom: 16px;
+  z-index: 30;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.l2d-toggle-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
+.l2d-toggle-btn.is-on { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.4); }
+/* On mobile the hide-avatar toggle is removed entirely (the avatar is a small
+   ambient presence there; no manual toggle clutter). */
+@media (max-width: 640px) {
+  button.l2d-toggle-btn { display: none; }
+}
+
+/* Start button */
+.talk-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 36px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb),0.3);
+  transition: background 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+.talk-start-btn:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 20px rgba(var(--accent-rgb),0.4);
+  transform: translateY(-1px);
+}
+.talk-start-btn:active { transform: translateY(0); }
+
+/* Live control buttons */
+.live-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Icon-only circular live controls (web + mobile). Slashed icon (swapped in
+   JSX) + red tint communicates a muted/destructive state without any text. */
+.live-controls--icons { gap: 14px; }
+.ctrl-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 110ms ease;
+}
+.ctrl-icon:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); transform: translateY(-1px); }
+.ctrl-icon:active { transform: translateY(0); }
+/* Muted state (your mic OFF, Nicole's voice OFF) — clear red. */
+.ctrl-icon.is-muted {
+  background: var(--danger-light);
+  border-color: rgba(var(--danger-rgb), 0.4);
+  color: var(--danger);
+}
+/* Camera active = teal "on". */
+.ctrl-icon.is-active {
+  background: var(--accent-light);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  color: var(--accent);
+}
+/* End = always red. */
+.ctrl-icon--end {
+  background: var(--danger-light);
+  border-color: rgba(var(--danger-rgb), 0.3);
+  color: var(--danger);
+}
+.ctrl-icon--end:hover { background: rgba(var(--danger-rgb), 0.14); border-color: var(--danger); color: var(--danger); }
+
+/* Volume control — icon button with a popover slider (keeps the live row minimal). */
+.ctrl-volume { position: relative; display: inline-flex; }
+.volume-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid transparent;
-  transition: transform 120ms ease, background 200ms ease, border-color 200ms ease;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+  animation: volpop-in 140ms ease;
 }
-.primary-btn:active,
-.control-btn:active { transform: translateY(1px); }
+@keyframes volpop-in { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.volume-pop__mute {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 50%;
+}
+.volume-pop__mute:hover { background: var(--surface-2); color: var(--text); }
+.volume-pop__slider {
+  -webkit-appearance: none; appearance: none;
+  width: 120px; height: 4px; border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--vol, 80%), var(--border) var(--vol, 80%), var(--border) 100%);
+  cursor: pointer;
+}
+.volume-pop__slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.volume-pop__slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--surface);
+  background: var(--accent);
+}
+.volume-pop__val { font-size: 0.78rem; font-weight: 600; color: var(--text-2); min-width: 22px; text-align: right; }
 
-.talk-btn {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 14px 28px;
-  font-size: 15px; font-weight: 600; letter-spacing: 0.02em;
-  color: #0b0e1a;
-  background: linear-gradient(180deg, #c4b1ff, #7c5cff);
-  box-shadow: 0 8px 30px rgba(124, 92, 255, 0.45);
-}
-.talk-btn:hover { transform: translateY(-1px); }
-.talk-btn-dot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: #0b0e1a; opacity: 0.6;
+/* Mobile: open the slider above, wider touch target. */
+@media (max-width: 640px) {
+  .volume-pop { padding: 10px 14px; }
+  .volume-pop__slider { width: 140px; height: 6px; }
+  .volume-pop__mute { width: 36px; height: 36px; }
 }
 
-.control-btn {
-  padding: 12px 24px; font-size: 14px; font-weight: 500;
-  color: var(--text, #f0edff);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
+/* Camera overlay */
+.camera-corner {
+  position: fixed;
+  bottom: 84px;
+  /* LEFT side so it never overlaps the bottom-right avatar companion. */
+  left: 24px;
+  width: 240px;
+  border-radius: var(--radius-md);
+  overflow: visible;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  z-index: 10;
 }
-.control-btn.is-off { color: #ffb4b4; border-color: rgba(255, 120, 120, 0.4); }
-.control-btn.is-end { color: #ff9d9d; }
-.control-btn:hover { background: rgba(255, 255, 255, 0.12); }
-
-.ghost-btn {
-  padding: 7px 16px; font-size: 13px;
-  color: var(--muted, #8b93b0);
-  border-color: rgba(255, 255, 255, 0.12);
-  background: transparent;
+@media (max-width: 640px) {
+  /* On mobile, center the camera above the controls so it clears both the
+     avatar (bottom-right) and the side edges. */
+  .camera-corner { left: 50%; transform: translateX(-50%); width: min(240px, 70vw); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
-.ghost-btn:hover { color: var(--text, #f0edff); border-color: rgba(255, 255, 255, 0.28); }
 
-/* Responsive -------------------------------------------------------------- */
-@media (max-width: 860px) {
-  .talk-stage {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+/* Responsive */
+@media (max-width: 960px) {
+  .talk-body { grid-template-columns: 280px 1fr; }
+}
+@media (max-width: 640px) {
+  /* One column: a clean compact presence header on top, conversation below. */
+  .talk-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .talk-presence {
+    padding: 10px 14px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
   }
-  .stage-side { grid-template-rows: 220px auto; }
+  /* Small round avatar (a header chip, not a hero) on mobile. */
+  .presence-avatar {
+    width: 44px; height: 44px; min-height: 44px;
+    flex: none; aspect-ratio: 1; border-radius: 50%;
+  }
+  .presence-img { object-position: center 12%; transform: scale(1.08); }
+  /* Hide the redundant "Your Personal VA" label on mobile to free space. */
+  .presence-state { display: none; }
+  /* Voice selector becomes the main element of the header, filling the row. */
+  .voice-selector { margin-top: 0; flex: 1; min-width: 0; }
+  .voice-current-name { font-size: 0.86rem; }
+  /* The compact picker opens DOWNWARD on mobile (header is at the top). */
+  .voice-pop { top: calc(100% + 6px); bottom: auto; }
+  /* Bigger touch targets for live controls on a phone (WCAG 44px+). */
+  .live-controls--icons { gap: 16px; }
+  .ctrl-icon { width: 56px; height: 56px; }
+  .talk-start-btn { min-height: 56px; font-size: 0.98rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk-start-btn, .ctrl-icon, .starter-card,
+  .presence-avatar, .status-dot { transition: none; animation: none; }
 }
