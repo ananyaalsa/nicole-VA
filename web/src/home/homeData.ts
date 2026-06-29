@@ -146,37 +146,3 @@ export function coachStats(runs: TrainingRun[], now: Date = new Date()): CoachSt
 
   return { streak, lastScore, trend, weakest };
 }
-
-/* ── Recent sessions (continue where you left off) ───────────────────────── */
-
-export interface RecentItem {
-  id: number;
-  kind: 'roleplay' | 'training';
-  title: string;
-  score: number | null;
-  /** Human "2 days ago" style relative time. */
-  ago: string;
-}
-
-function relativeTime(iso: string, now: Date = new Date()): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const mins = Math.round((now.getTime() - then) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days} days ago`;
-  const wks = Math.round(days / 7);
-  return wks === 1 ? 'last week' : `${wks} weeks ago`;
-}
-
-/** The most recent N runs as resume tiles. */
-export function recents(runs: TrainingRun[], count = 3, now: Date = new Date()): RecentItem[] {
-  return [...runs]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, count)
-    .map((r) => ({ id: r.id, kind: r.kind, title: r.title, score: r.score, ago: relativeTime(r.createdAt, now) }));
-}

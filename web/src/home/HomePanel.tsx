@@ -5,16 +5,14 @@ import { fetchHistory, type TrainingRun } from '../training/trainingApi';
 import { fetchBrief, type Brief, type BriefSection, type BriefEmail, type BriefEvent } from './briefApi';
 import { BRAND_ICONS } from '../integrations/brandIcons';
 import {
-  greeting, starters, coachStats, recents,
-  type Starter, type CoachStats, type RecentItem,
+  greeting, starters, coachStats,
+  type Starter, type CoachStats,
 } from './homeData';
 import './HomePanel.css';
 
 export interface HomePanelProps {
   /** Tap a starter → begin a session seeded with that prompt. */
   onStarter: (prompt: string) => void;
-  /** Open a past session's mode (training/roleplay). */
-  onResume: (item: RecentItem) => void;
   /** Tap the weak-spot drill → go to Training. */
   onDrill: (weakest: string) => void;
 }
@@ -88,7 +86,7 @@ const STREAK_ICON = (
  * recent-session resume tiles, and goal-personalized one-tap starter chips.
  * Everything degrades gracefully when there's no data yet.
  */
-export function HomePanel({ onStarter, onResume, onDrill }: HomePanelProps): JSX.Element {
+export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
   const { user, token } = useAuth();
   const [goals, setGoals] = useState<string[]>([]);
   const [runs, setRuns] = useState<TrainingRun[]>([]);
@@ -115,7 +113,6 @@ export function HomePanel({ onStarter, onResume, onDrill }: HomePanelProps): JSX
   const hello = greeting(user?.displayName);
   const chips: Starter[] = starters(goals, 3);
   const stats: CoachStats = coachStats(runs);
-  const recent: RecentItem[] = recents(runs, 3);
   const showBrief = !briefDismissed && brief?.available && Object.keys(brief.sections).length > 0;
 
   const dismissBrief = useCallback(() => setBriefDismissed(true), []);
@@ -196,28 +193,6 @@ export function HomePanel({ onStarter, onResume, onDrill }: HomePanelProps): JSX
           </button>
         ))}
       </div>
-
-      {/* Continue where you left off */}
-      {recent.length > 0 && (
-        <div className="home-recents" data-testid="home-recents">
-          <div className="home-recents__head">Pick up where you left off</div>
-          <ul className="home-recents__list">
-            {recent.map((r) => (
-              <li key={r.id}>
-                <button type="button" className="home-recent" onClick={() => onResume(r)}>
-                  <span className={`home-recent__kind home-recent__kind--${r.kind}`}>
-                    {r.kind === 'training' ? 'Training' : 'Roleplay'}
-                  </span>
-                  <span className="home-recent__title">{r.title}</span>
-                  <span className="home-recent__meta">
-                    {r.score != null ? `${r.score.toFixed(1)}/10 · ` : ''}{r.ago}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

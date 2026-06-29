@@ -117,30 +117,6 @@
 }
 .home-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
 
-/* ── Recents ──────────────────────────────────────────────────────────────── */
-.home-recents { width: 100%; text-align: left; margin-top: 2px; }
-.home-recents__head {
-  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; text-align: center;
-}
-.home-recents__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.home-recent {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  text-align: left; padding: 10px 14px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-md); cursor: pointer; font-family: inherit;
-  transition: border-color 130ms ease, transform 100ms ease, box-shadow 130ms ease;
-}
-.home-recent:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-.home-recent__kind {
-  flex-shrink: 0; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em;
-  text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-pill);
-  background: var(--accent-light); color: var(--accent);
-}
-.home-recent__kind--roleplay { background: rgba(var(--accent-rgb), 0.12); }
-.home-recent__title { flex: 1; min-width: 0; font-size: 0.86rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.home-recent__meta { flex-shrink: 0; font-size: 0.74rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
-
 /* ── Mobile (≤640px) ──────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   /* Full-width, never overflowing the viewport; everything centered. */
@@ -170,12 +146,9 @@
   /* Coach pills wrap + center; the drill chip can take a full row. */
   .home-coach { padding: 0 12px; }
   .home-coach__drill { flex-basis: 100%; text-align: center; }
-  /* Recents: comfortable tap height, full width. */
-  .home-recents { padding: 0 12px; }
-  .home-recent { min-height: 52px; }
   /* Brief stays a contained card, never dominating the fold. */
   .home-brief { margin: 0 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-chip, .home-recent, .home-coach__drill { transition: none; }
+  .home-chip, .home-coach__drill { transition: none; }
 }

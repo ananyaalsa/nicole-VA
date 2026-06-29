@@ -471,7 +471,6 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
             <div className="talk-empty">
               <HomePanel
                 onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
-                onResume={(item) => { if (item.kind === 'training') onTrain?.(); else onRoleplay?.(); }}
                 onDrill={() => onTrain?.()}
               />
             </div>
