@@ -27,16 +27,18 @@ export interface TrainingScreenProps {
 }
 
 /** Human-friendly labels for each phase shown on the progress rail. */
+// Plain-language phase labels (no jargon like "Model"/"Gate"/"Baseline") so it's
+// obvious what each step is. Shown in the rail with a "Step N of M" position.
 const PHASE_LABELS: Record<Phase, string> = {
-  intro: 'Intro',
-  teach: 'Teach',
-  model: 'Model',
-  guided_practice: 'Practice',
+  intro: 'Get set up',
+  teach: 'Learn the steps',
+  model: "See it done",
+  guided_practice: 'Practice with help',
   baseline_assess: 'Baseline',
-  readiness_check: 'Readiness',
+  readiness_check: 'Ready check',
   level_gate: 'Gate',
-  roleplay_demo: 'Roleplay',
-  debrief: 'Debrief',
+  roleplay_demo: 'Live rep',
+  debrief: 'Your results',
 };
 
 /**
@@ -425,8 +427,14 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   }
 
   // ───────── LIVE ─────────
+  const stepNumber = currentIndex >= 0 ? currentIndex + 1 : 1;
   const rail = (
     <div className="live-rail">
+      {/* Unmistakable "where you are": Step N of M + the current phase name. */}
+      <div className="phase-now" data-testid="phase-now">
+        <span className="phase-now__step">Step {stepNumber} of {PHASE_ORDER.length}</span>
+        <span className="phase-now__name">{PHASE_LABELS[phase]}</span>
+      </div>
       <nav className="phase-stepper" aria-label="Lesson progress" data-testid="phase-indicator">
         {PHASE_ORDER.map((p, i) => {
           const state = i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'upcoming';

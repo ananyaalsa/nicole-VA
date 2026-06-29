@@ -591,3 +591,8 @@
 @media (prefers-reduced-motion: reduce) {
   .lesson-card, .picker-cta-bar__btn, .session-aura, .session-coach-avatar { transition: none; }
 }
+
+/* ── "Where you are" header in the LiveRoom rail ─────────────────────────── */
+.phase-now { display: flex; flex-direction: column; gap: 1px; padding: 2px 2px 8px; }
+.phase-now__step { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+.phase-now__name { font-size: 1.05rem; font-weight: 700; color: var(--text); }

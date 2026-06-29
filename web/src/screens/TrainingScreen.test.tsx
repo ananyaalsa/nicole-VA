@@ -191,12 +191,16 @@ describe('TrainingScreen', () => {
     expect(arg.lesson.title).toBe(LESSONS[1].title);
   });
 
-  it('the phase indicator shows the current phase label', () => {
+  it('shows where you are: a Step N of M header + plain phase labels', () => {
     const api = render(<TrainingScreen />);
     enterRoom(api);
+    // Plain-language label (no raw key, no jargon) in the stepper.
     const indicator = api.getByTestId('phase-indicator');
-    // 'intro' should surface a human label, not the raw key.
-    expect(indicator.textContent?.toLowerCase()).toContain('intro');
+    expect(indicator.textContent?.toLowerCase()).toContain('get set up');
+    // And an unmistakable "Step 1 of 7" position header.
+    const now = api.getByTestId('phase-now');
+    expect(now.textContent).toMatch(/step 1 of 7/i);
+    expect(now.textContent?.toLowerCase()).toContain('get set up');
   });
 
   it('auto-starts the lesson on entering the room (no separate Begin button)', () => {
