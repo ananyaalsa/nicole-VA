@@ -290,9 +290,15 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   const { phase } = session;
   const [started, setStarted] = useState(false);
   const [scoring, setScoring] = useState(false);
+  // Set when scoring the practice rep fails; shows a retry instead of a fake 0/10.
+  const [scoreError, setScoreError] = useState(false);
   const { token } = (useAuth() as { token?: string | null });
   const startedAtRef = useRef(Date.now());
-  const savedRef = useRef(false);
+  // The scorecard object we last persisted. Tracking by IDENTITY (not a boolean)
+  // means a SECOND rep — which produces a NEW scorecardResult object via "Again" —
+  // saves again, while a re-render with the same object never double-saves. The
+  // old boolean guard permanently blocked every rep after the first.
+  const savedScorecardRef = useRef<unknown>(null);
   const autoStartedRef = useRef(false);
 
   // Mounting this component IS the user's intent to begin (they tapped "Start
@@ -314,10 +320,12 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save run + post 'finished' once scorecardResult first becomes non-null.
+  // Save run + post 'finished' each time a NEW scorecardResult appears (one per
+  // completed rep, including replays). Guard by object identity so re-renders
+  // don't re-save the same result.
   useEffect(() => {
-    if (!session.scorecardResult || savedRef.current) return;
-    savedRef.current = true;
+    if (!session.scorecardResult || savedScorecardRef.current === session.scorecardResult) return;
+    savedScorecardRef.current = session.scorecardResult;
     const sc = session.scorecardResult;
     const transcriptText = session.practiceTranscript
       .map((l) => `${l.speaker === 'you' ? 'You' : l.speaker === 'rep' ? 'Rep' : 'Nicole'}: ${l.text}`)
@@ -370,8 +378,13 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   const handleFinishPractice = useCallback(async () => {
     if (scoring) return;
     setScoring(true);
+    setScoreError(false);
     try {
       await session.finishPractice();
+    } catch {
+      // The judge call failed. Don't show/save a fake 0 — surface a retry; the rep
+      // is still live (finishPractice threw before moving to debrief).
+      setScoreError(true);
     } finally {
       setScoring(false);
     }
@@ -526,7 +539,9 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         rail={rail}
         footer={
           <>
-            <span className="room-footer__turn">{speaking ? 'Speaking…' : started ? 'Live' : 'Ready'}</span>
+            <span className="room-footer__turn">
+              {scoreError ? "Couldn't score — try again" : speaking ? 'Speaking…' : started ? 'Live' : 'Ready'}
+            </span>
             <div className="room-footer__actions">
               {phase === 'roleplay_demo' && (
                 <button
@@ -536,7 +551,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
                   disabled={scoring}
                   onClick={() => void handleFinishPractice()}
                 >
-                  {scoring ? 'Scoring…' : "I'm done"}
+                  {scoring ? 'Scoring…' : scoreError ? 'Retry scoring' : "I'm done"}
                 </button>
               )}
             </div>

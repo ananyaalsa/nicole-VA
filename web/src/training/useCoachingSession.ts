@@ -180,6 +180,11 @@ export function useCoachingSession(
   // (re)connect after the user has begun — not on the initial render.
   const startedRef = useRef(false);
   const prospectActiveRef = useRef(false);
+  // True once the coach has been torn down for the live rep — the reliable signal
+  // that she must be RESTARTED for the debrief. Using this instead of the async
+  // `coach.connected` flag avoids a race where the socket hadn't finished closing
+  // yet when we reached debrief, leaving the coach down and the debrief silent.
+  const coachStoppedForRepRef = useRef(false);
 
   // Keep stable refs to the session start/stop so effects don't churn on every
   // re-render (useNicoleSession returns fresh closures each render).
@@ -289,22 +294,14 @@ export function useCoachingSession(
   const finishPractice = useCallback(async () => {
     const transcript = buildPracticeTranscript();
     const dims = lessonDimensions(lesson);
-    let sc: Scorecard;
-    try {
-      sc = await requestScore({ kind: 'training', dimensions: dims, transcript }, token ?? undefined);
-    } catch {
-      sc = {
-        overallScore: 0,
-        band: 'needs_work',
-        scores: dims.map((d) => ({ dimensionId: d.id, label: d.label, score: 0 as const, band: 'missing' as const, rationale: 'Could not grade.', evidenceQuote: null })),
-        signals: { talkRatioPct: 0, questionCount: 0, longestMonologueWords: 0 },
-        headline: 'Could not grade that run.',
-        worked: { note: '', quote: null },
-        fix: { note: 'Try again.', quote: null, why: '' },
-        nextTime: 'Run it again.',
-        spoken: 'Let us run that again.',
-      };
-    }
+    // Score FIRST, before tearing the rep down or moving to debrief. If the judge
+    // fails we throw — we do NOT fabricate a fake 0/10 scorecard (that got saved to
+    // history as a score the learner never earned). The caller surfaces a retry and
+    // the rep stays intact so they can try scoring again.
+    const sc: Scorecard = await requestScore(
+      { kind: 'training', dimensions: dims, transcript },
+      token ?? undefined,
+    );
     setPracticeTranscript(transcript);
     setScorecardResult(sc);
     if (prospectActiveRef.current) {
@@ -426,6 +423,7 @@ export function useCoachingSession(
       // getUserMedia (starting both in the same synchronous tick made the second
       // getUserMedia hang on a device-busy race → the prospect never connected).
       coachStopRef.current();
+      coachStoppedForRepRef.current = true;
       if (!prospectActiveRef.current) {
         prospectActiveRef.current = true;
         sentProspectOpenRef.current = false; // allow the opener to fire on connect
@@ -447,8 +445,11 @@ export function useCoachingSession(
       }
       // Returning to a coach-led phase AFTER the rep (i.e. debrief): the coach was
       // torn down for the rep, so restart her and kick her with this phase's
-      // overlay so she opens the debrief herself.
-      if (phase === 'debrief' && !coach.connected) {
+      // overlay so she opens the debrief herself. Gate on the ref we set when we
+      // stopped her (NOT the async coach.connected flag, which could still read
+      // true mid-close and skip the restart → silent debrief).
+      if (phase === 'debrief' && coachStoppedForRepRef.current) {
+        coachStoppedForRepRef.current = false;
         reconnectOverlaySeenRef.current = coachOverlayRef.current;
         const overlayNow = coachOverlayRef.current;
         void coachStartRef.current().then(() => {

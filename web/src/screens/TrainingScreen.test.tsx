@@ -280,4 +280,23 @@ describe('TrainingScreen', () => {
       undefined,
     );
   });
+
+  it('saves AGAIN when a second rep produces a new scorecard (replay is not lost)', async () => {
+    const saveRunMock = vi.fn(async () => ({ id: 1 }));
+    const api = renderTrainingAtPhase(
+      'debrief',
+      { scorecardResult: { ...SAMPLE_SCORECARD, overallScore: 5.0 }, practiceTranscript: [{ speaker: 'you', text: 'rep one' }] },
+      { saveRun: saveRunMock },
+    );
+    await waitFor(() => expect(saveRunMock).toHaveBeenCalledTimes(1));
+    // Simulate a replay producing a NEW scorecard object (different identity).
+    Object.assign(fake, { scorecardResult: { ...SAMPLE_SCORECARD, overallScore: 8.0 } });
+    api.rerender(<TrainingScreen />);
+    // The second rep must be persisted too — the old boolean guard dropped it.
+    await waitFor(() => expect(saveRunMock).toHaveBeenCalledTimes(2));
+    expect(saveRunMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'training', score: 8.0 }),
+      undefined,
+    );
+  });
 });

@@ -258,6 +258,40 @@ describe('RoleplayScreen', () => {
     expect(screen.getByText('7.2')).toBeInTheDocument();
   });
 
+  it('on a scoring FAILURE shows a retry — never a fake 0/10, never saves', async () => {
+    // The judge call fails. We must NOT fabricate a 0/10 scorecard or persist it.
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }) as unknown as typeof fetch);
+    render(<RoleplayScreen />);
+    await pickThrough();
+    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    fireEvent.click(screen.getByTestId('end-score-button'));
+    // The score-error screen appears with a retry; NOT a results card.
+    expect(await screen.findByTestId('roleplay-score-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('session-results')).toBeNull();
+    expect(screen.getByTestId('retry-score-button')).toBeInTheDocument();
+    // A failed score is never saved to history (no fake 0).
+    expect(saveRun).not.toHaveBeenCalled();
+  });
+
+  it('retry after a failed score succeeds and shows the results', async () => {
+    // Fail only the /score request, and only until we flip `healScore`. Keying on
+    // the URL avoids a blind call-counter that other fetches (status posts) skew.
+    let healScore = false;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.includes('/score') && !healScore) throw new Error('network');
+      return { ok: true, json: async () => ({ scorecard: { ...DEFAULT_SCORECARD, overallScore: 6.1 } }) };
+    }) as unknown as typeof fetch);
+    render(<RoleplayScreen />);
+    await pickThrough();
+    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    fireEvent.click(screen.getByTestId('end-score-button'));
+    await screen.findByTestId('retry-score-button');
+    healScore = true; // the scoring service recovers
+    fireEvent.click(screen.getByTestId('retry-score-button'));
+    expect(await screen.findByTestId('session-results')).toBeInTheDocument();
+    await waitFor(() => expect(saveRun).toHaveBeenCalled());
+  });
+
   it('offers a custom builder for the custom profile', async () => {
     fetchProfiles.mockResolvedValueOnce([
       { ...SALES_PROFILE, id: 'custom', name: 'Custom' },

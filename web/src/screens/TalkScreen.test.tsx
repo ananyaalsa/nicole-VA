@@ -166,16 +166,14 @@ describe('TalkScreen', () => {
     expect(msg.toLowerCase()).toContain('do not respond');
   });
 
-  it('mutes the mic when Talk goes to the background (and does NOT auto-unmute on return)', async () => {
+  it('ENDS the Talk session when it goes to the background (frees the Gemini session)', async () => {
     sessionState = { ...sessionState, connected: true, micOn: true };
-    // Start in the foreground (live, mic on), then go to background.
+    // Start in the foreground (live), then switch to another mode (backgrounded).
     const { rerender } = render(<TalkScreen backgrounded={false} />);
+    stop.mockClear();
     await act(async () => { rerender(<TalkScreen backgrounded={true} />); });
-    // Entering background mutes the mic so Talk-Nicole stops listening.
-    expect(setMic).toHaveBeenCalledWith(false);
-    setMic.mockClear();
-    // Returning to the foreground must NOT auto-unmute — the user has to re-engage.
-    await act(async () => { rerender(<TalkScreen backgrounded={false} />); });
-    expect(setMic).not.toHaveBeenCalledWith(true);
+    // Entering the background stops the live session so it stops burning credits
+    // while Training/Roleplay (their own paid sessions) are active.
+    expect(stop).toHaveBeenCalled();
   });
 });

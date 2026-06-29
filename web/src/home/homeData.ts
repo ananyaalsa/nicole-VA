@@ -89,9 +89,12 @@ interface ScRow { dimension?: string; hit?: boolean }
 function readRows(card: unknown): ScRow[] {
   return Array.isArray(card) ? card.filter((r): r is ScRow => !!r && typeof r === 'object') : [];
 }
-/** Local YYYY-MM-DD key for a date. */
+/** Local YYYY-MM-DD key for a date (month is 1-indexed + zero-padded, so the key
+ *  is a real date string and safe to compare/sort lexicographically). */
 function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 /** Compute streak, last score + trend, and weakest dimension from runs. */

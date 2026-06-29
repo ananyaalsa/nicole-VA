@@ -281,25 +281,23 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   teardownRef.current = () => { camera.stop(); stop(); };
   useEffect(() => () => teardownRef.current(), []);
 
-  // Pause Talk in the background: when another mode takes over, mute the mic so
-  // Talk-Nicole stops listening — but keep the session + audio alive so her
-  // current sentence finishes.
+  // Pause Talk in the background by ENDING its live session entirely. When the
+  // user switches to Training or Roleplay (each of which opens its OWN paid Gemini
+  // session), keeping the Talk session connected too would burn Gemini credits for
+  // a session nobody is using — and run two paid sessions at once. So we stop it.
   //
-  // On RETURN we deliberately do NOT auto-unmute. The user came back from a
-  // Training/Roleplay call; the Talk session is technically still live, but they
-  // did not click anything to resume talking, so Nicole must NOT start listening
-  // (or speaking) on her own. The mic stays muted until the user taps unmute —
-  // matching "I never clicked, so why is she talking/listening?". The mic button
-  // reflects the muted state so re-engaging is one tap.
-  const wasBgForMicRef = useRef(backgrounded);
+  // Nothing important is lost: the transcript stays in React state, durable facts
+  // were already saved to memory, and returning shows the normal "Start talking"
+  // entry so Nicole never resumes listening/speaking on her own (matching "I never
+  // clicked, so why is she talking?"). One tap reconnects.
+  const wasBgRef = useRef(backgrounded);
   useEffect(() => {
-    if (!connected) return;
-    const enteringBg = !wasBgForMicRef.current && backgrounded;
-    wasBgForMicRef.current = backgrounded;
-    if (enteringBg && micOn) {
-      setMic(false); // mute while backgrounded; stays muted on return
-    }
-  }, [backgrounded, connected, micOn, setMic]);
+    const enteringBg = !wasBgRef.current && backgrounded;
+    wasBgRef.current = backgrounded;
+    // teardownRef wraps camera.stop()+stop() and is kept current each render, so
+    // this effect depends only on the primitives that define the edge.
+    if (enteringBg && connected) teardownRef.current();
+  }, [backgrounded, connected]);
 
   // One-tap-to-send: when a home starter is tapped we stash its prompt and call
   // start(); once the session connects, seed that prompt as the first turn.

@@ -475,6 +475,11 @@ function RoleplayRoom({
   // True from the moment "End & score" is tapped until the report is ready, so we
   // leave the call screen and show a "generating your report…" state (no stuck UI).
   const [scoring, setScoring] = useState(false);
+  // Set when the judge call fails. We do NOT fabricate a 0/10 scorecard or save it
+  // (that polluted history with fake zeros) — we show a retry instead.
+  const [scoreError, setScoreError] = useState(false);
+  // Captured at end-of-call so "Retry scoring" can re-run without the live session.
+  const scoredLinesRef = useRef<ResultLine[]>([]);
   // Auto end-of-call prompt: appears when either side says goodbye, offering
   // End & score / Replay (dismissible so a false 'later' mid-call doesn't trap).
   const [endPromptOpen, setEndPromptOpen] = useState(false);
@@ -516,15 +521,12 @@ function RoleplayRoom({
   // Debounced so the Speaking/Listening label doesn't flicker on brief voice dips.
   const speaking = useDebouncedSpeaking(amplitude > SPEAKING_AMP);
 
-  const endAndScore = useCallback(async () => {
-    if (scoringRef.current) return; // ignore double-clicks during scoring
-    scoringRef.current = true;
-    setScoring(true); // leave the call screen → show "generating your report…"
-    const lines: ResultLine[] = transcript.map((l) => ({
-      speaker: l.speaker === 'you' ? 'you' : 'rep',
-      text: l.text,
-    }));
-    stop();
+  // Run the judge on the captured transcript, then save + post status. Separated
+  // from endAndScore so "Retry scoring" can re-run it after a transient failure
+  // WITHOUT needing the (already stopped) live session.
+  const runScoring = useCallback(async (lines: ResultLine[]) => {
+    setScoreError(false);
+    setScoring(true);
     let sc: Scorecard;
     try {
       sc = await requestScore(
@@ -538,19 +540,12 @@ function RoleplayRoom({
         token ?? undefined,
       );
     } catch {
-      sc = {
-        overallScore: 0,
-        band: 'needs_work',
-        scores: dimensions.length
-          ? dimensions.map((d) => ({ dimensionId: d.id, label: d.label, score: 0, band: 'missing', rationale: '', evidenceQuote: null }))
-          : [{ dimensionId: 'engagement', label: 'Engagement', score: 0, band: 'missing', rationale: '', evidenceQuote: null }],
-        signals: { talkRatioPct: 0, questionCount: 0, longestMonologueWords: 0 },
-        headline: 'Could not score — network error.',
-        worked: { note: '', quote: null },
-        fix: { note: '', quote: null, why: '' },
-        nextTime: '',
-        spoken: '',
-      };
+      // Do NOT fabricate a 0/10 scorecard or save it — that polluted history with
+      // fake zeros and showed the user a "0.0" they never earned. Surface a retry.
+      scoringRef.current = false;
+      setScoring(false);
+      setScoreError(true);
+      return;
     }
     setScResult(sc);
     setSaving(true);
@@ -577,7 +572,24 @@ function RoleplayRoom({
       { mode: 'roleplay', state: 'finished', skill: `${persona.name} · ${scenario.name}`, startedAt: startedAtRef.current, finishedAt: Date.now(), score: sc.overallScore },
       token ?? undefined,
     );
-  }, [transcript, dimensions, stop, profileId, persona, scenario, alias, token]);
+  }, [dimensions, profileId, persona, scenario, alias, token]);
+
+  const endAndScore = useCallback(async () => {
+    if (scoringRef.current) return; // ignore double-clicks during scoring
+    scoringRef.current = true;
+    const lines: ResultLine[] = transcript.map((l) => ({
+      speaker: l.speaker === 'you' ? 'you' : 'rep',
+      text: l.text,
+    }));
+    scoredLinesRef.current = lines;
+    stop();
+    await runScoring(lines);
+  }, [transcript, stop, runScoring]);
+
+  const retryScoring = useCallback(() => {
+    scoringRef.current = true;
+    void runScoring(scoredLinesRef.current);
+  }, [runScoring]);
 
   // Replay the SAME scene from scratch: wipe the conversation (it is NOT saved —
   // only End & score persists), re-arm the end prompt, turn the mic back on, and
@@ -596,6 +608,27 @@ function RoleplayRoom({
     setEndPromptOpen(false);
     setMic(true);
   }, [setMic]);
+
+  // SCORING-FAILED stage — the judge call failed. We DON'T show a fake 0/10 or
+  // save it; we let the user retry (the transcript is captured) or just exit.
+  if (scoreError && !scResult) {
+    return (
+      <div className="roleplay roleplay--generating" data-testid="roleplay-score-error">
+        <div className="rp-generating">
+          <p className="rp-generating__title">Couldn't score that call</p>
+          <p className="rp-generating__sub">The scoring service didn't respond. Your conversation is safe — try again.</p>
+          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+            <button type="button" className="picker-cta-bar__btn" data-testid="retry-score-button" onClick={retryScoring}>
+              Try scoring again
+            </button>
+            <button type="button" className="results-secondary" data-testid="score-error-exit" onClick={onDone}>
+              Exit without scoring
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // GENERATING stage — between "End & score" and the report being ready. We
   // leave the call screen immediately so the user sees clear progress, not a
@@ -715,7 +748,7 @@ function RoleplayRoom({
                 type="button"
                 className="ctrl-btn ctrl-btn--end"
                 data-testid="end-score-button"
-                disabled={saving}
+                disabled={scoring || saving}
                 onClick={() => void endAndScore()}
               >
                 End &amp; score
