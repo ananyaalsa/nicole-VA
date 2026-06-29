@@ -1,8 +1,8 @@
 // server/src/session/routes.ts
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
-import { JWT_SECRET } from '../auth/middleware.js';
+import { resolveUserId } from '../auth/middleware.js';
+import { readJsonBody } from '../http/readBody.js';
 import { setLiveStatus, getLiveStatus, type LiveStatus } from './liveStatus.js';
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -15,32 +15,19 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function resolveUserId(req: IncomingMessage): string {
-  const header = req.headers.authorization ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) return config.userId;
-  try { return (jwt.verify(token, JWT_SECRET) as { sub: string }).sub; } catch { return config.userId; }
-}
-
-function readBody(req: IncomingMessage): Promise<any> {
-  return new Promise((resolve) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch { resolve({}); } });
-    req.on('error', () => resolve({}));
-  });
-}
-
 export async function handleSessionRoute(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (!url.pathname.startsWith('/api/session')) return false;
-  const userId = resolveUserId(req);
 
   if (req.method === 'OPTIONS') { sendJson(res, 204, {}); return true; }
 
+  // Per-user; requires auth in production (dev falls back to the default user).
+  const userId = resolveUserId(req, config.userId);
+  if (!userId) { sendJson(res, 401, { error: 'Unauthorized' }); return true; }
+
   if (url.pathname === '/api/session/status') {
     if (req.method === 'POST') {
-      const b = await readBody(req);
+      const b = await readJsonBody(req);
       const mode = b.mode === 'roleplay' ? 'roleplay' : 'training';
       const state = ['entered', 'active', 'finished', 'left'].includes(b.state) ? b.state : 'entered';
       const status: LiveStatus = {

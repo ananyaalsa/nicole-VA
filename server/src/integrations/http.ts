@@ -1,5 +1,27 @@
 // Tiny HTTP helpers shared by the provider adapters. Node 18+ has global fetch.
 
+/** An upstream-provider HTTP failure. Carries the status for branching but NOT
+ *  the raw response body — that can contain tokens/workspace metadata that must
+ *  never propagate to a client-facing error. The body is logged server-side only. */
+export class ProviderHttpError extends Error {
+  constructor(public readonly status: number, public readonly url: string) {
+    super(`Provider request failed (${status})`);
+    this.name = 'ProviderHttpError';
+  }
+}
+
+/** Log the upstream failure detail server-side (never returned to the client). */
+function logProviderError(method: string, url: string, status: number, body: unknown): void {
+  // eslint-disable-next-line no-console
+  console.error(`[integrations] ${method} ${redactUrl(url)} → ${status}`, typeof body === 'string' ? body.slice(0, 500) : body);
+}
+
+/** Strip query strings (may carry tokens) from a URL before logging. */
+function redactUrl(url: string): string {
+  const i = url.indexOf('?');
+  return i >= 0 ? url.slice(0, i) : url;
+}
+
 /** POST application/x-www-form-urlencoded (the OAuth token-exchange shape). */
 export async function postForm(
   url: string,
@@ -14,7 +36,8 @@ export async function postForm(
   const text = await res.text();
   const body = text ? safeJson(text) : {};
   if (!res.ok) {
-    throw new Error(`POST ${url} → ${res.status}: ${typeof body === 'object' ? JSON.stringify(body) : text}`);
+    logProviderError('POST', url, res.status, body);
+    throw new ProviderHttpError(res.status, redactUrl(url));
   }
   return body;
 }
@@ -41,7 +64,8 @@ export async function apiFetch(
   const text = await res.text();
   const body = text ? safeJson(text) : {};
   if (!res.ok) {
-    throw new Error(`${opts.method ?? 'GET'} ${url} → ${res.status}: ${typeof body === 'object' ? JSON.stringify(body) : text}`);
+    logProviderError(opts.method ?? 'GET', url, res.status, body);
+    throw new ProviderHttpError(res.status, redactUrl(url));
   }
   return body;
 }

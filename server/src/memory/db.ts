@@ -12,7 +12,29 @@ const { Pool } = pg;
 export const pool = new Pool({
   connectionString: config.databaseUrl,
   ssl: { rejectUnauthorized: false },
+  // Bounded pool with fail-fast timeouts so the API degrades gracefully under
+  // load instead of hanging forever on a stuck/slow database:
+  //  - max: cap concurrent DB connections (Supabase has its own ceiling).
+  //  - connectionTimeoutMillis: give up acquiring a connection rather than queueing
+  //    requests indefinitely when the pool is exhausted.
+  //  - idleTimeoutMillis: release idle clients so we don't hold connections open.
+  //  - statement_timeout: a runaway query can't pin a connection forever.
+  max: Number(process.env.PG_POOL_MAX ?? 10),
+  connectionTimeoutMillis: 8_000,
+  idleTimeoutMillis: 30_000,
+  statement_timeout: 20_000,
 });
+
+// A pool 'error' on an idle client (e.g. the DB dropped the connection) is
+// emitted on the pool itself; without a listener it crashes the process. Log and
+// let the pool recycle the client. (Guarded so a mocked pool in tests, which has
+// no event emitter, doesn't throw at import time.)
+if (typeof (pool as { on?: unknown }).on === 'function') {
+  pool.on('error', (err: Error) => {
+    // eslint-disable-next-line no-console
+    console.error('[db] idle client error (pool will recycle):', err.message);
+  });
+}
 
 /** Shape of a row as it comes back from Postgres (snake_case columns). */
 interface MemoryRow {

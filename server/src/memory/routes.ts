@@ -6,6 +6,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { config } from '../config.js';
 import { loadFacts, saveFact, forgetFact } from './db.js';
 import { requireAuth } from '../auth/middleware.js';
+import { readJsonBody } from '../http/readBody.js';
+
+/** Max length of a single stored memory fact (chars). Prevents a user from
+ *  storing a huge string that bloats the table + slows every memory load. */
+const MAX_FACT_LEN = 10_000;
+/** Max length of a memory key. */
+const MAX_KEY_LEN = 200;
 
 /** Keys the user sets in their profile/settings — tagged source='settings'. */
 const PROFILE_KEYS = new Set(['user_about', 'user_goals', 'user_phone', 'user_name']);
@@ -19,21 +26,6 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
   });
   res.end(text);
-}
-
-function readBody(req: IncomingMessage): Promise<any> {
-  return new Promise((resolve) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch {
-        resolve({});
-      }
-    });
-    req.on('error', () => resolve({}));
-  });
 }
 
 /**
@@ -63,9 +55,17 @@ export async function handleMemoryRoute(
       return true;
     }
     if (req.method === 'POST') {
-      const body = await readBody(req);
-      if (!body.fact) {
+      const body = await readJsonBody(req);
+      if (!body.fact || typeof body.fact !== 'string') {
         sendJson(res, 400, { error: 'fact is required' });
+        return true;
+      }
+      if (body.fact.length > MAX_FACT_LEN) {
+        sendJson(res, 400, { error: 'fact is too long' });
+        return true;
+      }
+      if (body.key != null && (typeof body.key !== 'string' || body.key.length > MAX_KEY_LEN)) {
+        sendJson(res, 400, { error: 'invalid key' });
         return true;
       }
       const key = body.key ?? slugify(body.fact);

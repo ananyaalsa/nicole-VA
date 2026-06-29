@@ -5,9 +5,22 @@ import { pool } from '../memory/db.js';
 import { requireAuth, JWT_SECRET } from './middleware.js';
 import { config } from '../config.js';
 import { readJsonBody } from '../http/readBody.js';
+import { RateLimiter, clientIp } from '../http/rateLimit.js';
 
 /** bcrypt work factor. 12 is the 2025 baseline for password hashing. */
 const BCRYPT_ROUNDS = 12;
+/** Per-IP brute-force guards: 10 login attempts / 15 min, 5 signups / hour. */
+const loginLimiter = new RateLimiter(10, 15 * 60 * 1000);
+const signupLimiter = new RateLimiter(5, 60 * 60 * 1000);
+
+function tooMany(res: ServerResponse, retryAfterSec: number): void {
+  res.writeHead(429, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': config.frontendUrl,
+    'Retry-After': String(retryAfterSec),
+  });
+  res.end(JSON.stringify({ error: 'Too many attempts. Please wait and try again.' }));
+}
 /** A throwaway bcrypt hash compared against when a login email doesn't exist, so
  *  the response time matches the real-user path and emails can't be enumerated
  *  via timing. (Hash of a random string; the value is irrelevant.) */
@@ -62,6 +75,8 @@ export async function handleAuthRoute(
 
   // POST /api/auth/signup
   if (url.pathname === '/api/auth/signup' && req.method === 'POST') {
+    const ip = clientIp(req);
+    if (!signupLimiter.hit(ip)) { tooMany(res, signupLimiter.retryAfterSec(ip)); return true; }
     const body = await readJsonBody(req);
     const { email, password, displayName } = body;
     if (!email || !password || !displayName) {
@@ -99,6 +114,8 @@ export async function handleAuthRoute(
 
   // POST /api/auth/login
   if (url.pathname === '/api/auth/login' && req.method === 'POST') {
+    const ip = clientIp(req);
+    if (!loginLimiter.hit(ip)) { tooMany(res, loginLimiter.retryAfterSec(ip)); return true; }
     const body = await readJsonBody(req);
     const { email, password } = body;
     if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {

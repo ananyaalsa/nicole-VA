@@ -153,7 +153,11 @@ export async function handleIntegrationsRoute(
       });
       sendCallbackBridge(res, `connected:${parsed.provider}`);
     } catch (err) {
-      sendCallbackBridge(res, `error:${(err as Error).message.slice(0, 80)}`);
+      // Don't surface the upstream error detail to the browser (it can carry
+      // token/provider internals). Log it; tell the user a generic failure.
+      // eslint-disable-next-line no-console
+      console.error('[integrations] OAuth callback exchange failed', err instanceof Error ? err.message : err);
+      sendCallbackBridge(res, 'error:exchange_failed');
     }
     return true;
   }

@@ -40,7 +40,18 @@ export async function handleWeatherRoute(
       return true;
     }
     if (lat && lon) {
-      const w = await weatherAt(Number(lat), Number(lon));
+      const latNum = Number(lat);
+      const lonNum = Number(lon);
+      // Validate the coordinates so junk (NaN, out-of-range) never reaches the
+      // upstream weather API as a malformed query.
+      if (
+        !Number.isFinite(latNum) || !Number.isFinite(lonNum) ||
+        latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180
+      ) {
+        sendJson(res, 400, { error: 'lat must be -90..90 and lon -180..180' });
+        return true;
+      }
+      const w = await weatherAt(latNum, lonNum);
       sendJson(res, 200, w);
       return true;
     }

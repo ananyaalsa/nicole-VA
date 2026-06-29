@@ -58,7 +58,13 @@ export const notionAdapter: ProviderAdapter = {
       }),
     });
     const body = (await res.json()) as any;
-    if (!res.ok) throw new Error(`Notion token exchange ${res.status}: ${JSON.stringify(body)}`);
+    if (!res.ok) {
+      // Log the detail server-side only; never embed the response body in the
+      // thrown error (it can contain workspace/bot metadata that reaches a client).
+      // eslint-disable-next-line no-console
+      console.error('[integrations] Notion token exchange failed', res.status, JSON.stringify(body).slice(0, 500));
+      throw new Error(`Notion token exchange failed (${res.status})`);
+    }
     return {
       accessToken: body.access_token,
       refreshToken: null,
