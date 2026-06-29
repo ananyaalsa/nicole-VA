@@ -15,12 +15,15 @@ export const REALTIME_INPUT_CONFIG = {
   automaticActivityDetection: {
     startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
     endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
-    prefixPaddingMs: 600,
+    // 300ms: a shorter onset pad so the FIRST word of an utterance isn't clipped
+    // before the VAD has "armed". 600ms was long enough that quiet/quick openers
+    // ("hi", "so…") could be swallowed, which read as "it didn't hear me / I had
+    // to repeat myself louder". 300ms still suppresses pre-speech room noise.
+    prefixPaddingMs: 300,
     // 1000ms: tolerate natural pauses BETWEEN WORDS so one slow-spoken utterance
     // stays ONE turn (not many short turns → fragmented bubbles + reply-spam).
-    // The mic input boost ensures the speech itself reaches the VAD, so this
-    // longer window doesn't make her seem deaf. The client's sustained-frame
-    // barge-in gate still lets the user interrupt her quickly.
+    // The client's sustained-frame barge-in gate still lets the user interrupt
+    // her quickly, so this longer end-window doesn't make her seem deaf.
     silenceDurationMs: 1000,
   },
 } as const;

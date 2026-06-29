@@ -596,3 +596,13 @@
 .phase-now { display: flex; flex-direction: column; gap: 1px; padding: 2px 2px 8px; }
 .phase-now__step { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
 .phase-now__name { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+
+/* ── Debrief report: own scroll area ─────────────────────────────────────────
+   .training--session is 100dvh + overflow:hidden, so the full-length report has
+   to scroll inside its own container (TopBar stays pinned above it). */
+.session-report-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 32px;
+}

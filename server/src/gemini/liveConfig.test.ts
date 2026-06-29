@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { REALTIME_INPUT_CONFIG, buildLiveConfig } from './liveConfig.js';
 
 describe('REALTIME_INPUT_CONFIG', () => {
-  it('matches the CHAT VAD values exactly', () => {
+  it('uses sensitive onset VAD that does not clip the first word', () => {
     expect(REALTIME_INPUT_CONFIG).toEqual({
       automaticActivityDetection: {
         startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
         endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
-        prefixPaddingMs: 600,
+        // Short onset pad so a quick/quiet opener ("hi", "so…") isn't swallowed
+        // before the VAD arms (600ms was long enough to drop it → "had to repeat").
+        prefixPaddingMs: 300,
         // Patient (1000ms) so a slow-spoken utterance with pauses stays one turn.
         silenceDurationMs: 1000,
       },

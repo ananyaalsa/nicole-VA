@@ -14,6 +14,7 @@ const toggleMic = vi.fn();
 const setVoice = vi.fn();
 const sendText = vi.fn();
 const sendVideoFrame = vi.fn();
+const setMic = vi.fn();
 let sessionState = {
   connected: false,
   micOn: true,
@@ -23,6 +24,7 @@ let sessionState = {
   start,
   stop,
   toggleMic,
+  setMic,
   setVoice,
   sendText,
   sendVideoFrame,
@@ -81,9 +83,10 @@ beforeEach(() => {
   toggleMic.mockClear();
   setVoice.mockClear();
   sendText.mockClear();
+  setMic.mockClear();
   mockFetchLiveStatus.mockClear();
   mockFetchLiveStatus.mockResolvedValue(null);
-  sessionState = { connected: false, micOn: true, transcript: [], realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setVoice, sendText, sendVideoFrame };
+  sessionState = { connected: false, micOn: true, transcript: [], realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
   cameraState = { on: false, stream: null, facing: 'user', start: cameraStart, stop: cameraStop, flip: vi.fn(), error: null };
 });
 
@@ -141,7 +144,7 @@ describe('TalkScreen', () => {
     expect(onTrain).toHaveBeenCalled();
   });
 
-  it('sends a [STATUS] directive when returning from backgrounded=true to false while connected', async () => {
+  it('feeds a SILENT [STATUS] context on return (Nicole must NOT speak unprompted)', async () => {
     // Session must be connected so the effect fires.
     sessionState = { ...sessionState, connected: true };
     // fetchLiveStatus returns a finished training status.
@@ -153,8 +156,26 @@ describe('TalkScreen', () => {
       rerender(<TalkScreen backgrounded={false} />);
     });
 
-    // sendText should have been called once with a [STATUS] string.
+    // sendText should have been called once with a SILENT [STATUS] context line —
+    // the user came back without re-engaging, so Nicole must be told to stay quiet
+    // (not the old "ask how it went" directive that made her talk unprompted).
     expect(sendText).toHaveBeenCalledTimes(1);
-    expect(sendText.mock.calls[0][0]).toMatch(/^\[STATUS\]/);
+    const msg = sendText.mock.calls[0][0] as string;
+    expect(msg).toMatch(/^\[STATUS/);
+    expect(msg.toLowerCase()).toContain('silent');
+    expect(msg.toLowerCase()).toContain('do not respond');
+  });
+
+  it('mutes the mic when Talk goes to the background (and does NOT auto-unmute on return)', async () => {
+    sessionState = { ...sessionState, connected: true, micOn: true };
+    // Start in the foreground (live, mic on), then go to background.
+    const { rerender } = render(<TalkScreen backgrounded={false} />);
+    await act(async () => { rerender(<TalkScreen backgrounded={true} />); });
+    // Entering background mutes the mic so Talk-Nicole stops listening.
+    expect(setMic).toHaveBeenCalledWith(false);
+    setMic.mockClear();
+    // Returning to the foreground must NOT auto-unmute — the user has to re-engage.
+    await act(async () => { rerender(<TalkScreen backgrounded={false} />); });
+    expect(setMic).not.toHaveBeenCalledWith(true);
   });
 });

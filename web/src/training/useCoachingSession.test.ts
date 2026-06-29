@@ -57,10 +57,12 @@ vi.mock('../engine/useNicoleSession', () => {
         amplitude: 0,
         start: async () => {
           inst!.started = true;
+          inst!.stopped = false; // a fresh start clears the stopped flag
           inst!.startCalls += 1;
         },
         stop: () => {
           inst!.stopped = true;
+          inst!.started = false; // reflect that the session is no longer live
           inst!.stopCalls += 1;
         },
         toggleMic: () => {},
@@ -110,12 +112,14 @@ function renderCoaching(lesson = LESSONS[0]) {
       ];
       rerender();
     },
-    /** Push a line into the coach (you) or prospect (rep) transcript with an
-     *  EXPLICIT sequenced id (`l..._<seq>`) so ordering tests are deterministic. */
+    /** Push a line into the PROSPECT transcript with an EXPLICIT sequenced id
+     *  (`lx_<seq>`) so ordering tests are deterministic. During the live rep the
+     *  prospect session is the ONLY live one, so it captures BOTH the user's mic
+     *  ('you') AND the prospect's replies ('rep' → speaker 'nicole') — mirroring
+     *  the real single-session rep. */
     pushLine(who: 'you' | 'rep', seq: number, text: string) {
-      const mode = who === 'you' ? 'coach' : 'prospect';
       const speaker = who === 'you' ? 'you' : 'nicole';
-      const inst = instances.find((i) => i.options.mode === mode);
+      const inst = instances.find((i) => i.options.mode === 'prospect');
       if (!inst) return;
       inst.transcript = [
         ...inst.transcript,
@@ -208,7 +212,12 @@ describe('useCoachingSession', () => {
     // readiness_check -> roleplay_demo (5 advances).
     for (let i = 0; i < 5; i++) act(() => result.current.advance());
     expect(result.current.phase).toBe('roleplay_demo');
+    // The prospect start is deferred one tick (so the browser releases the mic
+    // from the coach teardown before the prospect's getUserMedia) — wait for it.
+    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
     expect(prospect().started).toBe(true);
+    // And the COACH was torn down for the rep (single live session).
+    expect(coach().stopped).toBe(true);
 
     // Leaving roleplay_demo (-> debrief) stops the prospect.
     act(() => result.current.advance());

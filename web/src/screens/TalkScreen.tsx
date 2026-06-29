@@ -226,7 +226,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   );
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
-  const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, volume, muted, setVolume, setMuted } = session;
+  const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, setMic, volume, muted, setVolume, setMuted } = session;
 
   // "Connecting" guard so the Start button can't be spam-clicked between the tap
   // and the session going live (each extra click would open another session).
@@ -255,14 +255,20 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       const st = await fetchLiveStatus(token ?? undefined);
       if (!st) return;
       const skill = st.skill ? ` (${st.skill})` : '';
-      const line = st.state === 'finished'
-        ? `[STATUS] The user just COMPLETED a ${st.mode}${skill}${typeof st.score === 'number' ? `, scored ${st.score}/10` : ''}. If relevant, ask how it went; do not offer to start it again.`
+      // SILENT context only. The user came back without re-engaging (mic is
+      // muted), so Nicole must NOT speak on her own. This tells her what just
+      // happened so she has it ready IF the user brings it up — she does not
+      // volunteer it. (Previously this made her talk unprompted on return.)
+      const facts = st.state === 'finished'
+        ? `the user just COMPLETED a ${st.mode}${skill}${typeof st.score === 'number' ? `, scored ${st.score}/10` : ''}`
         : st.state === 'left'
-          ? `[STATUS] The user opened a ${st.mode}${skill} and LEFT WITHOUT completing it. Do NOT say "nice work finishing" or congratulate them — they did not finish.`
+          ? `the user opened a ${st.mode}${skill} and LEFT WITHOUT completing it (do NOT congratulate them on finishing — they did not finish)`
           : st.state === 'active'
-            ? `[STATUS] The user is mid-${st.mode}${skill}.`
-            : `[STATUS] The user opened ${st.mode} but did not start.`;
-      sendTextRef.current(line);
+            ? `the user is mid-${st.mode}${skill}`
+            : `the user opened ${st.mode} but did not start`;
+      sendTextRef.current(
+        `[STATUS — SILENT CONTEXT, DO NOT RESPOND] For your awareness only: ${facts}. Do NOT say anything now. Stay silent until the user speaks. If they ask about it later, you'll know.`,
+      );
     })();
   }, [backgrounded, connected, token]);
 
@@ -277,21 +283,23 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
   // Pause Talk in the background: when another mode takes over, mute the mic so
   // Talk-Nicole stops listening — but keep the session + audio alive so her
-  // current sentence finishes. Restore the mic when Talk returns to foreground.
-  const micBeforeBgRef = useRef<boolean | null>(null);
+  // current sentence finishes.
+  //
+  // On RETURN we deliberately do NOT auto-unmute. The user came back from a
+  // Training/Roleplay call; the Talk session is technically still live, but they
+  // did not click anything to resume talking, so Nicole must NOT start listening
+  // (or speaking) on her own. The mic stays muted until the user taps unmute —
+  // matching "I never clicked, so why is she talking/listening?". The mic button
+  // reflects the muted state so re-engaging is one tap.
+  const wasBgForMicRef = useRef(backgrounded);
   useEffect(() => {
     if (!connected) return;
-    if (backgrounded) {
-      if (micBeforeBgRef.current === null) {
-        micBeforeBgRef.current = micOn;
-        if (micOn) toggleMic(); // mute while backgrounded
-      }
-    } else if (micBeforeBgRef.current !== null) {
-      // Returned to foreground — restore prior mic state.
-      if (micBeforeBgRef.current && !micOn) toggleMic();
-      micBeforeBgRef.current = null;
+    const enteringBg = !wasBgForMicRef.current && backgrounded;
+    wasBgForMicRef.current = backgrounded;
+    if (enteringBg && micOn) {
+      setMic(false); // mute while backgrounded; stays muted on return
     }
-  }, [backgrounded, connected, micOn, toggleMic]);
+  }, [backgrounded, connected, micOn, setMic]);
 
   // One-tap-to-send: when a home starter is tapped we stash its prompt and call
   // start(); once the session connects, seed that prompt as the first turn.

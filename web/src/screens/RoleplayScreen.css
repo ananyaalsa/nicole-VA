@@ -487,6 +487,12 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* The parent .roleplay is 100dvh + overflow:hidden, so the full-length report
+     MUST scroll inside its own area or its lower half (scorecard + transcript +
+     the Done/Run-again buttons) is clipped with no way to reach it. */
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 32px;
 }
 
 /* ── Result ──────────────────────────────────────────────────────────────── */

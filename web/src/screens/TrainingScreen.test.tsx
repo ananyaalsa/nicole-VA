@@ -16,6 +16,12 @@ const fake = {
     text: string;
   }>,
   coachRealtime: { you: '', nicole: '' },
+  // Active-speaker views (prospect during the live rep, coach otherwise). The
+  // screen renders from these; default them to the coach's empty values.
+  activeTranscript: [] as Array<{ id: string; speaker: 'you' | 'nicole'; text: string }>,
+  activeRealtime: { you: '', nicole: '' },
+  activeAmplitude: 0,
+  inLiveRep: false,
   scorecardResult: null as null | {
     overallScore: number;
     band: 'needs_work' | 'developing' | 'proficient' | 'strong';
@@ -34,6 +40,7 @@ const fake = {
   start: vi.fn(async () => {}),
   stop: vi.fn(),
   advance: vi.fn(),
+  goLive: vi.fn(),
   markProgress: vi.fn(),
   finishPractice: vi.fn(async () => {}),
   replayPractice: vi.fn(),
@@ -106,6 +113,7 @@ beforeEach(() => {
   fake.start.mockClear();
   fake.stop.mockClear();
   fake.advance.mockClear();
+  fake.goLive.mockClear();
   fake.finishPractice.mockClear();
   fake.replayPractice.mockClear();
   fake.reteach.mockClear();
@@ -217,10 +225,18 @@ describe('TrainingScreen', () => {
     expect(screen.getByTestId('readiness-confirm')).toBeInTheDocument();
   });
 
-  it('readiness-confirm calls advance()', () => {
+  it('readiness-confirm jumps straight to the live rep (goLive, no gatekeeping)', () => {
     renderTrainingAtPhase('readiness_check');
     fireEvent.click(screen.getByTestId('readiness-confirm'));
-    expect(fake.advance).toHaveBeenCalled();
+    expect(fake.goLive).toHaveBeenCalled();
+  });
+
+  it('offers "Skip to live rep" from a teaching phase too (no gatekeeping)', () => {
+    renderTrainingAtPhase('teach');
+    const skip = screen.getByTestId('readiness-confirm');
+    expect(skip.textContent?.toLowerCase()).toContain('skip to live rep');
+    fireEvent.click(skip);
+    expect(fake.goLive).toHaveBeenCalled();
   });
 
   it('shows the practice-done action at roleplay_demo phase (in the footer bar)', () => {

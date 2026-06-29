@@ -348,8 +348,9 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
 
   const currentIndex = PHASE_ORDER.indexOf(phase);
   const atEnd = phase === 'debrief';
-  // Debounced so the coach status doesn't flicker Speaking/Coaching on voice dips.
-  const speaking = useDebouncedSpeaking(session.coachAmplitude > 0.02);
+  // Use the ACTIVE speaker's amplitude — the prospect during the live rep, the
+  // coach otherwise — so the on-screen "speaking" pulse tracks whoever is talking.
+  const speaking = useDebouncedSpeaking(session.activeAmplitude > 0.02);
 
   const handleExit = useCallback(() => {
     session.stop();
@@ -409,14 +410,19 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
           }
         />
         {session.scorecardResult ? (
-          <SessionResults
-            scorecard={session.scorecardResult}
-            transcript={session.practiceTranscript}
-            repLabel={lesson.coreFramework.name}
-            saving={false}
-            onAgain={() => session.replayPractice()}
-            onDone={handleExit}
-          />
+          // Scroll wrapper: the screen is 100dvh/overflow-hidden, so the report
+          // (which is taller than the viewport) MUST live in its own scroll area
+          // or its lower half is clipped with no way to reach it.
+          <div className="session-report-scroll" data-testid="session-report-scroll">
+            <SessionResults
+              scorecard={session.scorecardResult}
+              transcript={session.practiceTranscript}
+              repLabel={lesson.coreFramework.name}
+              saving={false}
+              onAgain={() => session.replayPractice()}
+              onDone={handleExit}
+            />
+          </div>
         ) : (
           <div className="session-body session-body--debrief">
             <p className="session-scoring-msg">Scoring your practice rep…</p>
@@ -447,14 +453,19 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         })}
       </nav>
       <p className="session-goal" aria-live="polite">{PHASE_GOAL[phase]}</p>
-      {phase === 'readiness_check' && (
+      {/* Skip-ahead: the learner can jump straight to the live rep from ANY
+          teaching phase — no gatekeeping, no "let's practice once more". This
+          fixes the coach refusing to advance when the user said they were ready.
+          Hidden during the rep itself (debrief already returned above). */}
+      {phase !== 'roleplay_demo' && (
         <button
           type="button"
           className="picker-cta-bar__btn"
           data-testid="readiness-confirm"
-          onClick={() => session.advance()}
+          onClick={() => session.goLive()}
         >
-          I'm ready — go live <span aria-hidden="true">→</span>
+          {phase === 'readiness_check' ? "I'm ready — go live" : 'Skip to live rep'}{' '}
+          <span aria-hidden="true">→</span>
         </button>
       )}
       {/* The live "I'm done" action lives in the footer bar (room-footer). */}
@@ -493,14 +504,14 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
       />
 
       <LiveRoom
-        lines={session.coachTranscript}
-        realtime={session.coachRealtime}
-        labels={{ nicole: phase === 'roleplay_demo' ? 'Prospect' : 'Nicole' }}
+        lines={session.activeTranscript}
+        realtime={session.activeRealtime}
+        labels={{ nicole: session.inLiveRep ? 'Prospect' : 'Nicole' }}
         presence={
           <CallPresence
-            name={phase === 'roleplay_demo' ? 'Prospect' : 'Nicole'}
+            name={session.inLiveRep ? 'Prospect' : 'Nicole'}
             status={PHASE_GOAL[phase]}
-            avatarSrc={phase === 'roleplay_demo' ? '/nicole-avatar-male.png' : '/nicole-avatar.png'}
+            avatarSrc={session.inLiveRep ? '/nicole-avatar-male.png' : '/nicole-avatar.png'}
             speaking={speaking}
             live={started}
           />

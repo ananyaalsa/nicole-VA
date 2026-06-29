@@ -124,6 +124,31 @@ const GATE_PHASES = new Set([
   'roleplay_demo',
 ]);
 
+/**
+ * Build the system overlay for the live-rep PROSPECT session in TRAINING.
+ *
+ * This is a SEPARATE Gemini session with a different (male) voice — the person on
+ * the other end of the practice scenario. It is NOT Nicole and NOT a coach: it
+ * never teaches, never gives tips, never breaks character. This mirrors Roleplay
+ * mode's prospect overlay (which works well), derived from the lesson's own
+ * objective/framework so the scene matches the skill being drilled.
+ */
+export function buildProspectOverlay(
+  lesson: ClientLessonSpec,
+  difficultyPrompt?: string,
+): string {
+  return [
+    `You are the OTHER PARTY in this practice scenario: ${lesson.objective}`,
+    `Play a realistic, grounded counterpart for this scenario — e.g. the prospect on a cold call, the customer raising the objection, the interviewer, depending on the skill "${lesson.title}". Stay FULLY in character for the ENTIRE conversation.`,
+    `You are speaking out loud — no markdown, no stage directions in brackets, no narration.`,
+    `IMPORTANT: This is a live role-play, not a lesson. You are NOT Nicole and NOT a coach. Do NOT teach, do NOT give feedback or tips, do NOT explain frameworks, do NOT tell the user what they "should" say, and do NOT break character to comment. React only as a real person in this scenario would — with natural pushback, questions, and responses. Never introduce yourself as Nicole or as an AI.`,
+    `ENDING: When the user signals the call/conversation is over (bye, thanks for your time, gotta go, etc.), give ONE short, natural in-character sign-off and then stop. After a goodbye you are STILL this character — never switch into a helpful assistant, never offer to help with tasks.`,
+    difficultyPrompt ? `DIFFICULTY: ${difficultyPrompt}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 export function buildPhasePrompt(
   lesson: ClientLessonSpec,
   phase: Phase | 'level_choice',
@@ -168,7 +193,7 @@ export function buildPhasePrompt(
       break;
     }
     case 'readiness_check':
-      core = `${base}\nPHASE: READINESS CHECK. First ask them to explain the ${lesson.coreFramework.name} framework in their own words. Then give them ONE full solo run at the scenario, end to end. Do not coach during their solo attempt.`;
+      core = `${base}\nPHASE: READINESS CHECK. Briefly invite them to do one quick solo run, or to explain the ${lesson.coreFramework.name} framework back in their own words. IMPORTANT: if the learner says they are ready, want to move on, or want to go to the live rep, DO NOT argue, stall, or insist on "one more time" — acknowledge in one short line and let them go. The app moves them to the live rep; never block it.`;
       break;
     case 'baseline_assess':
       core = `${base}\nPHASE: BASELINE ASSESS. Before teaching anything, gauge their starting level. Set up ONE cold, solo attempt at the scenario (${lesson.objective}) and have them run it end to end on their own. This is a baseline read: do not coach, do not hint, do not react mid-attempt. Set it up clearly, then listen silently so the attempt can be scored.`;
