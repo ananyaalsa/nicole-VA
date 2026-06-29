@@ -7,9 +7,9 @@ describe('REALTIME_INPUT_CONFIG', () => {
       automaticActivityDetection: {
         startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
         endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
-        // Short onset pad so a quick/quiet opener ("hi", "so…") isn't swallowed
-        // before the VAD arms (600ms was long enough to drop it → "had to repeat").
-        prefixPaddingMs: 300,
+        // Onset pad keeps audio before the detected speech-start so the first
+        // word/letter isn't clipped. 500ms reliably captures a quick opener.
+        prefixPaddingMs: 500,
         // Patient (1000ms) so a slow-spoken utterance with pauses stays one turn.
         silenceDurationMs: 1000,
       },

@@ -49,7 +49,16 @@ const BASE = (l: ClientLessonSpec) =>
   l.coreFramework.moves
     .map((m) => `${m.step} — ${m.intent} (e.g. "${m.keyLine}")`)
     .join('; ') +
-  '.';
+  '.' +
+  // TURN DISCIPLINE — the #1 thing that made coaching feel broken: she would ask
+  // the learner to try something and then, in the SAME turn, answer her own
+  // question / role-play both sides / jump two steps ahead as if they'd already
+  // responded. Hard rule: one turn = one beat, then STOP and wait.
+  '\n\nTURN-TAKING — CRITICAL. After you ask the learner anything ("ready?", "your turn", ' +
+  '"try it", "what would you say?"), you MUST STOP and wait for THEIR spoken reply. NEVER ' +
+  'answer your own question, NEVER speak for the learner or assume what they said, and NEVER ' +
+  'continue to the next step until they have actually responded. Take exactly ONE step per ' +
+  'turn. If the learner is silent, wait — do not fill the silence by moving ahead.';
 
 // Appended to EVERY non-debrief phase — keeps Nicole in the coaching role so she
 // never drifts back to "normal Nicole / what's on your agenda" mid-lesson.
@@ -124,29 +133,59 @@ const GATE_PHASES = new Set([
   'roleplay_demo',
 ]);
 
+/** A small pool of fixed MALE personas for the live-rep prospect. Picking ONE up
+ *  front (deterministically from the lesson id) and pinning it hard is what stops
+ *  the model from improvising — it was leaking "Nicole" + offering female names +
+ *  asking the user what to call it. The voice is male, so the name must be too. */
+const PROSPECT_PERSONAS = [
+  { name: 'Grant', role: 'a busy operations director' },
+  { name: 'Marcus', role: 'a no-nonsense VP of sales' },
+  { name: 'David', role: 'a skeptical small-business owner' },
+  { name: 'James', role: 'a time-pressed procurement manager' },
+  { name: 'Daniel', role: 'a pragmatic IT lead' },
+] as const;
+
+/** Stable index from a string so the same lesson always gets the same persona. */
+function personaFor(seed: string): (typeof PROSPECT_PERSONAS)[number] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return PROSPECT_PERSONAS[Math.abs(h) % PROSPECT_PERSONAS.length];
+}
+
 /**
  * Build the system overlay for the live-rep PROSPECT session in TRAINING.
  *
- * This is a SEPARATE Gemini session with a different (male) voice — the person on
- * the other end of the practice scenario. It is NOT Nicole and NOT a coach: it
- * never teaches, never gives tips, never breaks character. This mirrors Roleplay
- * mode's prospect overlay (which works well), derived from the lesson's own
- * objective/framework so the scene matches the skill being drilled.
+ * This is a SEPARATE Gemini session with a MALE voice — the person on the other
+ * end of the practice scenario. It is NOT Nicole and NOT a coach. We pin a fixed
+ * male identity (name + role) so the character is consistent and NEVER calls
+ * itself Nicole, offers alternate names, or asks the user what to call it.
  */
 export function buildProspectOverlay(
   lesson: ClientLessonSpec,
   difficultyPrompt?: string,
 ): string {
+  const persona = personaFor(lesson.skillId || lesson.title);
   return [
-    `You are the OTHER PARTY in this practice scenario: ${lesson.objective}`,
-    `Play a realistic, grounded counterpart for this scenario — e.g. the prospect on a cold call, the customer raising the objection, the interviewer, depending on the skill "${lesson.title}". Stay FULLY in character for the ENTIRE conversation.`,
+    `You ARE ${persona.name} — ${persona.role}. This is your ONE fixed identity for the entire conversation.`,
+    `You are the OTHER PARTY the user is practicing against in this scenario: ${lesson.objective}`,
+    `Play ${persona.name} realistically and stay FULLY in character the ENTIRE time. Speak in a MALE voice with a male name — you are ${persona.name}, a man.`,
     `You are speaking out loud — no markdown, no stage directions in brackets, no narration.`,
-    `IMPORTANT: This is a live role-play, not a lesson. You are NOT Nicole and NOT a coach. Do NOT teach, do NOT give feedback or tips, do NOT explain frameworks, do NOT tell the user what they "should" say, and do NOT break character to comment. React only as a real person in this scenario would — with natural pushback, questions, and responses. Never introduce yourself as Nicole or as an AI.`,
-    `ENDING: When the user signals the call/conversation is over (bye, thanks for your time, gotta go, etc.), give ONE short, natural in-character sign-off and then stop. After a goodbye you are STILL this character — never switch into a helpful assistant, never offer to help with tasks.`,
+    `HARD IDENTITY RULES (never break these):`,
+    `• Your name is ${persona.name}. NEVER say your name is "Nicole". NEVER offer or suggest other names (no "would you prefer Sarah or Maya?"), and NEVER ask the user what they'd like to call you. If asked who you are, just say "${persona.name}".`,
+    `• You are NOT an AI and NOT an assistant. Never say "how can I help you?" or "what can I do for you?" — you are a busy person who PICKED UP a call you didn't expect.`,
+    `• Do NOT confuse yourself with the caller. The user is the one selling/calling YOU; you are the prospect being called. If the user states their own name, that's THEIR name, not yours.`,
+    `This is a live role-play, not a lesson. Do NOT teach, give feedback/tips, explain frameworks, or tell the user what they "should" say, and do NOT break character to comment. React only as ${persona.name} would — with natural skepticism, questions, and pushback.`,
+    `ENDING: When the user signals the call is over (bye, thanks for your time, gotta go, etc.), give ONE short, natural in-character sign-off as ${persona.name} and then stop. After a goodbye you are STILL ${persona.name} — never switch into a helpful assistant, never offer to help with tasks.`,
     difficultyPrompt ? `DIFFICULTY: ${difficultyPrompt}` : '',
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+/** The prospect's display name for THIS lesson (so the UI labels the speaker with
+ *  the actual character name, e.g. "Grant", instead of a generic "Prospect"). */
+export function prospectName(lesson: ClientLessonSpec): string {
+  return personaFor(lesson.skillId || lesson.title).name;
 }
 
 export function buildPhasePrompt(

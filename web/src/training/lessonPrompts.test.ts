@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPhasePrompt, type ClientLessonSpec } from './lessonPrompts';
+import { buildPhasePrompt, buildProspectOverlay, prospectName, type ClientLessonSpec } from './lessonPrompts';
 
 const lesson: ClientLessonSpec = {
   skillId: 'price_objection',
@@ -145,6 +145,39 @@ describe('lessonPrompts.buildPhasePrompt', () => {
     it('gate phases get the GATE_RIDER', () => {
       const rp = buildPhasePrompt(lesson, 'roleplay_demo', null);
       expect(rp).toMatch(/do not call any advance tool/i);
+    });
+
+    it('every coach phase forbids simulating the learner (turn discipline)', () => {
+      for (const ph of ['intro', 'teach', 'model', 'guided_practice'] as const) {
+        const p = buildPhasePrompt(lesson, ph, null);
+        expect(p).toMatch(/TURN-TAKING/i);
+        expect(p.toLowerCase()).toContain('wait for');
+      }
+    });
+  });
+
+  describe('buildProspectOverlay (live-rep persona)', () => {
+    it('pins a fixed MALE persona and forbids Nicole / female / name-asking', () => {
+      const ov = buildProspectOverlay(lesson);
+      const name = prospectName(lesson);
+      // It IS the persona, by name.
+      expect(ov).toContain(name);
+      expect(ov).toMatch(/male/i);
+      // Hard identity rules present.
+      expect(ov).toMatch(/never say your name is "Nicole"/i);
+      expect(ov).toMatch(/never offer or suggest other names/i);
+      expect(ov).toMatch(/never ask the user what/i);
+      // Not a coach / assistant.
+      expect(ov).toMatch(/do NOT teach/i);
+      expect(ov).toMatch(/NOT an AI/i);
+    });
+
+    it('is deterministic per lesson (same lesson → same persona name)', () => {
+      expect(prospectName(lesson)).toBe(prospectName(lesson));
+    });
+
+    it('carries the difficulty prompt when given', () => {
+      expect(buildProspectOverlay(lesson, 'busy and skeptical')).toContain('busy and skeptical');
     });
   });
 });

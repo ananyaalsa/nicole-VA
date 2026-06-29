@@ -3,7 +3,7 @@ import { useNicoleSession } from '../engine/useNicoleSession';
 import { useAuth } from '../auth/AuthContext';
 import type { TranscriptLine } from '../engine/types';
 import { DEFAULT_VOICE } from '../audio/voices';
-import { buildPhasePrompt, buildProspectOverlay, type ClientLessonSpec } from './lessonPrompts';
+import { buildPhasePrompt, buildProspectOverlay, prospectName, type ClientLessonSpec } from './lessonPrompts';
 import { advancePhase, type Phase } from './phaseMachine';
 import { shouldAdvancePhase, AUTO_PHASES, type AdvanceSignals } from './phaseAdvance';
 import { requestScore, type Scorecard, type ResultLine, type DimensionInput } from './scoreApi';
@@ -60,6 +60,9 @@ export interface UseCoachingSessionResult {
   activeAmplitude: number;
   /** Whether the live rep (prospect-only session) is currently active. */
   inLiveRep: boolean;
+  /** The fixed in-character name of the live-rep prospect (e.g. "Grant"), so the
+   *  UI labels the speaker with the real persona instead of a generic "Prospect". */
+  prospectLabel: string;
   /** Begin the session (starts the coach; prospect starts only in roleplay). */
   start: () => Promise<void>;
   /** End the session — stops BOTH the coach and the prospect. */
@@ -100,9 +103,9 @@ const COACH_OPEN_DIRECTIVE =
   '[OPEN] You are the coach and you lead. Open the session yourself in one warm, brief line, name the skill we are working on from your overlay, and tell the learner what we will do first, then invite them to begin. Do not wait for them to speak first.';
 
 /** Silent opener for the live-rep PROSPECT so the character starts the scene in
- *  character (answers the phone / opens the conversation), like Roleplay mode. */
+ *  character (answers the phone as the fixed persona), like Roleplay mode. */
 const PROSPECT_OPEN_DIRECTIVE =
-  '[OPEN] Open the scene briefly IN CHARACTER and pull the user in — one short line (e.g. answer the phone, or open the conversation), then wait for their response. Do not explain that this is a role-play. Do not coach.';
+  '[OPEN] Answer the phone IN CHARACTER as yourself (your fixed name + role from your identity rules) — one short, natural line, e.g. "Yeah, this is <your name>." then wait for the caller. Do NOT say you are Nicole, do NOT offer other names, do NOT ask what to call you, do NOT explain that this is a role-play, do NOT coach.';
 
 /**
  * Orchestrates a two-voice coaching session.
@@ -443,23 +446,13 @@ export function useCoachingSession(
         prospectActiveRef.current = false;
         prospectStopRef.current();
       }
-      // Returning to a coach-led phase AFTER the rep (i.e. debrief): the coach was
-      // torn down for the rep, so restart her and kick her with this phase's
-      // overlay so she opens the debrief herself. Gate on the ref we set when we
-      // stopped her (NOT the async coach.connected flag, which could still read
-      // true mid-close and skip the restart → silent debrief).
-      if (phase === 'debrief' && coachStoppedForRepRef.current) {
+      // After the live rep, Nicole has NO voice role: the debrief is a SILENT,
+      // on-screen scored report (per product direction — the user found a spoken
+      // "you did good" jarring and unnecessary). So we deliberately do NOT restart
+      // the coach for debrief. She taught, the user did the rep, now they read the
+      // report. (coachStoppedForRepRef is cleared so a later replay can re-teach.)
+      if (phase === 'debrief') {
         coachStoppedForRepRef.current = false;
-        reconnectOverlaySeenRef.current = coachOverlayRef.current;
-        const overlayNow = coachOverlayRef.current;
-        void coachStartRef.current().then(() => {
-          // After reconnect, kick her into the debrief (the [OPEN]-style nudge).
-          coachAfterTurnRef.current(() => {
-            coachSendTextRef.current(
-              `[PHASE] ${overlayNow}\n\nOpen the debrief now in your own words — do not greet again.`,
-            );
-          });
-        });
       }
     }
   // coach.connected intentionally omitted: we only react to phase transitions.
@@ -514,6 +507,7 @@ export function useCoachingSession(
     activeRealtime: inLiveRep ? prospect.realtime : coach.realtime,
     activeAmplitude: inLiveRep ? prospect.amplitude : coach.amplitude,
     inLiveRep,
+    prospectLabel: prospectName(lesson),
     start,
     stop,
     advance,

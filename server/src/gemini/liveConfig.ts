@@ -15,11 +15,12 @@ export const REALTIME_INPUT_CONFIG = {
   automaticActivityDetection: {
     startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
     endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
-    // 300ms: a shorter onset pad so the FIRST word of an utterance isn't clipped
-    // before the VAD has "armed". 600ms was long enough that quiet/quick openers
-    // ("hi", "so…") could be swallowed, which read as "it didn't hear me / I had
-    // to repeat myself louder". 300ms still suppresses pre-speech room noise.
-    prefixPaddingMs: 300,
+    // prefixPaddingMs is how much audio BEFORE the detected speech-start is kept.
+    // Too small clips the first word/letter ("my first letter is never
+    // transcribed"). 500ms reliably captures the onset of a quick opener while
+    // still trimming pre-speech room noise. (A larger pad = LESS clipping, the
+    // opposite of an earlier mistaken lowering to 300.)
+    prefixPaddingMs: 500,
     // 1000ms: tolerate natural pauses BETWEEN WORDS so one slow-spoken utterance
     // stays ONE turn (not many short turns → fragmented bubbles + reply-spam).
     // The client's sustained-frame barge-in gate still lets the user interrupt

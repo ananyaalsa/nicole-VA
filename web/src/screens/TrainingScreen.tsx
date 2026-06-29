@@ -493,11 +493,17 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         brand={
           <div className="topbar-brand">
             <div className={`session-coach-avatar${speaking ? ' is-speaking' : ''}`} aria-hidden="true">
-              <img src="/nicole-avatar.png" alt="" />
+              <img src={session.inLiveRep ? '/nicole-avatar-male.png' : '/nicole-avatar.png'} alt="" />
             </div>
             <div className="session-coach-info">
-              <span className="topbar-brand-name">Nicole</span>
-              <span className="session-coach-status">{speaking ? 'Speaking…' : started ? 'Coaching' : 'Ready'}</span>
+              {/* During the live rep the user is on the phone with the PROSPECT,
+                  not Nicole — reflect that in the topbar so it isn't mislabeled. */}
+              <span className="topbar-brand-name">{session.inLiveRep ? session.prospectLabel : 'Nicole'}</span>
+              <span className="session-coach-status">
+                {session.inLiveRep
+                  ? (speaking ? 'Speaking…' : 'On the call')
+                  : (speaking ? 'Speaking…' : started ? 'Coaching' : 'Ready')}
+              </span>
             </div>
           </div>
         }
@@ -519,10 +525,10 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
       <LiveRoom
         lines={session.activeTranscript}
         realtime={session.activeRealtime}
-        labels={{ nicole: session.inLiveRep ? 'Prospect' : 'Nicole' }}
+        labels={{ nicole: session.inLiveRep ? session.prospectLabel : 'Nicole' }}
         presence={
           <CallPresence
-            name={session.inLiveRep ? 'Prospect' : 'Nicole'}
+            name={session.inLiveRep ? session.prospectLabel : 'Nicole'}
             status={PHASE_GOAL[phase]}
             avatarSrc={session.inLiveRep ? '/nicole-avatar-male.png' : '/nicole-avatar.png'}
             speaking={speaking}
