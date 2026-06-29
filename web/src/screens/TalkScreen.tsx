@@ -16,6 +16,7 @@ import { speakWeather } from '../weather/weatherApi';
 import { Live2DCompanion } from '../live2d/Live2DCompanion';
 import { loadAvatarPrefs, type AvatarPrefs } from '../live2d/avatars';
 import { useNicoleSession } from '../engine/useNicoleSession';
+import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { useCamera } from '../engine/useCamera';
 import { useUiCommands } from '../engine/useUiCommands';
 import { makeProfileActions } from '../engine/profileActions';
@@ -377,7 +378,12 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
     }
   };
 
-  const speaking = amplitude > SPEAKING_AMP;
+  // Debounce the speaking flag so the avatar's state (border/box-shadow + the
+  // data-state attribute) doesn't strobe every frame as amplitude crosses the
+  // threshold between syllables — that per-frame flip read as the avatar
+  // "blinking/glitching", especially on mobile. The orb/companion still react to
+  // the raw `amplitude` value (continuous, not a flickering boolean).
+  const speaking = useDebouncedSpeaking(amplitude > SPEAKING_AMP);
   const auraState: AuraState = speaking ? 'speaking' : connected && micOn ? 'listening' : 'idle';
   // Feed the wave's energy via a ref (not a prop) so its rAF loop is never torn
   // down on amplitude changes — the fix for the speaking glitch.
