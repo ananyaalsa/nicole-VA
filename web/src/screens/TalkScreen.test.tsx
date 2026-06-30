@@ -34,12 +34,15 @@ vi.mock('../engine/useNicoleSession', () => ({
 }));
 // Mock the camera hook so we can assert the button wiring without real getUserMedia.
 const cameraStart = vi.fn(async () => {});
+const cameraStartScreen = vi.fn(async () => {});
 const cameraStop = vi.fn();
 let cameraState = {
   on: false,
   stream: null as MediaStream | null,
   facing: 'user' as const,
+  source: null as 'camera' | 'screen' | null,
   start: cameraStart,
+  startScreen: cameraStartScreen,
   stop: cameraStop,
   flip: vi.fn(),
   error: null as string | null,
@@ -87,7 +90,7 @@ beforeEach(() => {
   mockFetchLiveStatus.mockClear();
   mockFetchLiveStatus.mockResolvedValue(null);
   sessionState = { connected: false, micOn: true, transcript: [], realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
-  cameraState = { on: false, stream: null, facing: 'user', start: cameraStart, stop: cameraStop, flip: vi.fn(), error: null };
+  cameraState = { on: false, stream: null, facing: 'user', source: null, start: cameraStart, startScreen: cameraStartScreen, stop: cameraStop, flip: vi.fn(), error: null };
 });
 
 describe('TalkScreen', () => {

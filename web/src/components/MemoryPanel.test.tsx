@@ -60,4 +60,45 @@ describe('MemoryPanel', () => {
     fireEvent.click(screen.getByTestId('memory-close-button'));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('turns memory OFF: posts the flag and the switch reads off', async () => {
+    const fetchSpy = vi.mocked(fetch);
+    render(<MemoryPanel />);
+    const toggle = await screen.findByTestId('memory-toggle');
+    const input = toggle.querySelector('input')! as HTMLInputElement;
+    expect(input.checked).toBe(true); // memory on by default (no flag)
+    fireEvent.click(input);
+    await waitFor(() => expect(input.checked).toBe(false));
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/memory',
+      expect.objectContaining({ method: 'POST', body: expect.stringContaining('memory_disabled') }),
+    );
+  });
+
+  it('renders as OFF and clears the flag when toggled back on', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: { method?: string }) => {
+      if (opts?.method === 'DELETE') return { ok: true, json: async () => ({ ok: true }) };
+      return { ok: true, json: async () => ({ facts: [...FACTS, { key: 'memory_disabled', fact: 'off', source: 'settings' }] }) };
+    }) as unknown as typeof fetch);
+    const fetchSpy = vi.mocked(fetch);
+    render(<MemoryPanel />);
+    const toggle = await screen.findByTestId('memory-toggle');
+    const input = toggle.querySelector('input')! as HTMLInputElement;
+    await waitFor(() => expect(input.checked).toBe(false)); // flag present → off
+    fireEvent.click(input);
+    await waitFor(() => expect(input.checked).toBe(true));
+    expect(fetchSpy).toHaveBeenCalledWith('/api/memory/memory_disabled', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('never lists the memory_disabled flag as a fact card', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ facts: [{ key: 'memory_disabled', fact: 'off', source: 'settings' }] }),
+    })) as unknown as typeof fetch);
+    render(<MemoryPanel />);
+    await screen.findByTestId('memory-toggle');
+    // Only the flag exists → no fact cards, empty state shows.
+    expect(screen.queryByText('off')).toBeNull();
+    expect(screen.getByTestId('memory-empty')).toBeInTheDocument();
+  });
 });

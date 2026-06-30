@@ -24,15 +24,20 @@ export interface UseCameraOptions {
 }
 
 export interface UseCameraResult {
-  /** Is the camera currently on? */
+  /** Is a vision source currently on (camera OR screen)? */
   on: boolean;
   /** The live MediaStream (for a <video> preview), or null. */
   stream: MediaStream | null;
   /** Which camera is active. */
   facing: 'user' | 'environment';
+  /** What the current source is, when on. */
+  source: 'camera' | 'screen' | null;
   /** Turn the camera on (prompts for permission). */
   start: () => Promise<void>;
-  /** Turn the camera off and release it. */
+  /** Share the screen instead of the camera (prompts the OS picker). Same frame
+   *  pipeline, so Nicole "sees" the screen. */
+  startScreen: () => Promise<void>;
+  /** Turn the current source off and release it. */
   stop: () => void;
   /** Flip between front and back camera. */
   flip: () => Promise<void>;
@@ -48,6 +53,7 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
   const [on, setOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
+  const [source, setSource] = useState<'camera' | 'screen' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
@@ -77,6 +83,7 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
     }
     canvasRef.current = null;
     setStream(null);
+    setSource(null);
     setOn(false);
   }, []);
 
@@ -98,6 +105,35 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
     if (b64) onFrameRef.current(b64);
   }, [maxWidth, quality]);
 
+  // Attach a stream to the detached <video> + start the frame-capture timer.
+  // Shared by both the camera and screen-share paths so capture logic isn't duped.
+  const attachStream = useCallback(
+    async (s: MediaStream, src: 'camera' | 'screen') => {
+      streamRef.current = s;
+      // If the user stops the share via the browser's own "Stop sharing" chrome,
+      // the track ends — tear down so our state matches reality. (getVideoTracks
+      // is always present on a real MediaStream; guard so we never throw.)
+      const [track] = s.getVideoTracks?.() ?? [];
+      if (track) track.addEventListener('ended', () => teardown(), { once: true });
+
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = s;
+      try { await video.play(); } catch { /* autoplay can reject; frames still capture */ }
+      videoRef.current = video;
+      if (!canvasRef.current) canvasRef.current = document.createElement('canvas');
+
+      if (timerRef.current != null) clearInterval(timerRef.current);
+      timerRef.current = setInterval(captureFrame, intervalMs);
+
+      setStream(s);
+      setSource(src);
+      setOn(true);
+    },
+    [captureFrame, intervalMs, teardown],
+  );
+
   const openWith = useCallback(
     async (mode: 'user' | 'environment') => {
       setError(null);
@@ -106,7 +142,7 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
         setError('Camera not supported in this browser.');
         return;
       }
-      // Release any prior stream before opening a new one (flip).
+      // Release any prior stream before opening a new one (flip / source switch).
       const prev = streamRef.current;
       if (prev) for (const t of prev.getTracks()) t.stop();
 
@@ -117,31 +153,34 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
         setError((e as Error)?.message ?? 'Could not open the camera.');
         return;
       }
-      streamRef.current = s;
-
-      // A detached <video> drives the frame capture (preview <video> in the UI
-      // can share the same stream).
-      const video = document.createElement('video');
-      video.muted = true;
-      video.playsInline = true;
-      video.srcObject = s;
-      try {
-        await video.play();
-      } catch {
-        /* autoplay can reject silently; frames still capture once ready */
-      }
-      videoRef.current = video;
-      if (!canvasRef.current) canvasRef.current = document.createElement('canvas');
-
-      if (timerRef.current != null) clearInterval(timerRef.current);
-      timerRef.current = setInterval(captureFrame, intervalMs);
-
-      setStream(s);
       setFacing(mode);
-      setOn(true);
+      await attachStream(s, 'camera');
     },
-    [captureFrame, intervalMs],
+    [attachStream],
   );
+
+  const startScreen = useCallback(async () => {
+    setError(null);
+    const md = navigator.mediaDevices as MediaDevices & {
+      getDisplayMedia?: (c: MediaStreamConstraints) => Promise<MediaStream>;
+    };
+    if (!md?.getDisplayMedia) {
+      setError('Screen sharing is not supported in this browser.');
+      return;
+    }
+    const prev = streamRef.current;
+    if (prev) for (const t of prev.getTracks()) t.stop();
+    let s: MediaStream;
+    try {
+      s = await md.getDisplayMedia({ video: true, audio: false });
+    } catch (e) {
+      // User cancelling the OS picker throws — not a real error, just bail quietly.
+      const msg = (e as Error)?.name === 'NotAllowedError' ? null : (e as Error)?.message;
+      if (msg) setError(msg);
+      return;
+    }
+    await attachStream(s, 'screen');
+  }, [attachStream]);
 
   const start = useCallback(() => openWith(facing), [openWith, facing]);
   const flip = useCallback(
@@ -152,5 +191,5 @@ export function useCamera(opts: UseCameraOptions): UseCameraResult {
   // Always release the camera on unmount.
   useEffect(() => () => teardown(), [teardown]);
 
-  return { on, stream, facing, start, stop: teardown, flip, error };
+  return { on, stream, facing, source, start, startScreen, stop: teardown, flip, error };
 }

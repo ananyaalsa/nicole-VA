@@ -91,8 +91,32 @@ export function MemoryPanel({ onClose }: MemoryPanelProps): JSX.Element {
     } catch { /* best-effort; it's already gone from the list */ }
   }, [token]);
 
-  const profile = facts.filter((f) => f.source === 'settings');
-  const learned = facts.filter((f) => f.source !== 'settings');
+  // Global memory on/off. A 'memory_disabled' fact means OFF; toggling sets/clears
+  // it (the relay then references no stored memory). One switch, no other clicks.
+  const memoryOff = facts.some((f) => f.key === 'memory_disabled');
+  const toggleMemory = useCallback(async () => {
+    const turningOff = !facts.some((f) => f.key === 'memory_disabled');
+    // Optimistic.
+    setFacts((prev) => turningOff
+      ? [...prev, { key: 'memory_disabled', fact: 'off', factType: 'setting', source: 'settings' }]
+      : prev.filter((f) => f.key !== 'memory_disabled'));
+    try {
+      if (turningOff) {
+        await fetch('/api/memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ key: 'memory_disabled', fact: 'off', factType: 'setting', source: 'settings' }),
+        });
+      } else {
+        await fetch('/api/memory/memory_disabled', { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      }
+    } catch { /* best-effort; UI already reflects the choice */ }
+  }, [facts, token]);
+
+  // Never list the internal flag as a fact.
+  const visible = facts.filter((f) => f.key !== 'memory_disabled');
+  const profile = visible.filter((f) => f.source === 'settings');
+  const learned = visible.filter((f) => f.source !== 'settings');
 
   // Group learned facts by topic.
   const byTopic = new Map<string, MemoryFact[]>();
@@ -106,7 +130,7 @@ export function MemoryPanel({ onClose }: MemoryPanelProps): JSX.Element {
   const rank = (l: string) => (topicOrder.indexOf(l) >= 0 ? topicOrder.indexOf(l) : l === 'Other' ? 999 : 500);
   const topics = [...byTopic.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 
-  const empty = !loading && !error && facts.length === 0;
+  const empty = !loading && !error && visible.length === 0;
 
   return (
     <div className="history memory-panel" data-testid="memory-panel" role="dialog" aria-label="What Nicole remembers">
@@ -125,7 +149,19 @@ export function MemoryPanel({ onClose }: MemoryPanelProps): JSX.Element {
           )}
         </header>
 
-        <div className="history__body">
+        {/* Global memory on/off — one switch. When off, Nicole uses no stored memory. */}
+        {!loading && !error && (
+          <label className="mem-toggle" data-testid="memory-toggle">
+            <span className="mem-toggle__text">
+              <strong>Memory {memoryOff ? 'off' : 'on'}</strong>
+              <span className="mem-toggle__hint">{memoryOff ? "Nicole won't use anything saved here." : 'Nicole remembers and uses these across chats.'}</span>
+            </span>
+            <input type="checkbox" role="switch" checked={!memoryOff} onChange={() => void toggleMemory()} aria-label="Memory on or off" />
+            <span className="mem-toggle__track" aria-hidden="true"><span className="mem-toggle__knob" /></span>
+          </label>
+        )}
+
+        <div className={`history__body${memoryOff ? ' is-dimmed' : ''}`}>
           {loading && <p className="history__status hud-label" data-testid="memory-loading">Loading…</p>}
           {error && <p className="history__status history__status--bad" data-testid="memory-error">{error}</p>}
           {empty && (

@@ -516,8 +516,14 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
                 <button type="button" className={`ctrl-icon${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? 'false' : 'true'} aria-label={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
                   <Icon name={micOn ? 'mic' : 'mic-off'} size={20} />
                 </button>
-                <button type="button" className={`ctrl-icon${camera.on ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on ? camera.stop() : void camera.start())} aria-label={camera.on ? 'Turn off camera' : 'Turn on camera'} data-tooltip={camera.on ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
+                <button type="button" className={`ctrl-icon${camera.on && camera.source === 'camera' ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on && camera.source === 'camera' ? camera.stop() : void camera.start())} aria-label={camera.source === 'camera' ? 'Turn off camera' : 'Turn on camera'} data-tooltip={camera.source === 'camera' ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
                   <Icon name="camera" size={20} />
+                </button>
+                <button type="button" className={`ctrl-icon${camera.on && camera.source === 'screen' ? ' is-active' : ''}`} data-testid="screen-button" onClick={() => (camera.on && camera.source === 'screen' ? camera.stop() : void camera.startScreen())} aria-label={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip-pos="top">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="2.5" y="4" width="19" height="13" rx="2" />
+                    <path d="M8.5 21h7M12 17v4" />
+                  </svg>
                 </button>
                 <button type="button" className={`ctrl-icon${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} aria-pressed={aiMuted ? 'true' : 'false'} aria-label={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
                   <Icon name={aiMuted ? 'speaker-off' : 'speaker'} size={20} />
@@ -563,7 +569,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
         </section>
       </div>
 
-      {camera.on && (
+      {camera.on && camera.source === 'camera' && (
         <div className="camera-corner">
           <CameraPreview stream={camera.stream} onClose={camera.stop} />
         </div>

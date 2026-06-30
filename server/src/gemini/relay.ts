@@ -274,14 +274,15 @@ export class LiveSession {
     const loader = this.deps.loadUserFacts ?? loadFacts;
     let memoryBlock = '';
     try {
-      const allFacts = await loader(this.deps.userId);
-      // "Start fresh": when the user asks to start fresh, drop the
-      // learned-in-conversation facts for THIS session so Nicole answers without
-      // referencing prior threads. Standing PROFILE facts (source 'settings' — name,
-      // location, etc.) stay, since "start fresh" means forget the conversation, not
-      // who they are. The flag is instance-scoped, so a new session is normal again.
-      const facts = this.suppressMemory
-        ? allFacts.filter((f) => f.source === 'settings')
+      const allFactsRaw = await loader(this.deps.userId);
+      // The user can turn memory OFF entirely (a 'memory_disabled' profile flag set
+      // from the memory panel). When off, Nicole references NO stored memory at all
+      // — drop every fact (the flag itself is hidden too). This is the persistent
+      // equivalent of "start fresh", which is per-session.
+      const memoryOff = allFactsRaw.some((f) => f.key === 'memory_disabled');
+      const allFacts = allFactsRaw.filter((f) => f.key !== 'memory_disabled');
+      const facts = (memoryOff || this.suppressMemory)
+        ? (memoryOff ? [] : allFacts.filter((f) => f.source === 'settings'))
         : allFacts;
       // The user's name (a users-table column, not a memory fact) so Nicole knows
       // who she's talking to from the FIRST message — she was asking "what's your

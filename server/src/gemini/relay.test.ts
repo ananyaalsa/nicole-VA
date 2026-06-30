@@ -221,6 +221,45 @@ describe('LiveSession memory tool dispatch', () => {
   });
 });
 
+describe('LiveSession memory_disabled (global memory OFF)', () => {
+  it('drops every stored fact from the prompt when memory_disabled is set', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client } = makeClient();
+    const ls = new LiveSession({
+      ai, model: 'm', userId: 'u', client, now,
+      // The user has facts AND the off-flag. Off must win: no fact text leaks.
+      loadUserFacts: async () => [
+        { key: 'memory_disabled', fact: 'off', factType: 'setting', userId: 'u', source: 'settings' },
+        { key: 'home_city', fact: 'Lives in Zorbathania', factType: 'identity', userId: 'u', source: 'settings' },
+        { key: 'fav_team', fact: 'Supports Quibblewick FC', factType: 'preference', userId: 'u', source: 'inferred' },
+      ],
+      loadDisplayName: async () => null, loadLiveStatus: async () => null,
+    });
+    await ls.connect(CFG);
+    const sys = String(sessions[0].config.systemInstruction);
+    expect(sys).not.toContain('Zorbathania');
+    expect(sys).not.toContain('Quibblewick');
+    // The flag itself must never appear as a fact, either.
+    expect(sys).not.toContain('memory_disabled');
+    ls.close();
+  });
+
+  it('uses stored facts normally when memory_disabled is absent', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client } = makeClient();
+    const ls = new LiveSession({
+      ai, model: 'm', userId: 'u', client, now,
+      loadUserFacts: async () => [
+        { key: 'home_city', fact: 'Lives in Zorbathania', factType: 'identity', userId: 'u', source: 'settings' },
+      ],
+      loadDisplayName: async () => null, loadLiveStatus: async () => null,
+    });
+    await ls.connect(CFG);
+    expect(String(sessions[0].config.systemInstruction)).toContain('Zorbathania');
+    ls.close();
+  });
+});
+
 describe('LiveSession.sendText (autostart directive)', () => {
   it('sends a text turn via sendClientContent', async () => {
     const { ai, sessions } = makeFakeAI();
