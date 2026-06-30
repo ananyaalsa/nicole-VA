@@ -225,24 +225,26 @@ describe('TrainingScreen', () => {
     expect(api.queryByTestId('start-button')).not.toBeInTheDocument();
   });
 
-  it('shows the readiness confirm at readiness_check and a full-width live room', () => {
+  it('shows the "you\'re ready" confirm ONLY at readiness_check, with a full-width live room', () => {
     renderTrainingAtPhase('readiness_check');
     expect(screen.getByTestId('live-room')).toBeInTheDocument();
-    expect(screen.getByTestId('readiness-confirm')).toBeInTheDocument();
+    const btn = screen.getByTestId('readiness-confirm');
+    expect(btn.textContent?.toLowerCase()).toContain("you're ready");
+    expect(btn.textContent?.toLowerCase()).toContain('live rep');
   });
 
-  it('readiness-confirm jumps straight to the live rep (goLive, no gatekeeping)', () => {
+  it('readiness-confirm enters the live rep (goLive)', () => {
     renderTrainingAtPhase('readiness_check');
     fireEvent.click(screen.getByTestId('readiness-confirm'));
     expect(fake.goLive).toHaveBeenCalled();
   });
 
-  it('offers "Skip to live rep" from a teaching phase too (no gatekeeping)', () => {
-    renderTrainingAtPhase('teach');
-    const skip = screen.getByTestId('readiness-confirm');
-    expect(skip.textContent?.toLowerCase()).toContain('skip to live rep');
-    fireEvent.click(skip);
-    expect(fake.goLive).toHaveBeenCalled();
+  it('does NOT show the go-live button during the teaching phases (only after the steps are done)', () => {
+    for (const p of ['intro', 'teach', 'model', 'guided_practice'] as const) {
+      const api = renderTrainingAtPhase(p);
+      expect(api.queryByTestId('readiness-confirm')).not.toBeInTheDocument();
+      api.unmount();
+    }
   });
 
   it('shows the practice-done action at roleplay_demo phase (in the footer bar)', () => {

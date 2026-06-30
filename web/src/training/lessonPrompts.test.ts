@@ -112,6 +112,32 @@ describe('lessonPrompts.buildPhasePrompt', () => {
         expect(out, `phase ${phase}`).toMatch(/mid-lesson/i);
       }
     });
+
+    it('bans the "anything else I can help with" general-assistant closing', () => {
+      for (const phase of ['teach', 'guided_practice', 'readiness_check'] as const) {
+        const out = buildPhasePrompt(lesson, phase, null);
+        expect(out, `phase ${phase}`).toMatch(/anything else i can help with/i);
+      }
+    });
+  });
+
+  describe('coaching behavior riders', () => {
+    it('readiness_check points the learner at the on-screen go-live button, not "anything else?"', () => {
+      const rc = buildPhasePrompt(lesson, 'readiness_check', null);
+      expect(rc).toMatch(/you'?re ready/i);
+      expect(rc).toMatch(/live rep/i);
+    });
+
+    it('teaching phases invite curiosity about other frameworks instead of refusing', () => {
+      const teach = buildPhasePrompt(lesson, 'teach', null);
+      expect(teach).toMatch(/other approaches|another framework|other framework/i);
+      expect(teach).toMatch(/do not brush them off|do not shut it down/i);
+    });
+
+    it('teaching phases enforce one-beat-then-stop turn discipline', () => {
+      const teach = buildPhasePrompt(lesson, 'teach', null);
+      expect(teach).toMatch(/one beat/i);
+    });
   });
 
   describe('riders ported from CHAT', () => {

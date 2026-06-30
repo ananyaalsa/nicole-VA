@@ -504,19 +504,19 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         })}
       </nav>
       <p className="session-goal" aria-live="polite">{PHASE_GOAL[phase]}</p>
-      {/* Skip-ahead: the learner can jump straight to the live rep from ANY
-          teaching phase — no gatekeeping, no "let's practice once more". This
-          fixes the coach refusing to advance when the user said they were ready.
-          Hidden during the rep itself (debrief already returned above). */}
-      {phase !== 'roleplay_demo' && (
+      {/* Go-live button: shown ONLY once the learner has worked through every
+          teaching phase and reached the Ready check (i.e. all earlier steps are
+          done). It is NOT a "skip ahead" during teaching — the user wanted the
+          button to appear only when they've actually completed the steps, with a
+          "you're ready" label they must click to enter the live rep. */}
+      {phase === 'readiness_check' && (
         <button
           type="button"
           className="picker-cta-bar__btn"
           data-testid="readiness-confirm"
           onClick={() => session.goLive()}
         >
-          {phase === 'readiness_check' ? "I'm ready — go live" : 'Skip to live rep'}{' '}
-          <span aria-hidden="true">→</span>
+          You&apos;re ready, enter the live rep <span aria-hidden="true">→</span>
         </button>
       )}
       {/* The live "I'm done" action lives in the footer bar (room-footer). */}
