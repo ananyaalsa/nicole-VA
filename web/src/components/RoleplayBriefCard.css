@@ -1,0 +1,47 @@
+.brief-card {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.brief-card__eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.brief-card__section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+}
+.brief-card__h {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.brief-card__who { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text); }
+.brief-card__situation, .brief-card__objective { margin: 0; font-size: 0.98rem; line-height: 1.5; color: var(--text); }
+.brief-card__context {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+.brief-card__start { align-self: center; min-width: 200px; }
+
+@media (max-width: 640px) {
+  .brief-card { padding: 18px 14px 24px; gap: 16px; }
+}

@@ -158,6 +158,15 @@ async function pickThrough() {
   fireEvent.click(screen.getByTestId('scenario-card'));
 }
 
+/** Click "Start roleplay", wait through the brief (generating → case cards), then
+ *  click "Start the call" to reach the live room. */
+async function enterRoom() {
+  fireEvent.click(screen.getByTestId('start-roleplay-button'));
+  // The brief synthesizes after a short beat; the "Start the call" button appears.
+  const startCall = await screen.findByTestId('start-from-brief-button', undefined, { timeout: 3000 });
+  fireEvent.click(startCall);
+}
+
 describe('RoleplayScreen', () => {
   it('renders the profile picker after fetchProfiles resolves', async () => {
     render(<RoleplayScreen />);
@@ -179,10 +188,28 @@ describe('RoleplayScreen', () => {
     expect((screen.getByTestId('start-roleplay-button') as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('entering the room auto-starts the session and shows the character (not Nicole)', async () => {
+  it('Start roleplay shows a CASE BRIEF before the call, then enters the room', async () => {
     render(<RoleplayScreen />);
     await pickThrough();
     fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    // Brief appears (after the short generating beat) — NOT the room yet.
+    const brief = await screen.findByTestId('roleplay-brief', undefined, { timeout: 3000 });
+    expect(brief).toBeInTheDocument();
+    expect(screen.queryByTestId('roleplay-room')).toBeNull();
+    expect(brief.textContent).toMatch(/who you'?re talking to/i);
+    expect(brief.textContent).toContain('Grant');
+    // The session must NOT have started during the brief (the call hasn't begun).
+    expect(sessionStart).not.toHaveBeenCalled();
+    // "Start the call" → the live room.
+    fireEvent.click(screen.getByTestId('start-from-brief-button'));
+    expect(screen.getByTestId('roleplay-room')).toBeInTheDocument();
+    expect(sessionStart).toHaveBeenCalled();
+  });
+
+  it('entering the room auto-starts the session and shows the character (not Nicole)', async () => {
+    render(<RoleplayScreen />);
+    await pickThrough();
+    await enterRoom();
 
     expect(screen.getByTestId('roleplay-room')).toBeInTheDocument();
     expect(sessionStart).toHaveBeenCalled();
@@ -194,7 +221,7 @@ describe('RoleplayScreen', () => {
   it('relabels the character lines with the alias in the LiveRoom transcript', async () => {
     render(<RoleplayScreen />);
     await pickThrough();
-    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    await enterRoom();
 
     // LiveRoom renders via ChatTranscript: .chat-who spans carry the speaker label.
     // The character's lines should show the alias "Grant", not the raw "nicole".
@@ -208,7 +235,7 @@ describe('RoleplayScreen', () => {
   it('End & score stops the session, shows SessionResults, and saves the run', async () => {
     render(<RoleplayScreen />);
     await pickThrough();
-    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    await enterRoom();
     fireEvent.click(screen.getByTestId('end-score-button'));
 
     expect(sessionStop).toHaveBeenCalled();
@@ -230,7 +257,7 @@ describe('RoleplayScreen', () => {
   it('Done returns to the picker', async () => {
     render(<RoleplayScreen />);
     await pickThrough();
-    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    await enterRoom();
     fireEvent.click(screen.getByTestId('end-score-button'));
     await screen.findByTestId('session-results');
     fireEvent.click(screen.getByTestId('results-done'));
@@ -260,7 +287,7 @@ describe('RoleplayScreen', () => {
     };
     render(<RoleplayScreen />);
     await pickThrough();
-    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    await enterRoom();
     fireEvent.click(screen.getByTestId('end-score-button'));
     await screen.findByTestId('session-results');
     expect(screen.getByTestId('results-overall')).toHaveTextContent('7.2');
@@ -271,7 +298,7 @@ describe('RoleplayScreen', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }) as unknown as typeof fetch);
     render(<RoleplayScreen />);
     await pickThrough();
-    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    await enterRoom();
     fireEvent.click(screen.getByTestId('end-score-button'));
     // The score-error screen appears with a retry; NOT a results card.
     expect(await screen.findByTestId('roleplay-score-error')).toBeInTheDocument();
@@ -291,7 +318,7 @@ describe('RoleplayScreen', () => {
     }) as unknown as typeof fetch);
     render(<RoleplayScreen />);
     await pickThrough();
-    fireEvent.click(screen.getByTestId('start-roleplay-button'));
+    await enterRoom();
     fireEvent.click(screen.getByTestId('end-score-button'));
     await screen.findByTestId('retry-score-button');
     healScore = true; // the scoring service recovers

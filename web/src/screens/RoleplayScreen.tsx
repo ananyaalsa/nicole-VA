@@ -21,6 +21,8 @@ import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { LiveRoom } from '../components/LiveRoom';
 import { CallPresence } from '../components/CallPresence';
 import { MicControls } from '../components/MicControls';
+import { RoleplayBriefCard } from '../components/RoleplayBriefCard';
+import { synthesizeBrief, briefOverlay, type RoleplayBrief } from '../training/roleplayBrief';
 import { SessionResults } from '../components/SessionResults';
 import { requestScore, postLiveStatus, type ResultLine, type Scorecard } from '../training/scoreApi';
 import '../components/ProfilePanel.css';
@@ -104,7 +106,11 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
   const [building, setBuilding] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
 
-  const [stage, setStage] = useState<'picker' | 'room'>('picker');
+  // picker → (Start) generating → brief (case cards) → (Start the call) room.
+  const [stage, setStage] = useState<'picker' | 'generating' | 'brief' | 'room'>('picker');
+  const [brief, setBrief] = useState<RoleplayBrief | null>(null);
+  // Bumped each time the user starts, so a re-run synthesizes a fresh-feeling case.
+  const briefVariantRef = useRef(0);
 
   // Load the profiles once on mount.
   useEffect(() => {
@@ -182,6 +188,64 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
 
   const canStart = persona !== null && scenario !== null;
 
+  // While "generating", synthesize the case brief (client-side, no model call) after
+  // a brief beat, then show the brief cards. A fresh variant each time → varied case.
+  useEffect(() => {
+    if (stage !== 'generating' || !persona || !scenario) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      if (!alive) return;
+      setBrief(synthesizeBrief(persona, scenario, difficulty, briefVariantRef.current));
+      setStage('brief');
+    }, 900);
+    return () => { alive = false; clearTimeout(t); };
+  }, [stage, persona, scenario, difficulty]);
+
+  // GENERATING — brief "spinning up your case" beat before the brief appears, so
+  // entering a call feels like being briefed rather than dropped in cold.
+  if (stage === 'generating' && persona && scenario) {
+    return (
+      <div className="roleplay roleplay--generating" data-testid="roleplay-brief-generating">
+        <div className="rp-generating">
+          <div className="rp-generating__spinner" aria-hidden="true" />
+          <p className="rp-generating__title">Setting up your roleplay…</p>
+          <p className="rp-generating__sub">Building a fresh case with {persona.name}. One moment.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // BRIEF — the case cards. The user reads who/situation/objective, then starts.
+  if (stage === 'brief' && persona && scenario && brief) {
+    return (
+      <div className="roleplay roleplay--brief" data-testid="roleplay-brief-view">
+        <TopBar
+          current="roleplay"
+          hideNav
+          brand={
+            <div className="topbar-brand">
+              <div className="session-coach-avatar session-coach-avatar--initial" aria-hidden="true">
+                {persona.name.trim().charAt(0).toUpperCase()}
+              </div>
+              <div className="session-coach-info">
+                <span className="topbar-brand-name">{persona.name}</span>
+                <span className="session-coach-status">Case brief</span>
+              </div>
+            </div>
+          }
+          right={
+            <button type="button" className="training__exit" data-testid="brief-back" onClick={() => setStage('picker')}>
+              Back
+            </button>
+          }
+        />
+        <div className="brief-view__scroll">
+          <RoleplayBriefCard brief={brief} onStart={() => setStage('room')} />
+        </div>
+      </div>
+    );
+  }
+
   if (stage === 'room' && persona && scenario) {
     return (
       <RoleplayRoom
@@ -190,6 +254,7 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
         difficulty={difficulty}
         dimensions={activeProfile?.dimensions ?? []}
         profileId={profileId ?? 'custom'}
+        briefOverlayText={brief ? briefOverlay(brief) : undefined}
         onAgain={() => {
           // Keep the same persona/scenario picked; just go back to the picker.
           setStage('picker');
@@ -424,7 +489,7 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
             className="picker-cta-bar__btn"
             data-testid="start-roleplay-button"
             disabled={!canStart}
-            onClick={() => setStage('room')}
+            onClick={() => { briefVariantRef.current += 1; setBrief(null); setStage('generating'); }}
           >
             Start roleplay <span aria-hidden="true">→</span>
           </button>
@@ -443,6 +508,8 @@ interface RoleplayRoomProps {
   difficulty: Difficulty;
   dimensions: DimensionDef[];
   profileId: string;
+  /** The case brief as an overlay line, so the prospect plays the briefed scenario. */
+  briefOverlayText?: string;
   onDone: () => void;
   onAgain: () => void;
 }
@@ -461,6 +528,7 @@ function RoleplayRoom({
   difficulty,
   dimensions,
   profileId,
+  briefOverlayText,
   onDone,
   onAgain,
 }: RoleplayRoomProps): JSX.Element {
@@ -468,7 +536,7 @@ function RoleplayRoom({
   const session = useRoleplaySession({
     persona,
     scenario,
-    extraOverlay: DIFFICULTY_META[difficulty].overlay,
+    extraOverlay: [DIFFICULTY_META[difficulty].overlay, briefOverlayText].filter(Boolean).join('\n\n'),
   });
   const { connected, ready, micOn, transcript, amplitude, realtime, start, stop, toggleMic, setMic, clearTranscript, aiMuted, toggleAiMute } = session;
 
