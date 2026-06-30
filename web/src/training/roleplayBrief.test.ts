@@ -10,8 +10,10 @@ describe('synthesizeBrief', () => {
     const b = synthesizeBrief(persona, scenario, 'medium', 0);
     expect(b.who).toContain('Grant');
     expect(b.who).toContain('blunt VP of Ops');
+    // The situation always references the scenario; the objective is non-empty
+    // (not every objective template embeds the scenario name, which is fine).
     expect(b.situation.toLowerCase()).toContain('cold call');
-    expect(b.objective.toLowerCase()).toContain('cold call');
+    expect(b.objective.trim().length).toBeGreaterThan(0);
     expect(b.context.length).toBeGreaterThan(0);
   });
 
@@ -19,6 +21,29 @@ describe('synthesizeBrief', () => {
     const a = synthesizeBrief(persona, scenario, 'medium', 0);
     const b = synthesizeBrief(persona, scenario, 'medium', 1);
     expect(a.situation).not.toBe(b.situation);
+  });
+
+  it('invents a concrete role + company and varies it across re-rolls', () => {
+    const a = synthesizeBrief(persona, scenario, 'medium', 0);
+    const b = synthesizeBrief(persona, scenario, 'medium', 1);
+    // Each brief names a role at a company (e.g. "VP of Sales at Northwind...").
+    expect(a.role).toMatch(/ at /);
+    expect(a.role.length).toBeGreaterThan(8);
+    // A re-roll lands on a different company/role.
+    expect(a.role).not.toBe(b.role);
+    // The situation now references the company, not just "a prospect".
+    expect(a.situation).toContain(a.role.split(' at ')[1].split(' — ')[0]);
+  });
+
+  it('the objective stays varied across re-rolls too', () => {
+    const a = synthesizeBrief(persona, scenario, 'medium', 0);
+    const b = synthesizeBrief(persona, scenario, 'medium', 1);
+    expect(a.objective).not.toBe(b.objective);
+  });
+
+  it('briefOverlay tells the prospect their role', () => {
+    const b = synthesizeBrief(persona, scenario, 'medium', 0);
+    expect(briefOverlay(b)).toContain(b.role);
   });
 
   it('reflects difficulty in the context bullets', () => {

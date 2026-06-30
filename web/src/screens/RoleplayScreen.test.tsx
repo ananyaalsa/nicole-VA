@@ -196,8 +196,10 @@ describe('RoleplayScreen', () => {
     const brief = await screen.findByTestId('roleplay-brief', undefined, { timeout: 3000 });
     expect(brief).toBeInTheDocument();
     expect(screen.queryByTestId('roleplay-room')).toBeNull();
-    expect(brief.textContent).toMatch(/who you'?re talking to/i);
+    // The redesigned brief leads with "Your case" + the prospect's name and role.
+    expect(brief.textContent).toMatch(/your case/i);
     expect(brief.textContent).toContain('Grant');
+    expect(brief.textContent).toMatch(/your objective/i);
     // The session must NOT have started during the brief (the call hasn't begun).
     expect(sessionStart).not.toHaveBeenCalled();
     // "Start the call" → the live room.

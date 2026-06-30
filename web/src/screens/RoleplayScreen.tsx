@@ -240,7 +240,15 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
           }
         />
         <div className="brief-view__scroll">
-          <RoleplayBriefCard brief={brief} onStart={() => setStage('room')} />
+          <RoleplayBriefCard
+            brief={brief}
+            personaName={persona.name}
+            onStart={() => setStage('room')}
+            onReshuffle={() => {
+              briefVariantRef.current += 1;
+              setBrief(synthesizeBrief(persona, scenario, difficulty, briefVariantRef.current));
+            }}
+          />
         </div>
       </div>
     );

@@ -1,47 +1,146 @@
+/* Roleplay CASE BRIEF card — the briefing screen between picking a scenario and
+   starting the live call. A single composed card: hero (who + role), a two-up
+   grid (situation / objective), at-a-glance fact chips, then the actions. */
+
 .brief-card {
   width: 100%;
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 28px 28px 32px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl, 20px);
+  box-shadow: var(--shadow-md, 0 8px 30px rgba(0, 0, 0, 0.06));
+  padding: 26px 26px 24px;
 }
-.brief-card__eyebrow {
-  margin: 0;
-  font-size: 0.7rem;
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.brief-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.brief-hero__avatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong, #0f5132));
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb, 16, 122, 87), 0.35);
+}
+.brief-hero__text { min-width: 0; }
+.brief-hero__eyebrow {
+  margin: 0 0 2px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent);
 }
-.brief-card__section {
-  background: var(--surface);
+.brief-hero__name {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1.1;
+}
+.brief-hero__role { margin: 3px 0 0; font-size: 0.92rem; color: var(--text-2); font-weight: 500; }
+.brief-hero__tagline { margin: 6px 0 0; font-size: 0.84rem; color: var(--text-3); font-style: italic; }
+
+/* ── Situation / objective grid ───────────────────────────────────────────── */
+.brief-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 14px;
+}
+.brief-block {
+  background: var(--surface-2, rgba(0, 0, 0, 0.025));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 16px 18px;
+  padding: 14px 16px;
 }
-.brief-card__h {
-  margin: 0 0 8px;
-  font-size: 0.78rem;
+.brief-block--objective {
+  background: rgba(var(--accent-rgb, 16, 122, 87), 0.06);
+  border-color: rgba(var(--accent-rgb, 16, 122, 87), 0.18);
+}
+.brief-block__h {
+  margin: 0 0 6px;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-3);
 }
-.brief-card__who { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text); }
-.brief-card__situation, .brief-card__objective { margin: 0; font-size: 0.98rem; line-height: 1.5; color: var(--text); }
-.brief-card__context {
-  margin: 12px 0 0;
-  padding-left: 18px;
+.brief-block--objective .brief-block__h { color: var(--accent); }
+.brief-block__body { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text); }
+.brief-block__body--goal { font-weight: 600; }
+
+/* ── At-a-glance fact chips ───────────────────────────────────────────────── */
+.brief-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  color: var(--text-2);
-  font-size: 0.9rem;
+  gap: 8px;
 }
-.brief-card__start { align-self: center; min-width: 200px; }
+.brief-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--text);
+  padding: 9px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.brief-fact__label {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  min-width: 64px;
+}
+.brief-fact__val { color: var(--text-2); line-height: 1.4; }
+
+/* ── Actions ──────────────────────────────────────────────────────────────── */
+.brief-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+.brief-card__start { min-width: 220px; }
+.brief-reshuffle {
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  transition: color 130ms ease, background 130ms ease;
+}
+.brief-reshuffle:hover { color: var(--accent); background: rgba(var(--accent-rgb, 16, 122, 87), 0.08); }
 
 @media (max-width: 640px) {
-  .brief-card { padding: 18px 14px 24px; gap: 16px; }
+  .brief-card { padding: 18px 14px 22px; gap: 14px; border-radius: var(--radius-lg); }
+  .brief-grid { grid-template-columns: 1fr; }
+  .brief-hero__name { font-size: 1.2rem; }
 }
