@@ -12,7 +12,8 @@
   padding: 16px;
 }
 
-/* Main column: presence panel pinned on top, transcript feed scrolls below. */
+/* Main column: avatar panel GROWS to fill the column height (so there's no big
+   empty void below it), the status row + transcript feed sit beneath it. */
 .live-room__main {
   grid-area: main;
   display: flex;
@@ -23,9 +24,8 @@
 .live-room__presence { flex-shrink: 0; }
 .live-room__feed { flex: 1; overflow-y: auto; min-height: 0; padding-right: 6px; }
 
-/* DESKTOP moving avatar panel — a contained lip-syncing avatar above the status
-   + transcript, framed like Talk (head + upper body with headroom). Tall enough
-   that it isn't a "short box" so it uses the same full-body framing as Talk. */
+/* DESKTOP moving avatar panel — fixed-height lip-syncing avatar above the status
+   + transcript, framed like Talk (head + upper body with headroom). */
 .live-room__avatar {
   flex-shrink: 0;
   height: 420px;

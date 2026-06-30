@@ -798,6 +798,16 @@ function RoleplayRoom({
             </div>
           </div>
         }
+        right={
+          <button
+            type="button"
+            className="training__exit"
+            data-testid="exit-button"
+            onClick={() => { stop(); onDone(); }}
+          >
+            Exit
+          </button>
+        }
       />
 
       <LiveRoom
@@ -847,16 +857,16 @@ function RoleplayRoom({
         }
         footer={
           <>
-            <span className={`room-footer__turn room-footer__turn--${turnState}`}>{turnLabel}</span>
+            {/* SAME layout as Training: mic controls pinned left, the primary
+                action pinned right (.room-footer__actions has margin-left:auto). */}
+            <MicControls
+              ready={ready}
+              micOn={micOn}
+              onToggleMic={toggleMic}
+              aiMuted={aiMuted}
+              onToggleAiMute={toggleAiMute}
+            />
             <div className="room-footer__actions">
-              {/* Mic-ready indicator + manual mic + mute-the-character controls. */}
-              <MicControls
-                ready={ready}
-                micOn={micOn}
-                onToggleMic={toggleMic}
-                aiMuted={aiMuted}
-                onToggleAiMute={toggleAiMute}
-              />
               <button
                 type="button"
                 className="ctrl-btn ctrl-btn--end"
