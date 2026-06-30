@@ -82,7 +82,10 @@ export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
       'Change the voice you speak in. Use when the user asks you to switch your ' +
       'voice (e.g. "switch to Leda", "use Fenrir", "talk in a deeper voice" -> ' +
       'pick a fitting male voice like Charon). Female: Aoede, Kore, Leda, Zephyr. ' +
-      'Male: Charon, Fenrir, Orus, Puck.',
+      'Male: Charon, Fenrir, Orus, Puck. Voice names are heard aloud and often ' +
+      'come through misheard/phonetic — map to the nearest real name and call ' +
+      'this tool anyway: "AOD"/"ay-oh-dee"/"aoidi" -> Aoede; "core"/"cora" -> Kore; ' +
+      '"fenris"/"fen rir" -> Fenrir. Do not ask the user to repeat the name.',
     parameters: {
       type: 'object',
       properties: {
