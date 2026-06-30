@@ -3,11 +3,11 @@
 
 .home {
   width: 100%;
-  max-width: 560px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
+  gap: 16px;
   text-align: center;
   padding: 8px 4px;
 }
@@ -17,9 +17,8 @@
   position: relative;
   width: 100%;
   text-align: left;
-  margin-bottom: 6px; /* extra breathing room before the greeting */
 }
-.home-brief__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.home-brief__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
 .home-brief__close {
   width: 22px; height: 22px; border-radius: 50%;
   border: none; background: transparent; color: var(--text-3);
@@ -32,15 +31,15 @@
 }
 
 /* Separate cards per source, each with its brand icon. */
-.home-brief__cards { display: flex; flex-direction: column; gap: 12px; }
+.home-brief__cards { display: flex; flex-direction: column; gap: 8px; }
 .brief-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
-.brief-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.brief-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .brief-card__ic { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
 .brief-card__ic svg { width: 18px; height: 18px; }
 .brief-card__label { font-size: 0.74rem; font-weight: 700; color: var(--text-2); letter-spacing: 0.02em; }

@@ -17,7 +17,9 @@ import { handleSessionRoute } from './session/routes.js';
 import { handleIntegrationsRoute } from './integrations/routes.js';
 import { handleBriefRoute } from './integrations/briefRoute.js';
 import { handleWeatherRoute } from './weather/routes.js';
+import { handleActivityRoute } from './activity/routes.js';
 import { ensureSchema } from './memory/db.js';
+import { ensureActivitySchema } from './activity/activityDb.js';
 import { ensureTrainingSchema } from './training/historyDb.js';
 import { ensureAuthSchema } from './auth/migrate.js';
 import { ensureIntegrationsSchema } from './integrations/db.js';
@@ -78,6 +80,11 @@ const httpServer = createServer((req, res) => {
 
   if (url.pathname.startsWith('/api/training')) {
     void handleTrainingRoute(req, res).catch((err) => sendServerError(res, err, 'training'));
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/activity')) {
+    void handleActivityRoute(req, res).catch((err) => sendServerError(res, err, 'activity'));
     return;
   }
 
@@ -272,6 +279,7 @@ async function main(): Promise<void> {
     await ensureAuthSchema();
     await ensureIntegrationsSchema();
     await ensureLiveStatusSchema();
+    await ensureActivitySchema();
   } catch (err) {
     console.warn('[server] ensureSchema failed (continuing):', (err as Error).message);
   }

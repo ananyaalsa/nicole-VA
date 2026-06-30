@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { fetchHistory, type TrainingRun } from '../training/trainingApi';
 import { fetchBrief, type Brief, type BriefSection, type BriefEmail, type BriefEvent } from './briefApi';
+import { pingActivity } from './activityApi';
 import { BRAND_ICONS } from '../integrations/brandIcons';
 import {
   greeting, starters, coachStats,
@@ -92,8 +93,12 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
   const [runs, setRuns] = useState<TrainingRun[]>([]);
   const [brief, setBrief] = useState<Brief | null>(null);
   const [briefDismissed, setBriefDismissed] = useState(false);
+  // Server-computed streak (counts ANY day Nicole is opened, not just scored
+  // reps). null until the ping resolves, then it overrides the history-only one.
+  const [dailyStreak, setDailyStreak] = useState<number | null>(null);
 
-  // Load goals (memory), history, and the daily brief in parallel.
+  // Load goals (memory), history, and the daily brief in parallel. Also ping the
+  // activity tracker so simply opening Nicole today advances the streak.
   useEffect(() => {
     if (!token) return;
     let alive = true;
@@ -107,12 +112,16 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
       .catch(() => {});
     fetchHistory(token).then((r) => alive && setRuns(r)).catch(() => {});
     fetchBrief(token).then((b) => alive && setBrief(b)).catch(() => {});
+    pingActivity(token).then((s) => { if (alive && s != null) setDailyStreak(s); }).catch(() => {});
     return () => { alive = false; };
   }, [token]);
 
   const hello = greeting(user?.displayName);
   const chips: Starter[] = starters(goals, 3);
-  const stats: CoachStats = coachStats(runs);
+  const baseStats: CoachStats = coachStats(runs);
+  // Prefer the server's daily streak; fall back to the history-derived one until
+  // the ping resolves (so the pill doesn't flicker to 0 on load).
+  const stats: CoachStats = { ...baseStats, streak: dailyStreak ?? baseStats.streak };
   const showBrief = !briefDismissed && brief?.available && Object.keys(brief.sections).length > 0;
 
   const dismissBrief = useCallback(() => setBriefDismissed(true), []);
