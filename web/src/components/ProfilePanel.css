@@ -475,6 +475,19 @@
 }
 .topbar-avatar-btn:hover { opacity: 0.88; transform: scale(1.05); }
 
+/* "What Nicole remembers" button — sits beside the avatar in the TopBar. */
+.topbar-memory-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--surface-2, rgba(0,0,0,0.04));
+  color: var(--text-2);
+  border: 1px solid var(--border); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.14s, color 0.14s, border-color 0.14s, transform 0.14s;
+  flex-shrink: 0;
+}
+.topbar-memory-btn:hover { color: var(--accent); border-color: var(--accent); transform: scale(1.05); }
+
 /* ── Mobile (≤640px): the right side-drawer becomes a full-height sheet that
    slides up from the bottom, with safe-area padding (NN/g bottom-sheet). ──── */
 @media (max-width: 640px) {

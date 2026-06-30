@@ -1,0 +1,58 @@
+/* MemoryPanel reuses the .history overlay/sheet shell (HistoryPanel.css); these
+   are the memory-specific group + card styles. */
+
+.mem-group { margin-bottom: 22px; }
+.mem-group__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+.mem-group__hint {
+  font-size: 0.8rem;
+  color: var(--text-3);
+  margin: 0 0 10px;
+}
+
+.mem-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.mem-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.mem-card__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mem-card__key {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.mem-card__fact { font-size: 0.92rem; color: var(--text); line-height: 1.4; }
+.mem-card__date { font-size: 0.74rem; color: var(--text-3); }
+
+.mem-card__delete {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.mem-card__delete:hover {
+  background: var(--danger-light, #fbe9e9);
+  color: var(--danger, #b91c1c);
+  border-color: var(--danger, #b91c1c);
+}

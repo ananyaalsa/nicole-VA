@@ -9,6 +9,7 @@ import { Icon } from '../components/Icon';
 import { TopBar } from '../components/TopBar';
 import { HomePanel } from '../home/HomePanel';
 import { ProfilePanel } from '../components/ProfilePanel';
+import { MemoryPanel } from '../components/MemoryPanel';
 import { useToast } from '../ui/toast';
 import { TOOL_TOASTS } from '../ui/toolToasts';
 import { WeatherWidget, type WeatherWidgetHandle } from '../weather/WeatherWidget';
@@ -107,6 +108,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
     VOICES.find((v) => v.name === (defaultVoice ?? DEFAULT_VOICE))?.gender === 'male' ? 'male' : 'female',
   );
   const [profileOpen, setProfileOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const [aiMuted, setAiMuted] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
   // Live2D companion visibility (persisted), controlled here so the toggle can
@@ -416,6 +418,19 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
               <span className="status-dot" aria-hidden="true" />
               <span className="status-text">{liveLabel}</span>
             </span>
+            <button
+              type="button"
+              className="topbar-memory-btn"
+              data-testid="memory-button"
+              onClick={() => setMemoryOpen(true)}
+              aria-label="What Nicole remembers"
+              data-tooltip="What Nicole remembers" data-tooltip-pos="bottom"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3a4 4 0 0 0-4 4c-1.5.5-2.5 2-2.5 3.5 0 1 .4 1.9 1 2.5-.3.5-.5 1.2-.5 1.8a3 3 0 0 0 3 3c.4 1.2 1.5 2 2.9 2s2.5-.8 2.9-2a3 3 0 0 0 3-3c0-.6-.2-1.3-.5-1.8.6-.6 1-1.5 1-2.5 0-1.5-1-3-2.5-3.5a4 4 0 0 0-4-4Z" />
+                <path d="M12 7v11" />
+              </svg>
+            </button>
             <button type="button" className="topbar-avatar-btn" onClick={() => setProfileOpen(true)} aria-label="Open profile">
               {userInitial}
             </button>
@@ -555,6 +570,8 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       )}
 
       <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+
+      {memoryOpen && <MemoryPanel onClose={() => setMemoryOpen(false)} />}
 
       {/* Show/hide-avatar toggle. Only on the ACTIVE Talk screen — TalkScreen
           stays mounted (hidden) when Training/Roleplay are open, but this portal
