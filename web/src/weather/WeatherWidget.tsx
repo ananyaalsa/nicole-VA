@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
+import { createPortal } from 'react-dom';
 import { getCoords, fetchWeatherAt, fetchWeatherFor, type Weather } from './weatherApi';
 import './WeatherWidget.css';
 
@@ -143,13 +144,17 @@ export function WeatherWidget({
         </div>
       )}
 
-      {/* Voice-opened dialog (centered, auto-dismiss). */}
-      {dialog && (
+      {/* Voice-opened dialog (centered, auto-dismiss). Portaled to <body> so it
+          shows on EVERY layout — including mobile, where the widget's host panel
+          is hidden. Otherwise the weather card would be trapped in a display:none
+          container and never appear when Nicole checks the weather by voice. */}
+      {dialog && createPortal(
         <div className="weather-overlay" onClick={() => setDialog(null)}>
           <div onClick={(e) => e.stopPropagation()}>
             <WeatherCard w={dialog} onClose={() => setDialog(null)} />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
