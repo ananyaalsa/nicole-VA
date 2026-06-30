@@ -264,6 +264,13 @@ export interface BuildSystemPromptOpts {
    * the Talk-assistant behavior never leaks in.
    */
   mode?: PromptMode;
+  /**
+   * The language the conversation is CURRENTLY in (e.g. "Hindi", "Spanish"), if
+   * the user has switched away from English. Re-anchored into the prompt on every
+   * (re)connect so a mid-session reconnect (voice change, proactive refresh,
+   * GoAway) keeps replying in that language instead of snapping back to English.
+   */
+  currentLanguage?: string;
 }
 
 /**
@@ -274,6 +281,14 @@ export interface BuildSystemPromptOpts {
 export function buildSystemPrompt(opts: BuildSystemPromptOpts): string {
   const mode = opts.mode ?? 'talk';
   const overlay = opts.overlay?.trim();
+
+  // If the conversation has switched languages, re-anchor it HARD on every
+  // rebuild. Without this, a reconnect (voice change / refresh) makes Nicole's
+  // first reply revert to English even though we'd been speaking, say, Hindi.
+  const lang = opts.currentLanguage?.trim();
+  const languageBlock = lang
+    ? `[LANGUAGE] You are CURRENTLY speaking ${lang} with the user. Continue EVERY reply in ${lang} (romanized in Latin script), including your very next sentence, until the user clearly switches to another language. Do NOT revert to English on your own — not after a voice change, not after any pause or reconnect. Keep speaking ${lang}.`
+    : '';
 
   // PRACTICE MODES (coach / prospect): the overlay IS the whole role. Use only the
   // lean identity core so the Talk-assistant personality (greeting, "what can I do
@@ -286,6 +301,7 @@ export function buildSystemPrompt(opts: BuildSystemPromptOpts): string {
     if (mem) blocks.push(mem);
     const style = opts.stylePrompt?.trim();
     if (style) blocks.push(style);
+    if (languageBlock) blocks.push(languageBlock);
     return blocks.join('\n\n');
   }
 
@@ -305,6 +321,8 @@ export function buildSystemPrompt(opts: BuildSystemPromptOpts): string {
 
   const stylePrompt = opts.stylePrompt?.trim();
   if (stylePrompt) blocks.push(stylePrompt);
+
+  if (languageBlock) blocks.push(languageBlock);
 
   return blocks.join('\n\n');
 }

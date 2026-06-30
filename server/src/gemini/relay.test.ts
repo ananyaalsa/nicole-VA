@@ -125,6 +125,28 @@ describe('LiveSession message relay + transcripts', () => {
     ls.close();
   });
 
+  it('keeps the conversation language across a voice-change reconnect', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client } = makeClient();
+    const ls = new LiveSession({ ai, model: 'm', userId: 'u', client, now, loadUserFacts: async () => [], loadDisplayName: async () => null, loadLiveStatus: async () => null });
+    await ls.connect(CFG);
+    const cb = sessions[0].callbacks;
+    // The conversation switches to Hindi (romanized, as STT delivers it).
+    cb.onmessage?.({ serverContent: { inputTranscription: { text: 'chalo Hindi mein baat karte hain' } } });
+    cb.onmessage?.({ serverContent: { outputTranscription: { text: 'Haan bilkul, main aapki madad kar sakti hoon' } } });
+    cb.onmessage?.({ serverContent: { turnComplete: true } });
+    // The first config (before the switch) carries no language anchor.
+    expect(String(sessions[0].config.systemInstruction)).not.toContain('[LANGUAGE]');
+    // Now the user changes the VOICE — this reconnects with a new session.
+    await ls.setVoice('Leda');
+    expect(sessions.length).toBeGreaterThanOrEqual(2);
+    const newSys = String(sessions[sessions.length - 1].config.systemInstruction);
+    // The rebuilt prompt re-anchors Hindi so the next reply won't revert to English.
+    expect(newSys).toContain('[LANGUAGE]');
+    expect(newSys).toContain('Hindi');
+    ls.close();
+  });
+
   it('captures a session-resumption handle from updates', async () => {
     const { ai, sessions } = makeFakeAI();
     const { client } = makeClient();

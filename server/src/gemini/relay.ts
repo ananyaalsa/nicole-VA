@@ -19,6 +19,7 @@
 
 import { buildLiveConfig } from './liveConfig.js';
 import { buildSystemPrompt } from '../prompt/nicolePrompt.js';
+import { detectLanguage } from './detectLanguage.js';
 import { formatMemoryBlock } from '../memory/memoryBlock.js';
 import { buildActivityDigest } from '../memory/activityDigest.js';
 import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
@@ -121,6 +122,10 @@ export class LiveSession {
   private runningSummary = '';
   private pendingUserText = '';
   private pendingNicoleText = '';
+  // The language the conversation is currently in (e.g. "Hindi"), or null for
+  // English/default. Re-anchored into the prompt on every (re)connect so a voice
+  // change or session refresh doesn't make Nicole revert to English.
+  private currentLanguage: string | null = null;
 
   // True while the user is mid-utterance (don't reconnect mid-speech).
   private userSpeaking = false;
@@ -335,6 +340,8 @@ export class LiveSession {
       stylePrompt: cfg.stylePrompt,
       // Only teach Nicole about integrations when she actually has the tools.
       integrationsEnabled: integrationDecls.length > 0,
+      // Keep replying in the conversation's current language across reconnects.
+      currentLanguage: this.currentLanguage ?? undefined,
     });
     return buildLiveConfig({
       systemPrompt,
@@ -432,6 +439,12 @@ export class LiveSession {
       const userText = this.pendingUserText.trim();
       this.turns.push({ role: 'user', text: userText });
       this.pendingUserText = '';
+      // Track the conversation language so a later reconnect (voice change /
+      // refresh) keeps replying in it instead of snapping back to English. Only
+      // UPDATE on a clear non-English signal; an ambiguous/English-looking turn
+      // (e.g. "ok", a name) leaves the current language as-is.
+      const detected = detectLanguage(userText);
+      if (detected) this.currentLanguage = detected;
       // "Start fresh" detection (talk mode only): if the user asks to start fresh /
       // clear history, suppress learned memory for the rest of this session. Takes
       // full effect on the next session rebuild (summary/reconnect); the prompt's
@@ -445,8 +458,15 @@ export class LiveSession {
       }
     }
     if (this.pendingNicoleText.trim()) {
-      this.turns.push({ role: 'nicole', text: this.pendingNicoleText.trim() });
+      const nicoleText = this.pendingNicoleText.trim();
+      this.turns.push({ role: 'nicole', text: nicoleText });
       this.pendingNicoleText = '';
+      // Nicole's own reply is the clearest signal of the active language —
+      // e.g. the user says "talk in Spanish" (English) and she answers in
+      // Spanish. Latch that so the language survives the next reconnect. (Her
+      // text is romanized, so the romanized heuristics carry it.)
+      const detected = detectLanguage(nicoleText);
+      if (detected) this.currentLanguage = detected;
     }
     // After a completed turn, consider summarizing to keep context bounded.
     void this.maybeSummarize();
