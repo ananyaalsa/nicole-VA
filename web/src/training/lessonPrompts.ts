@@ -91,14 +91,24 @@ const ADVANCE_RIDER =
   'or narrate the lesson structure. Just teach, and let it feel like one continuous conversation.';
 
 // Appended to the active TEACHING phases. The framework is the backbone; HOW Nicole
-// conveys each move varies, adapting to the learner's last reply — so she isn't
-// teaching one rigid way every time.
-const VARY_DELIVERY =
-  '\n\nVARY YOUR DELIVERY: teach each move more than one way — a Socratic question, a short ' +
-  'story or analogy, a quick worked example, or a plain direct explanation. Adapt to the ' +
-  "learner's last reply: if they seem confused or answer in a word, switch to an analogy or " +
-  'worked example; if they engage well, push with a deeper question; if they get it wrong, ' +
-  're-explain plainly then re-ask. Do not lecture in one single style.';
+// conveys each move varies, ADAPTING to this learner — so the drill never feels like
+// the same scripted delivery twice. `style` is assessed from the learner's replies
+// (see teachingStyle.ts) and steers the emphasis for the current phase.
+import type { TeachingStyle } from './teachingStyle';
+
+function varyDelivery(style: TeachingStyle = 'direct'): string {
+  const base =
+    '\n\nVARY YOUR DELIVERY — adapt to THIS learner, do not lecture in one rigid style. ' +
+    'You can teach a move as a Socratic question, a short analogy/story, a quick worked ' +
+    'example, or a plain direct explanation, and you should keep adjusting to their last reply.';
+  const steer =
+    style === 'socratic'
+      ? ' RIGHT NOW lean SOCRATIC: this learner is engaged — challenge them with a deeper "why/how" question and let them reason it out, rather than just telling them.'
+      : style === 'worked_example'
+        ? ' RIGHT NOW lean on a WORKED EXAMPLE: this learner needs to SEE it — demonstrate the move or give a concrete example first, in plain words, before asking them to try.'
+        : ' RIGHT NOW keep it DIRECT and plain: state the move clearly and simply without elaborate framing, then check they have it.';
+  return base + steer;
+}
 
 // Appended to the phases where the learner ACTIVELY ATTEMPTS the moves
 // (guided_practice and the live roleplay_demo). Nicole judges each attempt SILENTLY
@@ -193,6 +203,7 @@ export function buildPhasePrompt(
   phase: Phase | 'level_choice',
   reTeachMove: string | null,
   difficultyPrompt?: string,
+  teachingStyle: TeachingStyle = 'direct',
 ): string {
   const base = BASE(lesson);
 
@@ -264,7 +275,7 @@ export function buildPhasePrompt(
   let out = core + DRIFT_GUARD;
   if (AUTO_PHASES.has(phase)) out += ADVANCE_RIDER;
   if (phase === 'teach' || phase === 'model' || phase === 'guided_practice')
-    out += VARY_DELIVERY;
+    out += varyDelivery(teachingStyle);
   if (GATE_PHASES.has(phase)) out += GATE_RIDER;
   // Phases where the learner actively attempts moves get the SILENT live-scoring
   // instruction so Nicole drives the scorecard + feedback pops via

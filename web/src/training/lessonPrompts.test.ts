@@ -154,6 +154,15 @@ describe('lessonPrompts.buildPhasePrompt', () => {
         expect(p.toLowerCase()).toContain('wait for');
       }
     });
+
+    it('teaching phases steer delivery by the adaptive teaching style', () => {
+      const socratic = buildPhasePrompt(lesson, 'teach', null, undefined, 'socratic');
+      expect(socratic).toMatch(/lean SOCRATIC/i);
+      const worked = buildPhasePrompt(lesson, 'teach', null, undefined, 'worked_example');
+      expect(worked).toMatch(/WORKED EXAMPLE/i);
+      const direct = buildPhasePrompt(lesson, 'teach', null, undefined, 'direct');
+      expect(direct).toMatch(/keep it DIRECT/i);
+    });
   });
 
   describe('buildProspectOverlay (live-rep persona)', () => {

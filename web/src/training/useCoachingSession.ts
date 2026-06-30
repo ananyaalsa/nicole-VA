@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import type { TranscriptLine } from '../engine/types';
 import { DEFAULT_VOICE } from '../audio/voices';
 import { buildPhasePrompt, buildProspectOverlay, prospectName, type ClientLessonSpec } from './lessonPrompts';
+import { assessTeachingStyle, type TeachingStyle } from './teachingStyle';
 import { advancePhase, type Phase } from './phaseMachine';
 import { shouldAdvancePhase, AUTO_PHASES, type AdvanceSignals } from './phaseAdvance';
 import { requestScore, type Scorecard, type ResultLine, type DimensionInput } from './scoreApi';
@@ -143,10 +144,14 @@ export function useCoachingSession(
   const [aiMuted, setAiMuted] = useState(false);
   const { token } = useAuth();
 
-  // The coach overlay is fully derived from lesson + phase.
+  // Adaptive teaching: infer HOW to pitch the lesson for this learner from their
+  // replies, so the same drill doesn't feel scripted. Re-assessed as they engage.
+  const [teachingStyle, setTeachingStyle] = useState<TeachingStyle>('direct');
+
+  // The coach overlay is derived from lesson + phase + the adaptive teaching style.
   const coachOverlay = useMemo(
-    () => buildPhasePrompt(lesson, phase, null),
-    [lesson, phase],
+    () => buildPhasePrompt(lesson, phase, null, undefined, teachingStyle),
+    [lesson, phase, teachingStyle],
   );
   // Mirror the overlay + track which one the live coach session is connected with,
   // so the reconnect effect only reconnects on a REAL phase change (not on the
@@ -363,6 +368,16 @@ export function useCoachingSession(
       userTurnsThisPhaseRef.current += delta;
     }
     lastUserLineCountRef.current = youLines;
+  }, [coach.transcript]);
+
+  // Adaptive teaching: re-assess the learner's style from the coach transcript as
+  // they engage, but only during the teaching phases (not gates/rep). Updating
+  // `teachingStyle` re-derives coachOverlay, which the phase-directive effect then
+  // relays to the live coach — so her delivery adjusts mid-lesson without a reconnect.
+  useEffect(() => {
+    if (!AUTO_PHASES.includes(phaseRef.current)) return;
+    const next = assessTeachingStyle(coach.transcript);
+    setTeachingStyle((cur) => (cur === next ? cur : next));
   }, [coach.transcript]);
 
   // App-driven evaluator: advance the phase when engagement/time signals are met.
