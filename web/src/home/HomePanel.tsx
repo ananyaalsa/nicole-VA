@@ -25,13 +25,13 @@ export interface HomePanelProps {
  */
 function renderEmails(section: BriefSection): JSX.Element {
   const items = Array.isArray(section.data) ? (section.data as BriefEmail[]) : [];
-  if (!items.length) return <p className="brief-card__text">{section.summary}</p>;
+  if (!items.length) return <p className="home-brief-card__text">{section.summary}</p>;
   // Keep it calm: a count headline + just the top 2 senders (no subjects), so
   // the card reassures at a glance rather than reproducing the inbox.
   const shown = items.slice(0, 2);
   const extra = items.length - shown.length;
   return (
-    <p className="brief-card__text">
+    <p className="home-brief-card__text">
       <strong>{items.length}</strong> recent {items.length === 1 ? 'email' : 'emails'}
       {': '}
       {shown.map((e) => e.from).join(', ')}
@@ -48,7 +48,7 @@ function renderEmails(section: BriefSection): JSX.Element {
  */
 function renderCalendar(section: BriefSection): JSX.Element {
   const events = Array.isArray(section.data) ? (section.data as BriefEvent[]) : [];
-  if (!events.length) return <p className="brief-card__text">{section.summary}</p>;
+  if (!events.length) return <p className="home-brief-card__text">{section.summary}</p>;
   const fmt = (e: BriefEvent): string => {
     const iso = e.start?.dateTime ?? e.start?.date ?? '';
     if (!iso) return '';
@@ -137,30 +137,30 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
           </div>
           <div className="home-brief__cards">
             {brief.sections.calendar && (
-              <div className="brief-card" data-source="calendar">
-                <div className="brief-card__head">
-                  <span className="brief-card__ic">{BRAND_ICONS.calendar}</span>
-                  <span className="brief-card__label">Calendar</span>
+              <div className="home-brief-card" data-source="calendar">
+                <div className="home-brief-card__head">
+                  <span className="home-brief-card__ic">{BRAND_ICONS.calendar}</span>
+                  <span className="home-brief-card__label">Calendar</span>
                 </div>
                 {renderCalendar(brief.sections.calendar)}
               </div>
             )}
             {brief.sections.email && (
-              <div className="brief-card" data-source="email">
-                <div className="brief-card__head">
-                  <span className="brief-card__ic">{BRAND_ICONS.gmail}</span>
-                  <span className="brief-card__label">Email</span>
+              <div className="home-brief-card" data-source="email">
+                <div className="home-brief-card__head">
+                  <span className="home-brief-card__ic">{BRAND_ICONS.gmail}</span>
+                  <span className="home-brief-card__label">Email</span>
                 </div>
                 {renderEmails(brief.sections.email)}
               </div>
             )}
             {brief.sections.tasks && (
-              <div className="brief-card" data-source="tasks">
-                <div className="brief-card__head">
-                  <span className="brief-card__ic">{BRAND_ICONS.todoist}</span>
-                  <span className="brief-card__label">Tasks</span>
+              <div className="home-brief-card" data-source="tasks">
+                <div className="home-brief-card__head">
+                  <span className="home-brief-card__ic">{BRAND_ICONS.todoist}</span>
+                  <span className="home-brief-card__label">Tasks</span>
                 </div>
-                <p className="brief-card__text">{brief.sections.tasks.summary}</p>
+                <p className="home-brief-card__text">{brief.sections.tasks.summary}</p>
               </div>
             )}
           </div>

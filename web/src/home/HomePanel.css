@@ -30,24 +30,28 @@
   text-transform: uppercase; color: var(--accent);
 }
 
-/* Separate cards per source, each with its brand icon. */
+/* Separate cards per source, each with its brand icon.
+   NOTE: these are namespaced .home-brief-card* (NOT .brief-card) on purpose —
+   RoleplayBriefCard.css owns a global `.brief-card` with 28px padding + 20px
+   gap, and since all CSS is bundled globally those rules would bleed in and
+   make these home cards huge. Keep the names distinct. */
 .home-brief__cards { display: flex; flex-direction: column; gap: 8px; }
-.brief-card {
+.home-brief-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   padding: 10px 14px;
 }
-.brief-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.brief-card__ic { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
-.brief-card__ic svg { width: 18px; height: 18px; }
-.brief-card__label { font-size: 0.74rem; font-weight: 700; color: var(--text-2); letter-spacing: 0.02em; }
-.brief-card__text { margin: 0; font-size: 0.84rem; color: var(--text); line-height: 1.45; }
+.home-brief-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.home-brief-card__ic { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
+.home-brief-card__ic svg { width: 18px; height: 18px; }
+.home-brief-card__label { font-size: 0.74rem; font-weight: 700; color: var(--text-2); letter-spacing: 0.02em; }
+.home-brief-card__text { margin: 0; font-size: 0.84rem; color: var(--text); line-height: 1.45; }
 
 /* Clean calendar list — one event per row: title on the left, day/time on the
    right with a clear gap (so "Meeting" and "Sat, Jul 4" never run together). */
-.brief-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.brief-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .brief-list__row {
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
 }
