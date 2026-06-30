@@ -54,8 +54,12 @@ export function LiveRoom({
   }
 
   return (
-    <div className="live-room" data-testid="live-room">
+    <div className={`live-room${centerAvatar ? ' live-room--has-avatar' : ''}`} data-testid="live-room">
       <div className="live-room__main">
+        {/* DESKTOP: the moving lip-syncing avatar sits above the status + transcript,
+            so the room feels like a live call AND you can still read everything.
+            (On mobile we returned the avatar-only view above.) */}
+        {centerAvatar && <div className="live-room__avatar" data-testid="live-room-avatar">{centerAvatar}</div>}
         {presence && <div className="live-room__presence">{presence}</div>}
         <div className="live-room__feed" ref={feedRef}>
           {hasAny ? (

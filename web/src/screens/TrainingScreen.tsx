@@ -390,11 +390,15 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   // coach otherwise — so the on-screen "speaking" pulse tracks whoever is talking.
   const speaking = useDebouncedSpeaking(session.activeAmplitude > 0.02);
 
-  // Mobile = the big centered lip-syncing avatar, no transcript. The COACH is
+  // The big lip-syncing avatar (center on mobile, panel on desktop). The COACH is
   // Nicole (the user's companion avatar, Aria/Noah); the live-rep PROSPECT is the
-  // male Natori avatar. The active session's amplitude drives the lip-sync.
+  // Chitose avatar. The active session's amplitude drives the lip-sync. Load prefs
+  // ONCE (not every render) so the avatar's props stay referentially stable and
+  // never trigger a re-render/update loop.
   const isMobile = useIsMobile();
-  const companionId: 'aria' | 'noah' = loadAvatarPrefs().avatar === 'noah' ? 'noah' : 'aria';
+  const avatarPrefsRef = useRef(loadAvatarPrefs());
+  const companionId: 'aria' | 'noah' = avatarPrefsRef.current.avatar === 'noah' ? 'noah' : 'aria';
+  const companionColors = avatarPrefsRef.current.colors[companionId];
   const centerAvatarId: 'aria' | 'noah' | 'chitose' = session.inLiveRep ? 'chitose' : companionId;
 
   // Live-rep coaching tips (TRAINING ONLY): detect when the learner is stuck during
@@ -581,7 +585,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
             amplitude={session.activeAmplitude}
             speaking={speaking}
             avatarId={centerAvatarId}
-            colors={session.inLiveRep ? undefined : loadAvatarPrefs().colors[companionId]}
+            colors={session.inLiveRep ? undefined : companionColors}
           />
         }
         presence={

@@ -215,12 +215,34 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
           }
           const mh = live2dModel.internalModel.height || 1;
           const mw = live2dModel.internalModel.width || 1;
-          // Fit her ENTIRE rigged form within the box (whichever axis is tighter),
-          // with a little headroom. Positioned a bit LOWER in the box.
-          const scale = Math.min(w / mw, h / mh) * 0.95;
-          live2dModel.scale.set(scale);
-          live2dModel.anchor.set(0.5, 0.5);
-          live2dModel.position.set(w / 2, h * 0.6); // lower than centre
+          // Two framings, chosen by the box shape so the HEAD is never clipped:
+          //  • TALL box (mobile full-screen): fit the whole rigged form, sitting a
+          //    little low so there's headroom — full body visible.
+          //  • SHORT/WIDE box (the desktop avatar panel, ~240px): a full body
+          //    scaled to fit height would shrink to a speck AND, scaled to width,
+          //    would push the head off the top. Instead frame the UPPER BODY:
+          //    scale to width, anchor at the top, so the face + torso fill the
+          //    panel and the head is always in view.
+          const boxIsShort = h / w < 1.1;
+          if (boxIsShort) {
+            // HEAD-AND-SHOULDERS crop for a short/wide panel. Scale so roughly the
+            // top THIRD of the rigged body (head + shoulders) fills the box height,
+            // and pin the model's top a touch above the box top so the full head
+            // shows and the torso continues below (clipped by overflow:hidden).
+            // Cap by width so a very wide panel doesn't blow the face up.
+            const byHead = (h / (mh * 0.42));     // ~top 42% of body fills the height
+            const byWidth = (w / mw) * 1.0;       // never wider than the box
+            const scale = Math.min(byHead, byWidth);
+            live2dModel.scale.set(scale);
+            live2dModel.anchor.set(0.5, 0);       // top-center anchor
+            live2dModel.position.set(w / 2, h * 0.04); // head just below the top edge
+          } else {
+            // Fit her ENTIRE rigged form within the box, positioned a bit LOWER.
+            const scale = Math.min(w / mw, h / mh) * 0.95;
+            live2dModel.scale.set(scale);
+            live2dModel.anchor.set(0.5, 0.5);
+            live2dModel.position.set(w / 2, h * 0.6); // lower than centre
+          }
         };
         fit();
         // The box may not be measured on the first synchronous pass (or while

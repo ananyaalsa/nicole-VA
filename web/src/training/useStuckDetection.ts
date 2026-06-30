@@ -36,8 +36,15 @@ export function useStuckDetection({ transcript, active }: UseStuckDetectionOptio
 
   // Inspect each committed line: a new learner line resets the clock + may itself be
   // a ramble/concession; a new prospect line just resets the silence clock.
-  const youLines = transcript.filter((l) => l.speaker === 'you');
-  const youCount = youLines.length;
+  // NB: derive primitives for the deps. `transcript.filter(...)` returns a NEW
+  // array every render, so it must NEVER be an effect dependency — that made the
+  // effect re-run (and setSignal) on every render, an infinite update loop once
+  // the screen began re-rendering each frame for the live avatar.
+  const youCount = transcript.reduce((n, l) => (l.speaker === 'you' ? n + 1 : n), 0);
+  const lastYouText = (() => {
+    for (let i = transcript.length - 1; i >= 0; i--) if (transcript[i].speaker === 'you') return transcript[i].text;
+    return '';
+  })();
   const lastLineText = transcript.length ? transcript[transcript.length - 1].text : '';
   const lastSpeaker = transcript.length ? transcript[transcript.length - 1].speaker : null;
 
@@ -48,16 +55,15 @@ export function useStuckDetection({ transcript, active }: UseStuckDetectionOptio
     // checked for ramble/concession.
     if (youCount > lastYouCountRef.current) {
       lastYouCountRef.current = youCount;
-      const last = youLines[youLines.length - 1]?.text ?? '';
-      const words = last.split(/\s+/).filter(Boolean).length;
-      if (CONCEDE.test(last)) { seqRef.current += 1; setSignal({ type: 'conceding', id: seqRef.current }); return; }
+      const words = lastYouText.split(/\s+/).filter(Boolean).length;
+      if (CONCEDE.test(lastYouText)) { seqRef.current += 1; setSignal({ type: 'conceding', id: seqRef.current }); return; }
       if (words >= RAMBLE_WORDS) { seqRef.current += 1; setSignal({ type: 'rambling', id: seqRef.current }); return; }
       setSignal(null); // a normal turn → not stuck
       return;
     }
     // A prospect line (no new learner line) just resets the silence clock.
     if (lastSpeaker === 'nicole') setSignal((s) => (s?.type === 'silence' ? null : s));
-  }, [youCount, lastLineText, lastSpeaker, active, youLines]);
+  }, [youCount, lastYouText, lastLineText, lastSpeaker, active]);
 
   // Silence watchdog: count 1s ticks of quiet; once past the threshold, nudge once
   // and re-arm (so it doesn't spam every second). Reset by any new line above.
