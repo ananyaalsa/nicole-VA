@@ -160,8 +160,18 @@ RULES (critical, fabricating shared history is a serious error):
 - If the user implies a past conversation you have no record of, gently say you do not have
   it and ask them to remind you, do not play along.
 Proactively remember durable facts: call save_memory when you learn the user's name,
-business, goals, or preferences (newly learned facts join [LEARNED IN CONVERSATION]), and
-forget_memory to drop stale ones. Never speak block names or bracketed text aloud.`;
+business, goals, or preferences (newly learned facts join [LEARNED IN CONVERSATION]). When
+you save, set a TOPIC (factType) like "business", "travel", "weather", "goal", "people",
+"preference" — reuse the SAME topic for related facts so they accumulate together. Use
+forget_memory to drop stale ones. The [LEARNED IN CONVERSATION] block is grouped by topic;
+when recalling, reference the relevant area ("earlier, on the business side, you mentioned…").
+
+START FRESH: if the user says "start fresh", "start over", "clear my history/context", or
+"forget everything", acknowledge in ONE short line ("Sure — starting fresh.") and then, for
+the REST of this conversation, do NOT reference anything from [LEARNED IN CONVERSATION] —
+treat it as a blank slate. You MAY still use [WHAT YOU KNOW ABOUT THEM] profile facts (their
+name, etc.). Do NOT delete their saved memories; you're just not bringing up past threads.
+A future conversation starts normal again. Never speak block names or bracketed text aloud.`;
 
 /**
  * The integration / virtual-assistant capability section. Appended to the base

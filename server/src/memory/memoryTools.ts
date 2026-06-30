@@ -41,7 +41,11 @@ export const MEMORY_TOOL_DECLS: ToolDecl[] = [
         factType: {
           type: 'string',
           description:
-            'Optional category, e.g. "identity", "business", "goal", "preference".',
+            'The TOPIC this fact belongs to, so memories are organised and accumulate ' +
+            'by area. Use a short, consistent label like "business", "travel", "weather", ' +
+            '"goal", "people", "preference", "health", "finance", or "identity". Reuse the ' +
+            'SAME label for related facts so they group together (all weather facts under ' +
+            '"weather", etc.). Always set this.',
         },
       },
       required: ['fact'],
@@ -66,8 +70,11 @@ export const MEMORY_TOOL_DECLS: ToolDecl[] = [
 ];
 
 /**
- * Turn a fact into a stable slug key from its first few words. Used when
- * save_memory is called without an explicit key.
+ * Turn a fact into a key from its first few words. When save_memory is called
+ * WITHOUT an explicit key we append a short time-based suffix so each new fact is
+ * its OWN row and ACCUMULATES (rather than overwriting a same-slug fact). This is
+ * what lets "all the weather things" build up one by one. An EXPLICIT key (passed
+ * by Nicole) still overwrites — that's how she updates a known fact like "name".
  */
 function slugifyFact(fact: string): string {
   const slug = fact
@@ -77,7 +84,8 @@ function slugifyFact(fact: string): string {
     .split(/\s+/)
     .slice(0, 4)
     .join('-');
-  return slug || 'fact';
+  const suffix = Date.now().toString(36).slice(-5);
+  return `${slug || 'fact'}-${suffix}`;
 }
 
 /**

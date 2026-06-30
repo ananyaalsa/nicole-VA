@@ -41,6 +41,51 @@ function readableFact(key: string, fact: string): string {
   return fact;
 }
 
+/** Human label for a factType/topic ("business" → "Business", "" → "Other"). */
+function topicLabel(factType?: string): string {
+  const t = (factType ?? '').trim();
+  if (!t || t === 'general' || t === 'inferred' || t === 'explicit') return 'Other';
+  return t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ');
+}
+
+/** Preferred display order for common topics; unknown topics sort after, "Other" last. */
+const TOPIC_ORDER = ['Identity', 'Business', 'Goal', 'Goals', 'Project', 'Preference', 'Preferences', 'People', 'Travel', 'Weather', 'Health', 'Finance'];
+
+/**
+ * Group learned facts by their topic (factType) into labelled sections, each
+ * fact dated, newest first. Returns the rendered block body. Multiple facts under
+ * the same topic accumulate as a running list (that's how "all the weather things,
+ * one by one" build up).
+ */
+function groupLearnedByTopic(learned: MemoryFact[]): string {
+  const byTopic = new Map<string, MemoryFact[]>();
+  for (const f of learned) {
+    const label = topicLabel(f.factType);
+    const arr = byTopic.get(label) ?? [];
+    arr.push(f);
+    byTopic.set(label, arr);
+  }
+  const rank = (label: string): number => {
+    const i = TOPIC_ORDER.indexOf(label);
+    if (i >= 0) return i;
+    if (label === 'Other') return 999;
+    return 500; // unknown named topics: between known and Other
+  };
+  const labels = [...byTopic.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const sections = labels.map((label) => {
+    const facts = byTopic
+      .get(label)!
+      .slice()
+      .sort((a, b) => (b.updatedAt ?? b.createdAt ?? '').localeCompare(a.updatedAt ?? a.createdAt ?? ''));
+    const lines = facts.map((f) => {
+      const d = dateOf(f.updatedAt ?? f.createdAt);
+      return `  - ${d ? `${d}: ` : ''}${readableFact(f.key, f.fact)}`;
+    });
+    return `${label}:\n${lines.join('\n')}`;
+  });
+  return sections.join('\n\n');
+}
+
 /**
  * Render durable memory as PROVENANCE-SEPARATED blocks so Nicole never confuses
  * "facts I know about you" (profile/settings) with "things we actually
@@ -65,14 +110,13 @@ export function formatMemoryBlock(facts: MemoryFact[], extras: MemoryBlockExtras
     `[WHAT YOU KNOW ABOUT THEM] — profile facts the user set in settings or that you durably saved. You KNOW these; you did NOT necessarily discuss them.\n` +
     (knowLines.length ? knowLines.join('\n') : '- (nothing on file yet)');
 
-  // ── Block 2: learned-in-conversation facts ──
-  const learnedLines = learned.map((f) => {
-    const d = dateOf(f.updatedAt ?? f.createdAt);
-    return `- ${d ? `${d}: ` : ''}${readableFact(f.key, f.fact)}`;
-  });
+  // ── Block 2: learned-in-conversation facts, GROUPED BY TOPIC ──
+  // Group by factType so Nicole recalls "in the Business area we discussed X, Y"
+  // instead of one flat list, and so repeated topics accumulate together. Topics
+  // render in a stable, sensible order; anything uncategorised falls under "Other".
   const learnedBlock =
-    `[LEARNED IN CONVERSATION] — the ONLY record of what you and the user actually talked about, each dated. Reference these as "last time"/"earlier you mentioned".\n` +
-    (learnedLines.length ? learnedLines.join('\n') : '- (nothing yet — you have not learned anything from past conversations)');
+    `[LEARNED IN CONVERSATION] — the ONLY record of what you and the user actually talked about, grouped by topic and dated. Reference these as "last time"/"earlier you mentioned".\n` +
+    (learned.length ? groupLearnedByTopic(learned) : '- (nothing yet — you have not learned anything from past conversations)');
 
   // ── Block 3: recent activity (training / roleplay) ──
   const activityBlock =

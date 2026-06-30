@@ -53,4 +53,29 @@ describe('formatMemoryBlock', () => {
     expect(block).toContain('[LIVE STATUS]');
     expect(block).toContain('just finished a Roleplay');
   });
+
+  it('GROUPS learned facts by topic (factType) into labelled sections', () => {
+    const block = formatMemoryBlock([
+      { userId: 'u1', key: 'b1', fact: 'Runs an AI consulting startup', factType: 'business', source: 'inferred', updatedAt: '2026-06-28T00:00:00.000Z' },
+      { userId: 'u1', key: 'b2', fact: 'Targeting healthcare clients', factType: 'business', source: 'inferred', updatedAt: '2026-06-29T00:00:00.000Z' },
+      { userId: 'u1', key: 'w1', fact: 'Lives in Pune', factType: 'weather', source: 'inferred', updatedAt: '2026-06-27T00:00:00.000Z' },
+    ]);
+    // A "Business:" section with BOTH business facts (accumulated), and a separate
+    // "Weather:" section — not one flat list.
+    expect(block).toContain('Business:');
+    expect(block).toContain('Runs an AI consulting startup');
+    expect(block).toContain('Targeting healthcare clients');
+    expect(block).toContain('Weather:');
+    expect(block).toContain('Lives in Pune');
+    // Business (a known topic) sorts before Weather.
+    expect(block.indexOf('Business:')).toBeLessThan(block.indexOf('Weather:'));
+  });
+
+  it('files an unknown/blank topic under "Other"', () => {
+    const block = formatMemoryBlock([
+      { userId: 'u1', key: 'x', fact: 'Likes jazz', factType: '', source: 'inferred' },
+    ]);
+    expect(block).toContain('Other:');
+    expect(block).toContain('Likes jazz');
+  });
 });

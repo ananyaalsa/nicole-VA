@@ -80,7 +80,7 @@ export interface LiveSessionDeps {
   /** Override summarizer (tests inject a fake to avoid a real API call). */
   summarize?: (turns: Turn[]) => Promise<string>;
   /** Override fact loader (tests inject a fake to avoid a real DB). */
-  loadUserFacts?: (userId: string) => Promise<{ key: string; fact: string; factType: string; userId: string }[]>;
+  loadUserFacts?: (userId: string) => Promise<{ key: string; fact: string; factType: string; userId: string; source?: string }[]>;
   /** Override the display-name loader (tests inject a fake to avoid a real DB). */
   loadDisplayName?: (userId: string) => Promise<string | null>;
   /** Override the recent-activity digest builder (tests / DI). */
@@ -130,6 +130,10 @@ export class LiveSession {
   // Consecutive failed drop-reconnects, for exponential backoff so a flapping
   // Gemini connection can't trigger a tight reconnect storm (cost + rate-limit).
   private reconnectFailures = 0;
+  // "Start fresh": when the user asks to start fresh, suppress learned-in-
+  // conversation memory for the rest of THIS session (profile facts still apply).
+  // Instance-scoped, so the next session is normal again.
+  private suppressMemory = false;
 
   private watchdog: ReturnType<typeof setInterval> | null = null;
 
@@ -270,7 +274,15 @@ export class LiveSession {
     const loader = this.deps.loadUserFacts ?? loadFacts;
     let memoryBlock = '';
     try {
-      const facts = await loader(this.deps.userId);
+      const allFacts = await loader(this.deps.userId);
+      // "Start fresh": when the user asks to start fresh, drop the
+      // learned-in-conversation facts for THIS session so Nicole answers without
+      // referencing prior threads. Standing PROFILE facts (source 'settings' — name,
+      // location, etc.) stay, since "start fresh" means forget the conversation, not
+      // who they are. The flag is instance-scoped, so a new session is normal again.
+      const facts = this.suppressMemory
+        ? allFacts.filter((f) => f.source === 'settings')
+        : allFacts;
       // The user's name (a users-table column, not a memory fact) so Nicole knows
       // who she's talking to from the FIRST message — she was asking "what's your
       // name?" because it was never in her context.
@@ -416,8 +428,20 @@ export class LiveSession {
 
   private flushTurn(): void {
     if (this.pendingUserText.trim()) {
-      this.turns.push({ role: 'user', text: this.pendingUserText.trim() });
+      const userText = this.pendingUserText.trim();
+      this.turns.push({ role: 'user', text: userText });
       this.pendingUserText = '';
+      // "Start fresh" detection (talk mode only): if the user asks to start fresh /
+      // clear history, suppress learned memory for the rest of this session. Takes
+      // full effect on the next session rebuild (summary/reconnect); the prompt's
+      // START-FRESH rule governs Nicole's immediate behavior this turn.
+      if (
+        this.sessionConfig?.mode === 'talk' &&
+        !this.suppressMemory &&
+        /\b(start over|start fresh|clear (my )?(memory|history|context)|forget everything|fresh start|wipe the slate|blank slate)\b/i.test(userText)
+      ) {
+        this.suppressMemory = true;
+      }
     }
     if (this.pendingNicoleText.trim()) {
       this.turns.push({ role: 'nicole', text: this.pendingNicoleText.trim() });
