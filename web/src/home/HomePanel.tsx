@@ -135,39 +135,42 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
   const mailCount = Array.isArray(brief?.sections.email?.data) ? (brief!.sections.email!.data as unknown[]).length : 0;
 
   if (isMobile) {
+    const hasBrief = showBrief && brief;
     return (
       <div className="home home--mobile" data-testid="home-panel">
-        {/* Brief reduced to small icon badges, pinned top-right. Tapping dismisses. */}
-        {showBrief && brief && (
-          <div className="home-brief-mini" data-testid="home-brief-mini" aria-label="Your brief">
-            {brief.sections.calendar && (
-              <span className="brief-mini" data-source="calendar" title="Calendar">
-                <span className="brief-mini__ic">{BRAND_ICONS.calendar}</span>
-                {calCount > 0 && <span className="brief-mini__count">{calCount}</span>}
-              </span>
-            )}
-            {brief.sections.email && (
-              <span className="brief-mini" data-source="email" title="Email">
-                <span className="brief-mini__ic">{BRAND_ICONS.gmail}</span>
-                {mailCount > 0 && <span className="brief-mini__count">{mailCount}</span>}
-              </span>
-            )}
-            {brief.sections.tasks && (
-              <span className="brief-mini" data-source="tasks" title="Tasks">
-                <span className="brief-mini__ic">{BRAND_ICONS.todoist}</span>
+        {/* Compact top header: greeting on the left, brief icon-badges in the
+            corner on the right. Sits at the TOP so the center stays free. */}
+        <header className="home-mini__top">
+          <div className="home-mini__hello">
+            <h2 className="home-greeting home-greeting--mini" data-testid="home-greeting">{hello}</h2>
+            {stats.streak > 0 && (
+              <span className="home-coach__pill home-coach__pill--mini" title="Practice streak">
+                {STREAK_ICON} {stats.streak}-day streak
               </span>
             )}
           </div>
-        )}
-
-        {/* Small greeting up top; the center stays free for the avatar. */}
-        <h2 className="home-greeting home-greeting--mini" data-testid="home-greeting">{hello}</h2>
-        {stats.streak > 0 && (
-          <span className="home-coach__pill home-coach__pill--mini" title="Practice streak">
-            {STREAK_ICON} {stats.streak}-day streak
-          </span>
-        )}
-        <p className="home-sub home-sub--mini">Tap start to talk.</p>
+          {hasBrief && (
+            <div className="home-brief-mini" data-testid="home-brief-mini" aria-label="Your brief">
+              {brief.sections.calendar && (
+                <span className="brief-mini" data-source="calendar" title="Calendar">
+                  <span className="brief-mini__ic">{BRAND_ICONS.calendar}</span>
+                  {calCount > 0 && <span className="brief-mini__count">{calCount}</span>}
+                </span>
+              )}
+              {brief.sections.email && (
+                <span className="brief-mini" data-source="email" title="Email">
+                  <span className="brief-mini__ic">{BRAND_ICONS.gmail}</span>
+                  {mailCount > 0 && <span className="brief-mini__count">{mailCount}</span>}
+                </span>
+              )}
+              {brief.sections.tasks && (
+                <span className="brief-mini" data-source="tasks" title="Tasks">
+                  <span className="brief-mini__ic">{BRAND_ICONS.todoist}</span>
+                </span>
+              )}
+            </div>
+          )}
+        </header>
       </div>
     );
   }

@@ -3,7 +3,7 @@ import type { RecolorProfile, ElementId } from './recolor';
 /** The selectable corner companions. 'off' hides the avatar entirely.
  *  'natori' is the MALE PROSPECT avatar (roleplay / training live-rep), chosen by
  *  the app for the prospect role — not a user-selectable companion. */
-export type AvatarId = 'aria' | 'noah' | 'natori' | 'off';
+export type AvatarId = 'aria' | 'noah' | 'natori' | 'chitose' | 'off';
 type RealAvatarId = Exclude<AvatarId, 'off'>;
 /** Avatars the user can pick as their own companion (excludes prospect-only natori). */
 export type CompanionAvatarId = 'aria' | 'noah';
@@ -87,8 +87,8 @@ export const AVATARS: Record<RealAvatarId, AvatarDef> = {
       { file: 'haru.1024/texture_02.png', original: 'haru.1024/texture_02.original.png', elements: ['sleeves', 'skirt', 'tights'] },
     ],
   },
-  // MALE PROSPECT (roleplay / training live-rep). Cubism sample "Jin Natori".
-  // No wardrobe recoloring — he's the other party on the call, not a companion.
+  // PROSPECT (roleplay / training live-rep). Cubism sample "Jin Natori".
+  // No wardrobe recoloring — the other party on the call, not a companion.
   // Newer Cubism param naming (ParamMouthOpenY / ParamEye*Open).
   natori: {
     id: 'natori',
@@ -96,6 +96,16 @@ export const AVATARS: Record<RealAvatarId, AvatarDef> = {
     model: '/live2d/natori/natori_pro_t06.model3.json',
     mouthParam: 'ParamMouthOpenY',
     eyeParams: { left: 'ParamEyeLOpen', right: 'ParamEyeROpen' },
+    elements: [],
+    textures: [],
+  },
+  // PROSPECT (current). Cubism sample "Chitose". Old-style param naming
+  // (PARAM_MOUTH_OPEN_Y / PARAM_EYE_*_OPEN), so it uses the Live2DStage defaults.
+  chitose: {
+    id: 'chitose',
+    label: 'Prospect',
+    model: '/live2d/chitose/chitose.model3.json',
+    mouthParam: 'PARAM_MOUTH_OPEN_Y',
     elements: [],
     textures: [],
   },

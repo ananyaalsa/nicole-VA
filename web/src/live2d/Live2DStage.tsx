@@ -23,7 +23,7 @@ export interface Live2DStageProps {
   /** True while Nicole is speaking (drives idle ↔ gesture). */
   speakingRef: React.MutableRefObject<boolean>;
   /** Which avatar to render. */
-  avatarId?: 'aria' | 'noah' | 'natori';
+  avatarId?: 'aria' | 'noah' | 'natori' | 'chitose';
   /** Per-element wardrobe colors: { hair, top, collar, sleeves, skirt, tights }. */
   colors?: Record<string, string>;
   className?: string;

@@ -808,7 +808,7 @@ function RoleplayRoom({
           <CenterAvatar
             amplitude={amplitude}
             speaking={speaking}
-            avatarId="natori"
+            avatarId="chitose"
           />
         }
         presence={

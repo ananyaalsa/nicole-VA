@@ -16,8 +16,8 @@ import './CenterAvatar.css';
 export interface CenterAvatarProps {
   amplitude: number;
   speaking: boolean;
-  /** Aria/Noah = Nicole; natori = the male prospect (roleplay / live-rep). */
-  avatarId: 'aria' | 'noah' | 'natori';
+  /** Aria/Noah = Nicole; chitose/natori = the prospect (roleplay / live-rep). */
+  avatarId: 'aria' | 'noah' | 'natori' | 'chitose';
   /** Per-element wardrobe colors (companion avatars only; natori has none). */
   colors?: Record<string, string>;
   /** Whether the avatar should be visible. */

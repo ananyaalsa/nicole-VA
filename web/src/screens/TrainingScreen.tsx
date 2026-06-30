@@ -395,7 +395,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   // male Natori avatar. The active session's amplitude drives the lip-sync.
   const isMobile = useIsMobile();
   const companionId: 'aria' | 'noah' = loadAvatarPrefs().avatar === 'noah' ? 'noah' : 'aria';
-  const centerAvatarId: 'aria' | 'noah' | 'natori' = session.inLiveRep ? 'natori' : companionId;
+  const centerAvatarId: 'aria' | 'noah' | 'chitose' = session.inLiveRep ? 'chitose' : companionId;
 
   // Live-rep coaching tips (TRAINING ONLY): detect when the learner is stuck during
   // the rep and surface a short text tip from the lesson's framework — no extra
@@ -581,7 +581,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
             amplitude={session.activeAmplitude}
             speaking={speaking}
             avatarId={centerAvatarId}
-            colors={centerAvatarId === 'natori' ? undefined : loadAvatarPrefs().colors[companionId]}
+            colors={session.inLiveRep ? undefined : loadAvatarPrefs().colors[companionId]}
           />
         }
         presence={

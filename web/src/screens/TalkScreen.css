@@ -611,26 +611,36 @@ button.l2d-toggle-btn {
   .ctrl-icon { width: 56px; height: 56px; }
   .talk-start-btn { min-height: 56px; font-size: 0.98rem; }
 
-  /* MOBILE CENTER-AVATAR VIEW (live session): the big lip-syncing avatar IS the
+  /* MOBILE CENTER-AVATAR VIEW (idle AND live): the big lip-syncing avatar IS the
      screen. Hide the presence header chip so the avatar owns the space; the
-     conversation column becomes a full-height stage with controls pinned low. */
+     conversation column becomes a full-height stage with the home header pinned
+     at the top, the avatar filling the middle, and controls below. */
   .talk-body:has(.talk-center-stage) { grid-template-rows: 1fr; }
   .talk-body:has(.talk-center-stage) .talk-presence { display: none; }
+  /* Normal-flow flex column (NOT absolute) so the controls bar stays pinned at
+     the bottom of .talk-conversation and the avatar fills the space between. */
   .talk-center-stage {
-    position: absolute;
-    inset: 0;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding-bottom: 96px; /* clear the controls bar */
+    align-items: stretch;
+    padding: 8px 14px 4px;
+    position: relative;
+    z-index: 1;
   }
-  .talk-center-stage .center-avatar { width: 100%; height: 100%; max-height: 70vh; }
+  /* Home header (greeting + brief icons) sits at the top, own height only. */
+  .talk-center-stage .home { flex: 0 0 auto; }
+  /* The avatar fills ALL remaining vertical space, centered. */
+  .talk-center-stage .center-avatar {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+  }
   .center-stage__status {
-    position: absolute;
-    bottom: 84px;
-    margin: 0;
+    flex: 0 0 auto;
+    text-align: center;
+    margin: 4px 0 0;
     font-size: 0.82rem;
     font-weight: 600;
     color: var(--text-2);

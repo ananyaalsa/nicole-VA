@@ -414,7 +414,6 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   // the center (a phone session should still show a talking avatar).
   const companionId: 'aria' | 'noah' = avatarPrefs.avatar === 'noah' ? 'noah' : 'aria';
   const companionColors = avatarPrefs.colors[companionId];
-  const showCenterAvatar = isMobile && connected;
 
   return (
     <div className="talk-screen" data-testid="talk-screen" data-state={auraState}>
@@ -498,10 +497,17 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
         <section className="talk-conversation">
           <WaveBackdrop stateRef={auraStateRef} />
-          {showCenterAvatar ? (
-            // MOBILE, in a live session: just the big centered lip-syncing avatar —
-            // no transcript. (The conversation is voice; the screen is the avatar.)
-            <div className="talk-center-stage" data-testid="talk-center-stage">
+          {isMobile ? (
+            // MOBILE: the big centered lip-syncing avatar is ALWAYS the hero — both
+            // idle (resting) and live (speaking). No transcript. When idle, a
+            // compact home header (greeting + brief icons) sits at the top.
+            <div className={`talk-center-stage${connected ? ' is-live' : ''}`} data-testid="talk-center-stage">
+              {!connected && (
+                <HomePanel
+                  onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
+                  onDrill={() => onTrain?.()}
+                />
+              )}
               <CenterAvatar
                 key={`${companionId}:${JSON.stringify(companionColors ?? {})}`}
                 amplitude={amplitude}
@@ -509,7 +515,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
                 avatarId={companionId}
                 colors={companionColors}
               />
-              <p className="center-stage__status">{speaking ? 'Nicole is speaking…' : 'Listening…'}</p>
+              {connected && (
+                <p className="center-stage__status">{speaking ? 'Nicole is speaking…' : 'Listening…'}</p>
+              )}
             </div>
           ) : transcript.length === 0 && !realtime.you && !realtime.nicole ? (
             <div className="talk-empty">

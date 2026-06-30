@@ -157,19 +157,30 @@
   .home-chip, .home-coach__drill { transition: none; }
 }
 
-/* ── Mobile home — minimal: small greeting, brief as icon-badges, no chips ──── */
+/* ── Mobile home — minimal: small greeting + brief icon-badges in a top row,
+   center kept FREE (no chips). The home block fills the width and sits at the
+   top of the stage; .talk-empty stops vertically-centering it on mobile. ──── */
 .home--mobile {
-  gap: 10px;
-  padding: 10px 14px 0;
-  align-items: center;
-  text-align: center;
-  position: relative;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  gap: 0;
+  align-items: stretch;
+  text-align: left;
 }
-/* Brief reduced to tiny icon badges, pinned top-right so the center is free. */
+/* Top header row: greeting (left) + brief icon-badges (right). */
+.home-mini__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 2px 4px;
+}
+.home-mini__hello { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+/* Brief reduced to tiny icon badges in the corner so the center is free. */
 .home-brief-mini {
-  position: absolute;
-  top: 6px;
-  right: 8px;
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
 }
