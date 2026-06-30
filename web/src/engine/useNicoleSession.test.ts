@@ -316,6 +316,26 @@ describe('useNicoleSession', () => {
     expect(nicole[0].text.replace(/\s+/g, '')).toBe("That'sgreattohear");
   });
 
+  it('commits lines in chronological (start) order — you BEFORE Nicole, never swapped', async () => {
+    const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
+    // You start speaking first; Nicole's reply begins after and its chunks keep
+    // arriving (so Nicole is the LAST speaker to chunk before turnComplete). The
+    // old code ordered by last-chunk speaker and put Nicole's line ABOVE yours.
+    act(() => {
+      emit({ inputTranscription: { text: 'Air is so slow' } });
+      emit({ outputTranscription: { text: 'I understand, ' } });
+      emit({ outputTranscription: { text: 'it should clear up soon' } });
+      emit({ turnComplete: true });
+    });
+    const t = view.result.current.transcript;
+    expect(t).toHaveLength(2);
+    // Your line must come FIRST, Nicole's reply SECOND.
+    expect(t[0].speaker).toBe('you');
+    expect(t[0].text).toContain('Air is so slow');
+    expect(t[1].speaker).toBe('nicole');
+    expect(t[1].text).toContain('it should clear up soon');
+  });
+
   it('keeps the user in ONE bubble when speaking SLOWLY (real-time gaps between words)', async () => {
     const view = await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live' });
     const frags = ['No, I', "'m also ", 'ready ', 'to ', 'dive in'];

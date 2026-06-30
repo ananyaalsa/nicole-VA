@@ -304,6 +304,11 @@ export function useNicoleSession(
   // lines when input/output transcription arrived with timing skew (the rep
   // appearing to answer before the user finished).
   const lastSpeakerRef = useRef<Speaker | null>(null);
+  // When each speaker's CURRENT pending line started, as a monotonic counter.
+  // Lets finalizeTurn commit pending lines in true chronological (start) order
+  // rather than by whichever chunk arrived last — the cause of swapped lines.
+  const startSeqRef = useRef<Record<Speaker, number | null>>({ you: null, nicole: null });
+  const seqCounterRef = useRef(0);
 
   // Keep the latest opts in a ref so the WS open handler always reads fresh
   // config without re-subscribing.
@@ -320,13 +325,18 @@ export function useNicoleSession(
     const chunk = raw.replace(/\s*[—–]\s*/g, ', ');
     if (!chunk) return;
 
-    // Track who is currently speaking so finalizeTurn can commit in true spoken
-    // order (most-recent speaker last). We do NOT commit on every switch —
-    // input + output transcription legitimately interleave at the chunk level
-    // during one exchange, and committing per chunk would shatter the bubbles.
     lastSpeakerRef.current = speaker;
 
     const prev = realtimeRef.current[speaker];
+    // Record the order in which each speaker's CURRENT pending line began. When
+    // both lines are still pending at turnComplete, we commit them in this
+    // start order — the real chronological order — instead of by whichever
+    // chunk happened to arrive last (which made "you"/"Nicole" lines swap
+    // positions, so she looked like she replied before you finished).
+    if (!prev && startSeqRef.current[speaker] == null) {
+      seqCounterRef.current += 1;
+      startSeqRef.current[speaker] = seqCounterRef.current;
+    }
     let next: string;
     if (!prev) {
       next = chunk.replace(/^\s+/, '');
@@ -353,6 +363,9 @@ export function useNicoleSession(
   const commitSpeaker = useCallback((speaker: Speaker) => {
     const text = realtimeRef.current[speaker].trim();
     realtimeRef.current[speaker] = '';
+    // This pending line is done — clear its start marker so the next utterance
+    // from this speaker gets a fresh sequence number.
+    startSeqRef.current[speaker] = null;
     setRealtime((r) => (r[speaker] === '' ? r : { ...r, [speaker]: '' }));
     if (!text) return;
     setTranscript((prevList) => {
@@ -364,20 +377,21 @@ export function useNicoleSession(
   }, []);
 
   /** Finalize the whole turn (on turnComplete): commit any pending lines in the
-   *  order they were actually spoken — the MOST-RECENT speaker commits LAST so it
-   *  sits at the bottom. (Most turns have only one pending line by now, since the
-   *  turn-boundary commit in appendPartial already flushed the previous speaker.) */
+   *  order their utterances STARTED, so the transcript reads chronologically.
+   *  Ordering by start-sequence (not by who chunked last) is what stops the
+   *  user's and Nicole's lines from appearing in swapped positions. */
   const finalizeTurn = useCallback(() => {
-    const last = lastSpeakerRef.current;
-    if (last === 'nicole') {
-      commitSpeaker('you');
-      commitSpeaker('nicole');
-    } else {
-      // last === 'you' or null → user spoke most recently (or unknown): the rep's
-      // line, if any, came first.
-      commitSpeaker('nicole');
-      commitSpeaker('you');
-    }
+    const youSeq = startSeqRef.current.you;
+    const nicoleSeq = startSeqRef.current.nicole;
+    // Build the commit order: speakers with a pending line, earliest-started first.
+    const pending: Speaker[] = [];
+    if (youSeq != null) pending.push('you');
+    if (nicoleSeq != null) pending.push('nicole');
+    pending.sort((a, b) => (startSeqRef.current[a]! - startSeqRef.current[b]!));
+    for (const sp of pending) commitSpeaker(sp);
+    // Commit anyone left (defensive: a line with text but no recorded seq).
+    commitSpeaker('you');
+    commitSpeaker('nicole');
   }, [commitSpeaker]);
 
   /** Hard finalize one speaker (barge-in / stop): commit just that speaker. */
