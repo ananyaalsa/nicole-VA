@@ -8,6 +8,9 @@
 // Raw fetch (no googleapis SDK) to keep the dependency surface small and match
 // the rest of the codebase.
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { integrationsConfig, config } from '../../config.js';
 import { loadDisplayName } from '../../memory/db.js';
 import { postForm, apiFetch } from '../http.js';
@@ -357,27 +360,73 @@ async function senderEmail(token: string): Promise<string | null> {
   }
 }
 
-/** Wrap the user's body in a simple, email-client-safe branded template with
- *  Nicole's avatar + name, so the recipient sees it came from the assistant.
- *  Inline styles only (email clients strip <style>); table-free, single column. */
-function brandedHtml(bodyText: string, senderLabel: string): string {
-  // Preserve the body's line breaks as <br> after escaping.
+/** Load Nicole's avatar PNG ONCE as base64 for inline (CID) embedding, so it
+ *  renders in every inbox — Gmail won't fetch a localhost URL and strips data:
+ *  image URIs, so a CID attachment is the only thing that reliably shows. Tries
+ *  a few candidate paths (dev `src`, built `dist`, and the repo web/public copy)
+ *  and returns null if none are found (the template then degrades to a monogram). */
+let avatarB64Cache: string | null | undefined;
+function loadAvatarB64(): string | null {
+  if (avatarB64Cache !== undefined) return avatarB64Cache;
+  const here = dirname(fileURLToPath(import.meta.url)); // .../providers
+  const candidates = [
+    join(here, '../../../assets/nicole-avatar.png'),   // dist/integrations/providers → server/assets
+    join(here, '../../../../assets/nicole-avatar.png'),
+    join(here, '../../../web/public/nicole-avatar.png'),
+    join(process.cwd(), 'assets/nicole-avatar.png'),
+    join(process.cwd(), '../web/public/nicole-avatar.png'),
+  ];
+  for (const p of candidates) {
+    try {
+      const buf = readFileSync(p);
+      avatarB64Cache = buf.toString('base64');
+      return avatarB64Cache;
+    } catch { /* try next */ }
+  }
+  avatarB64Cache = null;
+  return null;
+}
+
+const AVATAR_CID = 'nicole-avatar@alsatalk';
+
+/** Wrap the user's body in a polished, email-client-safe branded template.
+ *  Table-based layout + inline styles (the only thing email clients render
+ *  consistently). The avatar uses cid: so it shows even offline; when it can't
+ *  be loaded, a teal "N" monogram stands in. */
+function brandedHtml(bodyText: string, ownerName: string, hasAvatar: boolean): string {
   const bodyHtml = escapeHtml(bodyText).replace(/\r?\n/g, '<br>');
-  const avatar = `${config.frontendUrl}/nicole-avatar.png`;
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f1ea;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a2b29;">
-  <div style="max-width:560px;margin:0 auto;padding:24px 16px;">
-    <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid #e2ddd0;">
-      <img src="${avatar}" alt="Nicole" width="44" height="44" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#0f766e;" />
-      <div>
-        <div style="font-weight:700;font-size:15px;color:#0b3d38;">Nicole</div>
-        <div style="font-size:12px;color:#6b756f;">${escapeHtml(senderLabel)}</div>
+  const avatarCell = hasAvatar
+    ? `<img src="cid:${AVATAR_CID}" alt="Nicole" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.6);" />`
+    : `<div style="width:48px;height:48px;border-radius:50%;background:#0b3d38;color:#fff;font:700 20px/48px -apple-system,Segoe UI,Arial,sans-serif;text-align:center;">N</div>`;
+  const onBehalf = ownerName ? `on behalf of ${escapeHtml(ownerName)}` : '';
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#eef1ed;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1ed;padding:24px 12px;">
+<tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(11,61,56,0.10);font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <!-- Header: teal gradient bar with avatar + name -->
+    <tr><td style="background:linear-gradient(120deg,#0f766e,#0b3d38);padding:18px 22px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td style="padding-right:12px;vertical-align:middle;">${avatarCell}</td>
+        <td style="vertical-align:middle;">
+          <div style="color:#ffffff;font-size:17px;font-weight:700;line-height:1.2;">Nicole</div>
+          <div style="color:#bfe3dd;font-size:12px;line-height:1.3;">AI assistant ${onBehalf}</div>
+        </td>
+      </tr></table>
+    </td></tr>
+    <!-- Body -->
+    <tr><td style="padding:24px 24px 8px;color:#1a2b29;font-size:15px;line-height:1.65;">${bodyHtml}</td></tr>
+    <!-- Footer -->
+    <tr><td style="padding:16px 24px 22px;">
+      <div style="border-top:1px solid #eceae3;padding-top:14px;color:#9aa39e;font-size:11px;line-height:1.5;">
+        Sent by Nicole, ${escapeHtml(ownerName || 'your')}’s AI assistant. Reply directly to continue the conversation.
       </div>
-    </div>
-    <div style="padding:18px 2px;font-size:15px;line-height:1.6;">${bodyHtml}</div>
-    <div style="padding-top:14px;border-top:1px solid #e2ddd0;font-size:11px;color:#9aa39e;">
-      Sent by Nicole, an AI assistant, on behalf of ${escapeHtml(senderLabel)}.
-    </div>
-  </div></body></html>`;
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body></html>`;
 }
 
 /** Build a base64url RFC-2822 message and either draft or send it. The message
@@ -395,35 +444,69 @@ async function draftEmail(
   const subject = String(args.subject ?? '');
   const body = String(args.body ?? '');
 
-  // Who the assistant is acting for, e.g. "Ananya's assistant".
+  // Who the assistant is acting for, e.g. "Ananya".
   let ownerName: string | null = null;
   try { ownerName = await loadDisplayName(userId); } catch { /* best-effort */ }
-  const senderLabel = ownerName ? `${ownerName}'s AI assistant` : 'AI assistant';
   const fromAddr = await senderEmail(token);
   const fromHeader = fromAddr
-    ? `From: ${encodeHeaderWord(`Nicole (${senderLabel})`)} <${fromAddr}>`
+    ? `From: ${encodeHeaderWord('Nicole')} <${fromAddr}>`
     : null;
 
-  // multipart/alternative: text first (fallback), then the branded HTML.
-  const boundary = `nicole_${Buffer.from(userId).toString('hex').slice(0, 12)}_b`;
+  const avatarB64 = loadAvatarB64();
+  const html = brandedHtml(body, ownerName ?? '', avatarB64 !== null);
+
+  // MIME structure:
+  //   multipart/alternative
+  //     ├─ text/plain                (fallback)
+  //     └─ multipart/related         (rich)
+  //         ├─ text/html
+  //         └─ image/png  (the inline avatar, referenced by cid:)
+  // Using two distinct boundaries (alt + related) so the nesting is valid.
+  const seed = Buffer.from(userId).toString('hex').slice(0, 12);
+  const altB = `alt_${seed}`;
+  const relB = `rel_${seed}`;
+
+  const relatedPart = [
+    `Content-Type: multipart/related; boundary="${relB}"`,
+    '',
+    `--${relB}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(html, 'utf8').toString('base64'),
+    '',
+    // Inline avatar attachment (only when we could load it).
+    ...(avatarB64
+      ? [
+          `--${relB}`,
+          'Content-Type: image/png',
+          'Content-Transfer-Encoding: base64',
+          `Content-ID: <${AVATAR_CID}>`,
+          'Content-Disposition: inline; filename="nicole.png"',
+          '',
+          avatarB64,
+          '',
+        ]
+      : []),
+    `--${relB}--`,
+  ].join('\r\n');
+
   const lines = [
     `To: ${to}`,
     `Subject: ${encodeHeaderWord(subject)}`,
     ...(fromHeader ? [fromHeader] : []),
     'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    `Content-Type: multipart/alternative; boundary="${altB}"`,
     '',
-    `--${boundary}`,
+    `--${altB}`,
     'Content-Type: text/plain; charset="UTF-8"',
     '',
     body,
     '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
+    `--${altB}`,
+    relatedPart,
     '',
-    brandedHtml(body, senderLabel),
-    '',
-    `--${boundary}--`,
+    `--${altB}--`,
   ];
   const raw = lines.join('\r\n');
   const encoded = Buffer.from(raw, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
