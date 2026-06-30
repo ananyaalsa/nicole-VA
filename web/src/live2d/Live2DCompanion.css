@@ -16,9 +16,11 @@
 }
 
 .l2d-companion__stage {
-  /* Bigger, full body in frame. */
-  width: 240px;
-  height: 420px;
+  /* Bigger, full body in frame — same width:height proportion (≈0.57) so she's
+     scaled up, never stretched. Larger than before, but sized so she stays in
+     the corner without crowding the centered greeting/brief. */
+  width: 280px;
+  height: 490px;
   pointer-events: none; /* click-through: she doesn't steal taps from the page */
   transition: opacity 220ms ease, transform 220ms ease;
 }

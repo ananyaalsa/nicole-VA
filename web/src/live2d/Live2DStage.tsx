@@ -215,31 +215,20 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
           }
           const mh = live2dModel.internalModel.height || 1;
           const mw = live2dModel.internalModel.width || 1;
-          // Two framings, chosen by the box shape so the HEAD is never clipped:
-          //  • TALL box (mobile full-screen): fit the whole rigged form, sitting a
-          //    little low so there's headroom — full body visible.
-          //  • SHORT/WIDE box (the desktop avatar panel, ~240px): a full body
-          //    scaled to fit height would shrink to a speck AND, scaled to width,
-          //    would push the head off the top. Instead frame the UPPER BODY:
-          //    scale to width, anchor at the top, so the face + torso fill the
-          //    panel and the head is always in view.
-          // Frame her the SAME WAY as Talk in both layouts so she's positioned
-          // consistently everywhere: a centered head-and-upper-body view with
-          // headroom, her lower body continuing past the bottom edge (clipped by
-          // overflow:hidden). The only difference is how we pick the scale:
-          //  • TALL box (mobile full-screen): fit the whole rigged form.
-          //  • SHORT/WIDE box (desktop avatar panel): a full-body fit would shrink
-          //    her to a speck, so scale to the box HEIGHT (upper body fills it)
-          //    and cap by width so a very wide panel can't blow the face up.
-          const boxIsShort = h / w < 1.1;
-          const scale = boxIsShort
-            ? Math.min(h / (mh * 0.66), (w / mw) * 1.5)
-            : Math.min(w / mw, h / mh) * 0.95;
+          // ONE consistent framing for every screen + model, so Nicole and the
+          // prospect look identical regardless of their differing rig proportions:
+          // TOP-ANCHOR the model and scale it BIG. Anchoring at the top means the
+          // face always lands just below the top edge (a fixed, model-independent
+          // headroom) and the body fills downward, clipped by overflow:hidden — a
+          // clean, generous head-and-upper-body portrait. We size to whichever of
+          // width/height is the binding constraint so she's as large as fits.
+          //   • tall box (mobile): height usually binds → big full upper body.
+          //   • short/wide box (desktop panel): width binds → big portrait crop.
+          const FILL = 1.32; // >1 = zoom in past a plain fit, so she reads BIG
+          const scale = Math.min(w / mw, h / mh) * FILL;
           live2dModel.scale.set(scale);
-          // Identical anchor + vertical placement to Talk: centered, sitting a
-          // little low so the face lands in the upper-middle with headroom above.
-          live2dModel.anchor.set(0.5, 0.5);
-          live2dModel.position.set(w / 2, h * 0.6);
+          live2dModel.anchor.set(0.5, 0);        // top-center
+          live2dModel.position.set(w / 2, h * 0.05); // small headroom above the head
         };
         fit();
         // The box may not be measured on the first synchronous pass (or while

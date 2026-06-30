@@ -28,7 +28,7 @@
    that it isn't a "short box" so it uses the same full-body framing as Talk. */
 .live-room__avatar {
   flex-shrink: 0;
-  height: 340px;
+  height: 420px;
   border-radius: var(--radius-lg);
   background: linear-gradient(160deg, var(--accent-light), var(--surface));
   border: 1px solid var(--border);
