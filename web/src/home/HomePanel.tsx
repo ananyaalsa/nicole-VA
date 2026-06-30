@@ -9,6 +9,7 @@ import {
   greeting, starters, coachStats,
   type Starter, type CoachStats,
 } from './homeData';
+import { useIsMobile } from '../engine/useIsMobile';
 import './HomePanel.css';
 
 export interface HomePanelProps {
@@ -125,6 +126,51 @@ export function HomePanel({ onStarter, onDrill }: HomePanelProps): JSX.Element {
   const showBrief = !briefDismissed && brief?.available && Object.keys(brief.sections).length > 0;
 
   const dismissBrief = useCallback(() => setBriefDismissed(true), []);
+
+  // Mobile home is intentionally MINIMAL: a small greeting, the brief reduced to
+  // tiny corner icon-badges (not full cards), no starter capsules — so the center
+  // is free for the avatar once a session starts.
+  const isMobile = useIsMobile();
+  const calCount = Array.isArray(brief?.sections.calendar?.data) ? (brief!.sections.calendar!.data as unknown[]).length : 0;
+  const mailCount = Array.isArray(brief?.sections.email?.data) ? (brief!.sections.email!.data as unknown[]).length : 0;
+
+  if (isMobile) {
+    return (
+      <div className="home home--mobile" data-testid="home-panel">
+        {/* Brief reduced to small icon badges, pinned top-right. Tapping dismisses. */}
+        {showBrief && brief && (
+          <div className="home-brief-mini" data-testid="home-brief-mini" aria-label="Your brief">
+            {brief.sections.calendar && (
+              <span className="brief-mini" data-source="calendar" title="Calendar">
+                <span className="brief-mini__ic">{BRAND_ICONS.calendar}</span>
+                {calCount > 0 && <span className="brief-mini__count">{calCount}</span>}
+              </span>
+            )}
+            {brief.sections.email && (
+              <span className="brief-mini" data-source="email" title="Email">
+                <span className="brief-mini__ic">{BRAND_ICONS.gmail}</span>
+                {mailCount > 0 && <span className="brief-mini__count">{mailCount}</span>}
+              </span>
+            )}
+            {brief.sections.tasks && (
+              <span className="brief-mini" data-source="tasks" title="Tasks">
+                <span className="brief-mini__ic">{BRAND_ICONS.todoist}</span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Small greeting up top; the center stays free for the avatar. */}
+        <h2 className="home-greeting home-greeting--mini" data-testid="home-greeting">{hello}</h2>
+        {stats.streak > 0 && (
+          <span className="home-coach__pill home-coach__pill--mini" title="Practice streak">
+            {STREAK_ICON} {stats.streak}-day streak
+          </span>
+        )}
+        <p className="home-sub home-sub--mini">Tap start to talk.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="home" data-testid="home-panel">

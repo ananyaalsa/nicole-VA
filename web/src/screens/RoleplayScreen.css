@@ -640,6 +640,20 @@
 .rp-generating__sub { margin: 0; font-size: 0.88rem; color: var(--text-2); }
 @media (prefers-reduced-motion: reduce) { .rp-generating__spinner { animation: none; } }
 
-/* Case-brief view: scrolls within the 100dvh shell (TopBar pinned above). */
+/* Case-brief view: scrolls within the 100dvh shell (TopBar pinned above). The
+   card is centered in the available space (with a sensible top offset) so it
+   doesn't cling to the top edge over a big empty void. */
 .roleplay--brief { display: flex; flex-direction: column; }
-.brief-view__scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 24px; }
+.brief-view__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 20px;
+}
+/* When the card is taller than the viewport, justify-content:center can clip the
+   top in a scroll container — fall back to top-aligned via auto margins on the
+   card itself, which centers when there's room and scrolls cleanly when not. */
+.brief-view__scroll > .brief-card { margin-block: auto; }

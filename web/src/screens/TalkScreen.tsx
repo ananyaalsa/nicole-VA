@@ -15,9 +15,11 @@ import { TOOL_TOASTS } from '../ui/toolToasts';
 import { WeatherWidget, type WeatherWidgetHandle } from '../weather/WeatherWidget';
 import { speakWeather } from '../weather/weatherApi';
 import { Live2DCompanion } from '../live2d/Live2DCompanion';
+import { CenterAvatar } from '../live2d/CenterAvatar';
 import { loadAvatarPrefs, type AvatarPrefs } from '../live2d/avatars';
 import { useNicoleSession } from '../engine/useNicoleSession';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
+import { useIsMobile } from '../engine/useIsMobile';
 import { useCamera } from '../engine/useCamera';
 import { useUiCommands } from '../engine/useUiCommands';
 import { makeProfileActions } from '../engine/profileActions';
@@ -405,6 +407,15 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   const avatarSrc = '/nicole-avatar.png';
   const userInitial = user?.displayName?.trim().charAt(0).toUpperCase() ?? '?';
 
+  // Mobile = the "big centered lip-syncing avatar, no transcript" voice view.
+  const isMobile = useIsMobile();
+  // The companion avatar id (Aria/Noah) the user picked; reused for the mobile
+  // center avatar so it lip-syncs to Nicole's voice. 'off' → fall back to Aria for
+  // the center (a phone session should still show a talking avatar).
+  const companionId: 'aria' | 'noah' = avatarPrefs.avatar === 'noah' ? 'noah' : 'aria';
+  const companionColors = avatarPrefs.colors[companionId];
+  const showCenterAvatar = isMobile && connected;
+
   return (
     <div className="talk-screen" data-testid="talk-screen" data-state={auraState}>
 
@@ -487,7 +498,20 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
         <section className="talk-conversation">
           <WaveBackdrop stateRef={auraStateRef} />
-          {transcript.length === 0 && !realtime.you && !realtime.nicole ? (
+          {showCenterAvatar ? (
+            // MOBILE, in a live session: just the big centered lip-syncing avatar —
+            // no transcript. (The conversation is voice; the screen is the avatar.)
+            <div className="talk-center-stage" data-testid="talk-center-stage">
+              <CenterAvatar
+                key={`${companionId}:${JSON.stringify(companionColors ?? {})}`}
+                amplitude={amplitude}
+                speaking={speaking}
+                avatarId={companionId}
+                colors={companionColors}
+              />
+              <p className="center-stage__status">{speaking ? 'Nicole is speaking…' : 'Listening…'}</p>
+            </div>
+          ) : transcript.length === 0 && !realtime.you && !realtime.nicole ? (
             <div className="talk-empty">
               <HomePanel
                 onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
@@ -561,7 +585,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
             key={`${avatarPrefs.avatar}:${JSON.stringify(avatarPrefs.colors[avatarPrefs.avatar === 'noah' ? 'noah' : 'aria'] ?? {})}`}
             amplitude={amplitude}
             speaking={speaking}
-            shown={companionShown && avatarPrefs.avatar !== 'off'}
+            // On mobile the big CENTER avatar takes over, so the corner companion
+            // is hidden (never two canvases at once).
+            shown={!isMobile && companionShown && avatarPrefs.avatar !== 'off'}
             avatarId={avatarPrefs.avatar === 'noah' ? 'noah' : 'aria'}
             colors={avatarPrefs.colors[avatarPrefs.avatar === 'noah' ? 'noah' : 'aria']}
           />

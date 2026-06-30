@@ -19,6 +19,9 @@ import { CoachingTip } from '../components/CoachingTip';
 import { useStuckDetection } from '../training/useStuckDetection';
 import { buildCoachingTip } from '../training/lessonPrompts';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
+import { useIsMobile } from '../engine/useIsMobile';
+import { CenterAvatar } from '../live2d/CenterAvatar';
+import { loadAvatarPrefs } from '../live2d/avatars';
 import { SessionResults } from '../components/SessionResults';
 import '../components/ProfilePanel.css';
 import './TrainingScreen.css';
@@ -387,6 +390,13 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   // coach otherwise — so the on-screen "speaking" pulse tracks whoever is talking.
   const speaking = useDebouncedSpeaking(session.activeAmplitude > 0.02);
 
+  // Mobile = the big centered lip-syncing avatar, no transcript. The COACH is
+  // Nicole (the user's companion avatar, Aria/Noah); the live-rep PROSPECT is the
+  // male Natori avatar. The active session's amplitude drives the lip-sync.
+  const isMobile = useIsMobile();
+  const companionId: 'aria' | 'noah' = loadAvatarPrefs().avatar === 'noah' ? 'noah' : 'aria';
+  const centerAvatarId: 'aria' | 'noah' | 'natori' = session.inLiveRep ? 'natori' : companionId;
+
   // Live-rep coaching tips (TRAINING ONLY): detect when the learner is stuck during
   // the rep and surface a short text tip from the lesson's framework — no extra
   // session, no voice. Detection is gated to the live rep.
@@ -564,6 +574,16 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
         lines={session.activeTranscript}
         realtime={session.activeRealtime}
         labels={{ nicole: session.inLiveRep ? session.prospectLabel : 'Nicole' }}
+        mobileCenter={isMobile}
+        centerAvatar={
+          <CenterAvatar
+            key={centerAvatarId}
+            amplitude={session.activeAmplitude}
+            speaking={speaking}
+            avatarId={centerAvatarId}
+            colors={centerAvatarId === 'natori' ? undefined : loadAvatarPrefs().colors[companionId]}
+          />
+        }
         presence={
           <CallPresence
             name={session.inLiveRep ? session.prospectLabel : 'Nicole'}

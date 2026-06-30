@@ -23,7 +23,7 @@ export interface Live2DStageProps {
   /** True while Nicole is speaking (drives idle ↔ gesture). */
   speakingRef: React.MutableRefObject<boolean>;
   /** Which avatar to render. */
-  avatarId?: 'aria' | 'noah';
+  avatarId?: 'aria' | 'noah' | 'natori';
   /** Per-element wardrobe colors: { hair, top, collar, sleeves, skirt, tights }. */
   colors?: Record<string, string>;
   className?: string;
@@ -53,7 +53,9 @@ async function applyWardrobe(
   isDisposed: () => boolean,
 ): Promise<void> {
   const anyColor = avatar.elements.some((e) => colors[e.id]);
-  if (!anyColor || !live2dModel) return;
+  // No recolor profile (e.g. the natori prospect) → nothing to recolor.
+  if (!anyColor || !live2dModel || !avatar.profile) return;
+  const profile = avatar.profile;
   const dir = modelDir(avatar.model);
   const texList: any[] = live2dModel.textures;
   await Promise.all(
@@ -62,7 +64,7 @@ async function applyWardrobe(
       if (els.length === 0) return;
       const srcImg = await loadImage(dir + t.original);
       if (isDisposed()) return;
-      const canvas = recolorTexture(srcImg, avatar.profile, t.elements, colors);
+      const canvas = recolorTexture(srcImg, profile, t.elements, colors);
       const tex = PIXI.Texture.from(canvas);
       if (texList && texList[idx]) {
         const old = texList[idx];
@@ -81,6 +83,9 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const avatar: AvatarDef = AVATARS[avatarId];
   const MOUTH_PARAM = avatar.mouthParam;
+  // Blink params differ across Cubism exports; default to the old PARAM_* naming.
+  const EYE_L = avatar.eyeParams?.left ?? 'PARAM_EYE_L_OPEN';
+  const EYE_R = avatar.eyeParams?.right ?? 'PARAM_EYE_R_OPEN';
   const model = avatar.model;
   // Color signature drives an in-place re-recolor effect (no reload).
   const colorSig = JSON.stringify(colors);
@@ -282,8 +287,8 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
               blinkPhase += dt / 120; // ~120ms close+open
               const open = blinkPhase < 1 ? Math.abs(1 - 2 * blinkPhase) : 1; // V-shape
               try {
-                coreModel.setParameterValueById('PARAM_EYE_L_OPEN', open);
-                coreModel.setParameterValueById('PARAM_EYE_R_OPEN', open);
+                coreModel.setParameterValueById(EYE_L, open);
+                coreModel.setParameterValueById(EYE_R, open);
               } catch { /* ignore */ }
               if (blinkPhase >= 1) { blinkPhase = -1; nextBlinkAt = now + 2500 + Math.floor(open * 2000); }
             }
@@ -293,8 +298,8 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
             mouth += (0 - mouth) * 0.4;
             try {
               coreModel.setParameterValueById(MOUTH_PARAM, mouth);
-              coreModel.setParameterValueById('PARAM_EYE_L_OPEN', 1);
-              coreModel.setParameterValueById('PARAM_EYE_R_OPEN', 1);
+              coreModel.setParameterValueById(EYE_L, 1);
+              coreModel.setParameterValueById(EYE_R, 1);
             } catch { /* ignore */ }
             // Push the held parameters to the rig without advancing time-based
             // motion/physics: a zero-delta update applies our param writes only.

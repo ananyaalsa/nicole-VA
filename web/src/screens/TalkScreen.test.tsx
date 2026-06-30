@@ -70,6 +70,17 @@ vi.mock('../auth/AuthContext', () => ({
 vi.mock('../components/ProfilePanel', () => ({
   ProfilePanel: () => null,
 }));
+// Live2D avatars mount PIXI/WebGL canvases jsdom can't run — stub to lightweight
+// markers so we can assert layout (center avatar vs transcript) without the deps.
+vi.mock('../live2d/CenterAvatar', () => ({
+  CenterAvatar: () => <div data-testid="center-avatar" />,
+}));
+vi.mock('../live2d/Live2DCompanion', () => ({
+  Live2DCompanion: () => <div data-testid="live2d-companion" />,
+}));
+// Mobile detection — controllable per test.
+let mockIsMobile = false;
+vi.mock('../engine/useIsMobile', () => ({ useIsMobile: () => mockIsMobile }));
 // scoreApi — stub fetchLiveStatus so TalkScreen [STATUS] tests stay deterministic.
 const mockFetchLiveStatus = vi.fn(async (_token?: string) => null as any);
 vi.mock('../training/scoreApi', () => ({
@@ -89,6 +100,7 @@ beforeEach(() => {
   setMic.mockClear();
   mockFetchLiveStatus.mockClear();
   mockFetchLiveStatus.mockResolvedValue(null);
+  mockIsMobile = false;
   sessionState = { connected: false, micOn: true, transcript: [], realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
   cameraState = { on: false, stream: null, facing: 'user', source: null, start: cameraStart, startScreen: cameraStartScreen, stop: cameraStop, flip: vi.fn(), error: null };
 });
@@ -167,6 +179,35 @@ describe('TalkScreen', () => {
     expect(msg).toMatch(/^\[STATUS/);
     expect(msg.toLowerCase()).toContain('silent');
     expect(msg.toLowerCase()).toContain('do not respond');
+  });
+
+  it('MOBILE + connected: shows the big center avatar and NO transcript', () => {
+    mockIsMobile = true;
+    sessionState = {
+      ...sessionState,
+      connected: true,
+      transcript: [{ id: 'l1', speaker: 'you', text: 'hello', streaming: false } as any],
+    };
+    render(<TalkScreen />);
+    // The centered lip-syncing avatar is the screen…
+    expect(screen.getByTestId('talk-center-stage')).toBeInTheDocument();
+    expect(screen.getByTestId('center-avatar')).toBeInTheDocument();
+    // …and the transcript text is NOT rendered on mobile.
+    expect(screen.queryByText('hello')).toBeNull();
+  });
+
+  it('DESKTOP keeps the transcript (no center stage)', () => {
+    mockIsMobile = false;
+    // jsdom doesn't implement Element.scrollTo; the feed auto-scroll uses it.
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    sessionState = {
+      ...sessionState,
+      connected: true,
+      transcript: [{ id: 'l1', speaker: 'you', text: 'hello', streaming: false } as any],
+    };
+    render(<TalkScreen />);
+    expect(screen.queryByTestId('talk-center-stage')).toBeNull();
+    expect(screen.getByText('hello')).toBeInTheDocument();
   });
 
   it('ENDS the Talk session when it goes to the background (frees the Gemini session)', async () => {

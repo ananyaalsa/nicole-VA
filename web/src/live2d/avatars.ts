@@ -1,8 +1,12 @@
 import type { RecolorProfile, ElementId } from './recolor';
 
-/** The selectable corner companions. 'off' hides the avatar entirely. */
-export type AvatarId = 'aria' | 'noah' | 'off';
+/** The selectable corner companions. 'off' hides the avatar entirely.
+ *  'natori' is the MALE PROSPECT avatar (roleplay / training live-rep), chosen by
+ *  the app for the prospect role — not a user-selectable companion. */
+export type AvatarId = 'aria' | 'noah' | 'natori' | 'off';
 type RealAvatarId = Exclude<AvatarId, 'off'>;
+/** Avatars the user can pick as their own companion (excludes prospect-only natori). */
+export type CompanionAvatarId = 'aria' | 'noah';
 
 export interface ElementDef {
   id: ElementId;
@@ -15,8 +19,14 @@ export interface AvatarDef {
   id: RealAvatarId;
   label: string;
   model: string;
-  profile: RecolorProfile;
+  /** Recolor profile for the wardrobe. Omitted for avatars with no recoloring
+   *  (e.g. the natori prospect), where the wardrobe step no-ops. */
+  profile?: RecolorProfile;
   mouthParam: string;
+  /** Eye-open parameter IDs for the blink animation. Cubism models differ:
+   *  older exports use PARAM_EYE_L_OPEN / _R_OPEN, newer ones ParamEyeLOpen /
+   *  ParamEyeROpen. Defaults to the old naming when omitted. */
+  eyeParams?: { left: string; right: string };
   /** Substrings of part IDs to FORCE-HIDE (opacity 0) every frame. Noah ships
    *  with two overlapping arm poses (set A + set B) both visible → "four hands";
    *  hiding one set leaves a single natural arms-down pose. */
@@ -76,6 +86,18 @@ export const AVATARS: Record<RealAvatarId, AvatarDef> = {
       { file: 'haru.1024/texture_01.png', original: 'haru.1024/texture_01.original.png', elements: ['hair'] },
       { file: 'haru.1024/texture_02.png', original: 'haru.1024/texture_02.original.png', elements: ['sleeves', 'skirt', 'tights'] },
     ],
+  },
+  // MALE PROSPECT (roleplay / training live-rep). Cubism sample "Jin Natori".
+  // No wardrobe recoloring — he's the other party on the call, not a companion.
+  // Newer Cubism param naming (ParamMouthOpenY / ParamEye*Open).
+  natori: {
+    id: 'natori',
+    label: 'Prospect',
+    model: '/live2d/natori/natori_pro_t06.model3.json',
+    mouthParam: 'ParamMouthOpenY',
+    eyeParams: { left: 'ParamEyeLOpen', right: 'ParamEyeROpen' },
+    elements: [],
+    textures: [],
   },
 };
 

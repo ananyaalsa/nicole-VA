@@ -156,3 +156,51 @@
 @media (prefers-reduced-motion: reduce) {
   .home-chip, .home-coach__drill { transition: none; }
 }
+
+/* ── Mobile home — minimal: small greeting, brief as icon-badges, no chips ──── */
+.home--mobile {
+  gap: 10px;
+  padding: 10px 14px 0;
+  align-items: center;
+  text-align: center;
+  position: relative;
+}
+/* Brief reduced to tiny icon badges, pinned top-right so the center is free. */
+.home-brief-mini {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+}
+.brief-mini {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.brief-mini__ic { width: 17px; height: 17px; display: inline-flex; }
+.brief-mini__ic svg { width: 17px; height: 17px; }
+.brief-mini__count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.home-greeting--mini { font-size: 1.15rem; margin-top: 8px; }
+.home-sub--mini { font-size: 0.82rem; color: var(--text-3); }
+.home-coach__pill--mini { font-size: 0.72rem; padding: 4px 10px; }

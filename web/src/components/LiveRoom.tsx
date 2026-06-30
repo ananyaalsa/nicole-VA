@@ -16,6 +16,12 @@ export interface LiveRoomProps {
   footer?: ReactNode;
   /** Shown in the feed before any line arrives — an invitation, not a void. */
   emptyState?: ReactNode;
+  /** A big centered lip-syncing avatar. When provided AND `mobileCenter` is true,
+   *  the room shows ONLY this avatar (no transcript, no rail) — the mobile voice
+   *  view. On desktop the normal transcript layout is kept. */
+  centerAvatar?: ReactNode;
+  /** True on a phone-sized viewport → use the centered-avatar voice view. */
+  mobileCenter?: boolean;
 }
 
 /**
@@ -25,7 +31,7 @@ export interface LiveRoomProps {
  * "you're on a live call," never a blank centered stage.
  */
 export function LiveRoom({
-  lines, realtime, labels, rail, presence, footer, emptyState,
+  lines, realtime, labels, rail, presence, footer, emptyState, centerAvatar, mobileCenter,
 }: LiveRoomProps): JSX.Element {
   const feedRef = useRef<HTMLDivElement | null>(null);
   // Stick to the newest line as the conversation grows.
@@ -35,6 +41,17 @@ export function LiveRoom({
   }, [lines.length, realtime.you, realtime.nicole]);
 
   const hasAny = lines.length > 0 || !!realtime.you || !!realtime.nicole;
+
+  // MOBILE voice view: just the big centered avatar + footer controls. No
+  // transcript, no rail — the avatar IS the screen (matches the Talk mobile view).
+  if (mobileCenter && centerAvatar) {
+    return (
+      <div className="live-room live-room--center" data-testid="live-room">
+        <div className="live-room__center" data-testid="live-room-center">{centerAvatar}</div>
+        {footer && <div className="live-room__footer">{footer}</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="live-room" data-testid="live-room">

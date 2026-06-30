@@ -18,7 +18,9 @@ import {
 } from '../training/trainingApi';
 import { useRoleplaySession } from '../training/useRoleplaySession';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
+import { useIsMobile } from '../engine/useIsMobile';
 import { LiveRoom } from '../components/LiveRoom';
+import { CenterAvatar } from '../live2d/CenterAvatar';
 import { CallPresence } from '../components/CallPresence';
 import { MicControls } from '../components/MicControls';
 import { RoleplayBriefCard } from '../components/RoleplayBriefCard';
@@ -619,6 +621,8 @@ function RoleplayRoom({
   const alias = persona.characterAlias || persona.name;
   // Debounced so the Speaking/Listening label doesn't flicker on brief voice dips.
   const speaking = useDebouncedSpeaking(amplitude > SPEAKING_AMP);
+  // Mobile = big centered lip-syncing avatar (the male Natori prospect), no transcript.
+  const isMobile = useIsMobile();
 
   // Run the judge on the captured transcript, then save + post status. Separated
   // from endAndScore so "Retry scoring" can re-run it after a transient failure
@@ -799,6 +803,14 @@ function RoleplayRoom({
         lines={transcript}
         realtime={realtime}
         labels={{ nicole: alias }}
+        mobileCenter={isMobile}
+        centerAvatar={
+          <CenterAvatar
+            amplitude={amplitude}
+            speaking={speaking}
+            avatarId="natori"
+          />
+        }
         presence={
           <CallPresence
             name={alias}
