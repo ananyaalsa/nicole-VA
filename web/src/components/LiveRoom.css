@@ -24,10 +24,11 @@
 .live-room__feed { flex: 1; overflow-y: auto; min-height: 0; padding-right: 6px; }
 
 /* DESKTOP moving avatar panel — a contained lip-syncing avatar above the status
-   + transcript. Fixed height so the transcript still gets most of the column. */
+   + transcript, framed like Talk (head + upper body with headroom). Tall enough
+   that it isn't a "short box" so it uses the same full-body framing as Talk. */
 .live-room__avatar {
   flex-shrink: 0;
-  height: 240px;
+  height: 340px;
   border-radius: var(--radius-lg);
   background: linear-gradient(160deg, var(--accent-light), var(--surface));
   border: 1px solid var(--border);

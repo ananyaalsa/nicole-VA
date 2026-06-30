@@ -8,7 +8,8 @@
 // Raw fetch (no googleapis SDK) to keep the dependency surface small and match
 // the rest of the codebase.
 
-import { integrationsConfig } from '../../config.js';
+import { integrationsConfig, config } from '../../config.js';
+import { loadDisplayName } from '../../memory/db.js';
 import { postForm, apiFetch } from '../http.js';
 import type {
   ProviderAdapter,
@@ -214,9 +215,9 @@ export const googleAdapter: ProviderAdapter = {
       case 'list_emails':
         return listEmails(token, args);
       case 'draft_email':
-        return draftEmail(token, args, false);
+        return draftEmail(token, args, false, ctx.userId);
       case 'send_email':
-        return draftEmail(token, args, true);
+        return draftEmail(token, args, true, ctx.userId);
       default:
         return { ok: false, summary: `Google can't do "${name}".` };
     }
@@ -326,32 +327,118 @@ async function listEmails(token: string, args: Record<string, unknown>): Promise
   return { ok: true, summary: `Your latest: ${spoken}${more}.`, data: items };
 }
 
-/** Build a base64url RFC-2822 message and either draft or send it. */
+/** Escape text for safe inclusion in an HTML email body. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** RFC-2047 encode a header value (display name) so non-ASCII is safe. */
+function encodeHeaderWord(s: string): string {
+  // ASCII with no special chars → leave as-is; otherwise base64-encode UTF-8.
+  if (/^[\x20-\x7E]*$/.test(s) && !/[",:;<>@]/.test(s)) return s;
+  return `=?UTF-8?B?${Buffer.from(s, 'utf8').toString('base64')}?=`;
+}
+
+/** The Gmail account's own email address (Gmail always sends FROM this; we can
+ *  only set the display NAME). Best-effort — falls back to no From header. */
+async function senderEmail(token: string): Promise<string | null> {
+  try {
+    const p = (await apiFetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+      { token },
+    )) as { emailAddress?: string };
+    return p?.emailAddress ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Wrap the user's body in a simple, email-client-safe branded template with
+ *  Nicole's avatar + name, so the recipient sees it came from the assistant.
+ *  Inline styles only (email clients strip <style>); table-free, single column. */
+function brandedHtml(bodyText: string, senderLabel: string): string {
+  // Preserve the body's line breaks as <br> after escaping.
+  const bodyHtml = escapeHtml(bodyText).replace(/\r?\n/g, '<br>');
+  const avatar = `${config.frontendUrl}/nicole-avatar.png`;
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f1ea;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a2b29;">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px;">
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid #e2ddd0;">
+      <img src="${avatar}" alt="Nicole" width="44" height="44" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#0f766e;" />
+      <div>
+        <div style="font-weight:700;font-size:15px;color:#0b3d38;">Nicole</div>
+        <div style="font-size:12px;color:#6b756f;">${escapeHtml(senderLabel)}</div>
+      </div>
+    </div>
+    <div style="padding:18px 2px;font-size:15px;line-height:1.6;">${bodyHtml}</div>
+    <div style="padding-top:14px;border-top:1px solid #e2ddd0;font-size:11px;color:#9aa39e;">
+      Sent by Nicole, an AI assistant, on behalf of ${escapeHtml(senderLabel)}.
+    </div>
+  </div></body></html>`;
+}
+
+/** Build a base64url RFC-2822 message and either draft or send it. The message
+ *  is multipart/alternative (plain text + a branded HTML part) and carries a
+ *  "Nicole" display name on the From header, so it reads as coming from the
+ *  assistant rather than just "me". (Gmail forces the From ADDRESS to the
+ *  authenticated account; only the display name is ours to set.) */
 async function draftEmail(
   token: string,
   args: Record<string, unknown>,
   send: boolean,
+  userId: string,
 ): Promise<ToolResult> {
-  const raw = [
-    `To: ${args.to}`,
-    `Subject: ${args.subject}`,
+  const to = String(args.to ?? '');
+  const subject = String(args.subject ?? '');
+  const body = String(args.body ?? '');
+
+  // Who the assistant is acting for, e.g. "Ananya's assistant".
+  let ownerName: string | null = null;
+  try { ownerName = await loadDisplayName(userId); } catch { /* best-effort */ }
+  const senderLabel = ownerName ? `${ownerName}'s AI assistant` : 'AI assistant';
+  const fromAddr = await senderEmail(token);
+  const fromHeader = fromAddr
+    ? `From: ${encodeHeaderWord(`Nicole (${senderLabel})`)} <${fromAddr}>`
+    : null;
+
+  // multipart/alternative: text first (fallback), then the branded HTML.
+  const boundary = `nicole_${Buffer.from(userId).toString('hex').slice(0, 12)}_b`;
+  const lines = [
+    `To: ${to}`,
+    `Subject: ${encodeHeaderWord(subject)}`,
+    ...(fromHeader ? [fromHeader] : []),
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     '',
-    String(args.body ?? ''),
-  ].join('\r\n');
-  const encoded = Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    body,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    brandedHtml(body, senderLabel),
+    '',
+    `--${boundary}--`,
+  ];
+  const raw = lines.join('\r\n');
+  const encoded = Buffer.from(raw, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (send) {
     await apiFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       token,
       body: { raw: encoded },
     });
-    return { ok: true, summary: `Sent your email to ${args.to}.` };
+    return { ok: true, summary: `Sent your email to ${to}.` };
   }
   await apiFetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
     method: 'POST',
     token,
     body: { message: { raw: encoded } },
   });
-  return { ok: true, summary: `Drafted an email to ${args.to}. It's in your Gmail drafts to review and send.` };
+  return { ok: true, summary: `Drafted an email to ${to}. It's in your Gmail drafts to review and send.` };
 }

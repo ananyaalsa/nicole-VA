@@ -225,17 +225,17 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
           //    panel and the head is always in view.
           const boxIsShort = h / w < 1.1;
           if (boxIsShort) {
-            // HEAD-AND-SHOULDERS crop for a short/wide panel. Scale so roughly the
-            // top THIRD of the rigged body (head + shoulders) fills the box height,
-            // and pin the model's top a touch above the box top so the full head
-            // shows and the torso continues below (clipped by overflow:hidden).
-            // Cap by width so a very wide panel doesn't blow the face up.
-            const byHead = (h / (mh * 0.42));     // ~top 42% of body fills the height
-            const byWidth = (w / mw) * 1.0;       // never wider than the box
-            const scale = Math.min(byHead, byWidth);
+            // HEAD-AND-SHOULDERS crop for a short/wide panel, framed like Talk:
+            // scale so the upper body (head + torso) fills most of the panel
+            // height, with a little headroom at the top, and the body continues
+            // below the bottom edge (clipped by overflow:hidden). Cap by width so
+            // a very wide panel never blows the face up past the sides.
+            const byHeight = (h / (mh * 0.62));   // upper ~62% of the body fills the box
+            const byWidth = (w / mw) * 1.6;       // generous width cap (portrait crop)
+            const scale = Math.min(byHeight, byWidth);
             live2dModel.scale.set(scale);
             live2dModel.anchor.set(0.5, 0);       // top-center anchor
-            live2dModel.position.set(w / 2, h * 0.04); // head just below the top edge
+            live2dModel.position.set(w / 2, h * 0.12); // headroom above the head
           } else {
             // Fit her ENTIRE rigged form within the box, positioned a bit LOWER.
             const scale = Math.min(w / mw, h / mh) * 0.95;
