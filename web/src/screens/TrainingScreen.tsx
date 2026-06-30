@@ -15,6 +15,9 @@ import { useCoachingSession } from '../training/useCoachingSession';
 import { LiveRoom } from '../components/LiveRoom';
 import { CallPresence } from '../components/CallPresence';
 import { MicControls } from '../components/MicControls';
+import { CoachingTip } from '../components/CoachingTip';
+import { useStuckDetection } from '../training/useStuckDetection';
+import { buildCoachingTip } from '../training/lessonPrompts';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { SessionResults } from '../components/SessionResults';
 import '../components/ProfilePanel.css';
@@ -384,6 +387,16 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
   // coach otherwise — so the on-screen "speaking" pulse tracks whoever is talking.
   const speaking = useDebouncedSpeaking(session.activeAmplitude > 0.02);
 
+  // Live-rep coaching tips (TRAINING ONLY): detect when the learner is stuck during
+  // the rep and surface a short text tip from the lesson's framework — no extra
+  // session, no voice. Detection is gated to the live rep.
+  const stuckSignal = useStuckDetection({
+    transcript: session.activeTranscript,
+    active: session.inLiveRep && started,
+  });
+  const [dismissedTipId, setDismissedTipId] = useState<number | null>(null);
+  const activeTip = stuckSignal && stuckSignal.id !== dismissedTipId ? stuckSignal : null;
+
   const handleExit = useCallback(() => {
     session.stop();
     // Tell Talk-Nicole the truth about what just happened so she doesn't
@@ -595,6 +608,16 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
           </>
         }
       />
+
+      {/* Live-rep coaching tip (Training only) — appears when the learner is stuck. */}
+      {session.inLiveRep && activeTip && (
+        <CoachingTip
+          tip={buildCoachingTip(lesson, activeTip.type, activeTip.id)}
+          kind={activeTip.type}
+          signalId={activeTip.id}
+          onDismiss={() => setDismissedTipId(activeTip.id)}
+        />
+      )}
     </div>
   );
 }

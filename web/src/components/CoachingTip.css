@@ -1,0 +1,46 @@
+/* Live-rep coaching tip — slides in from the right, sits clear of the footer. */
+.coaching-tip {
+  position: absolute;
+  right: 16px;
+  bottom: 90px;
+  z-index: 6;
+  max-width: 320px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-md, 0 6px 24px rgba(0,0,0,0.12));
+  cursor: pointer;
+  font-family: inherit;
+  animation: coaching-tip-in 220ms ease;
+}
+.coaching-tip__label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.coaching-tip__text { font-size: 0.88rem; line-height: 1.4; color: var(--text); }
+
+.coaching-tip--rambling { border-left-color: #2f6fb0; }
+.coaching-tip--rambling .coaching-tip__label { color: #2f6fb0; }
+.coaching-tip--conceding { border-left-color: #c2410c; }
+.coaching-tip--conceding .coaching-tip__label { color: #c2410c; }
+
+@keyframes coaching-tip-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .coaching-tip { right: 8px; left: 8px; max-width: none; bottom: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coaching-tip { animation: none; }
+}

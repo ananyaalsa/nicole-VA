@@ -198,6 +198,34 @@ export function prospectName(lesson: ClientLessonSpec): string {
   return personaFor(lesson.skillId || lesson.title).name;
 }
 
+/**
+ * TRAINING-ONLY. Build a short on-screen coaching tip for the live rep when the
+ * learner is stuck, drawn from the lesson's own framework moves. Plain text (it
+ * renders as a small card, never spoken). `stuckType` steers the tip; `moveIndex`
+ * lets the caller rotate through moves so it isn't always the same line.
+ */
+export function buildCoachingTip(
+  lesson: ClientLessonSpec,
+  stuckType: 'silence' | 'rambling' | 'conceding',
+  moveIndex = 0,
+): string {
+  const moves = lesson.coreFramework.moves;
+  const move = moves.length ? moves[Math.abs(moveIndex) % moves.length] : null;
+  switch (stuckType) {
+    case 'rambling':
+      return 'Tip: tighten it up — make your point, then pause and let them respond. Less talking, more listening.';
+    case 'conceding':
+      return move
+        ? `Tip: don't fold yet. Try your "${move.step}" move — ${move.intent}. e.g. "${move.keyLine}"`
+        : "Tip: don't fold yet — stay with your framework and make your next move.";
+    case 'silence':
+    default:
+      return move
+        ? `Stuck? Try "${move.step}": ${move.intent}. e.g. "${move.keyLine}"`
+        : 'Stuck? Take your next move from the framework — make it and see how they react.';
+  }
+}
+
 export function buildPhasePrompt(
   lesson: ClientLessonSpec,
   phase: Phase | 'level_choice',
