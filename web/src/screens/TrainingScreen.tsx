@@ -21,7 +21,7 @@ import { buildCoachingTip } from '../training/lessonPrompts';
 import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { useIsMobile } from '../engine/useIsMobile';
 import { CenterAvatar } from '../live2d/CenterAvatar';
-import { loadAvatarPrefs } from '../live2d/avatars';
+import { loadAvatarPrefs, avatarDefaults } from '../live2d/avatars';
 import { SessionResults } from '../components/SessionResults';
 import '../components/ProfilePanel.css';
 import './TrainingScreen.css';
@@ -585,7 +585,7 @@ function TrainingSession({ lesson, onExit }: TrainingSessionProps): JSX.Element 
             amplitude={session.activeAmplitude}
             speaking={speaking}
             avatarId={centerAvatarId}
-            colors={session.inLiveRep ? undefined : companionColors}
+            colors={session.inLiveRep ? avatarDefaults('chitose') : companionColors}
           />
         }
         presence={

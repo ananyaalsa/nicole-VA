@@ -19,7 +19,7 @@ export interface ElementColors {
   [element: string]: string | undefined;
 }
 
-export type RecolorProfile = 'izumi' | 'haru';
+export type RecolorProfile = 'izumi' | 'haru' | 'chitose';
 
 // ── color helpers ──────────────────────────────────────────────────────────
 function hexToRgb(hex: string): [number, number, number] {
@@ -75,6 +75,18 @@ function classifyHaru(h: number, s: number, l: number): ElementId | null {
   if (l < 0.3 && s < 0.35) return 'tights';
   // Skirt / dress = light, low-saturation fabric (but not pure-white bg).
   if (l >= 0.6 && l <= 0.92 && s < 0.2) return 'skirt';
+  return null;
+}
+// Chitose (the male prospect): navy blazer → 'top'; red tie → 'collar' (accent).
+// Skin (warm, low-sat), the white shirt (high L), and hair stay untouched so we
+// only re-theme the suit to teal. Sampled hues: blazer ≈ 210-250, tie ≈ 350-20.
+function classifyChitose(h: number, s: number, l: number): ElementId | null {
+  if (l > 0.86) return null;                                  // white shirt / sheen
+  if (h >= 195 && h <= 255 && s > 0.12 && l > 0.05 && l < 0.78) return 'top';   // blazer (blue)
+  // Red tie → accent. Keep the hue window TIGHT around true red (≈350–15) and
+  // require high saturation so warm SKIN tones (hue ~20–40, lower sat) are never
+  // recolored — a teal-tinted face would look broken.
+  if ((h <= 14 || h >= 345) && s > 0.42 && l > 0.12 && l < 0.62) return 'collar';
   return null;
 }
 
@@ -137,7 +149,9 @@ export function recolorTexture(
       continue;
     }
     if (fabricEls.length) {
-      const el = profile === 'izumi' ? classifyIzumi(ph, ps, pl) : classifyHaru(ph, ps, pl);
+      const el = profile === 'izumi' ? classifyIzumi(ph, ps, pl)
+        : profile === 'chitose' ? classifyChitose(ph, ps, pl)
+        : classifyHaru(ph, ps, pl);
       if (el && targetHsl[el]) {
         const [r, g, b] = applyFabric(targetHsl[el]!, pl);
         d[i] = r; d[i + 1] = g; d[i + 2] = b;

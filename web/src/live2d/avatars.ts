@@ -101,13 +101,23 @@ export const AVATARS: Record<RealAvatarId, AvatarDef> = {
   },
   // PROSPECT (current). Cubism sample "Chitose". Old-style param naming
   // (PARAM_MOUTH_OPEN_Y / PARAM_EYE_*_OPEN), so it uses the Live2DStage defaults.
+  // His navy blazer + red tie are recolored to the teal theme at load (the
+  // 'chitose' recolor profile); single texture, recolored once from itself.
   chitose: {
     id: 'chitose',
     label: 'Prospect',
     model: '/live2d/chitose/chitose.model3.json',
+    profile: 'chitose',
     mouthParam: 'PARAM_MOUTH_OPEN_Y',
-    elements: [],
-    textures: [],
+    elements: [
+      { id: 'top', label: 'Blazer', default: TEAL },
+      { id: 'collar', label: 'Tie', default: TEAL_DK },
+    ],
+    textures: [
+      // Single baked texture; used as both the source and the "original" base,
+      // since the prospect's outfit isn't user-editable (recolored once at load).
+      { file: 'chitose.2048/texture_00.png', original: 'chitose.2048/texture_00.png', elements: ['top', 'collar'] },
+    ],
   },
 };
 

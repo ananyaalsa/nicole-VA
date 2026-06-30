@@ -223,26 +223,23 @@ export function Live2DStage({ amplitudeRef, speakingRef, avatarId = 'aria', colo
           //    would push the head off the top. Instead frame the UPPER BODY:
           //    scale to width, anchor at the top, so the face + torso fill the
           //    panel and the head is always in view.
+          // Frame her the SAME WAY as Talk in both layouts so she's positioned
+          // consistently everywhere: a centered head-and-upper-body view with
+          // headroom, her lower body continuing past the bottom edge (clipped by
+          // overflow:hidden). The only difference is how we pick the scale:
+          //  • TALL box (mobile full-screen): fit the whole rigged form.
+          //  • SHORT/WIDE box (desktop avatar panel): a full-body fit would shrink
+          //    her to a speck, so scale to the box HEIGHT (upper body fills it)
+          //    and cap by width so a very wide panel can't blow the face up.
           const boxIsShort = h / w < 1.1;
-          if (boxIsShort) {
-            // HEAD-AND-SHOULDERS crop for a short/wide panel, framed like Talk:
-            // scale so the upper body (head + torso) fills most of the panel
-            // height, with a little headroom at the top, and the body continues
-            // below the bottom edge (clipped by overflow:hidden). Cap by width so
-            // a very wide panel never blows the face up past the sides.
-            const byHeight = (h / (mh * 0.62));   // upper ~62% of the body fills the box
-            const byWidth = (w / mw) * 1.6;       // generous width cap (portrait crop)
-            const scale = Math.min(byHeight, byWidth);
-            live2dModel.scale.set(scale);
-            live2dModel.anchor.set(0.5, 0);       // top-center anchor
-            live2dModel.position.set(w / 2, h * 0.12); // headroom above the head
-          } else {
-            // Fit her ENTIRE rigged form within the box, positioned a bit LOWER.
-            const scale = Math.min(w / mw, h / mh) * 0.95;
-            live2dModel.scale.set(scale);
-            live2dModel.anchor.set(0.5, 0.5);
-            live2dModel.position.set(w / 2, h * 0.6); // lower than centre
-          }
+          const scale = boxIsShort
+            ? Math.min(h / (mh * 0.66), (w / mw) * 1.5)
+            : Math.min(w / mw, h / mh) * 0.95;
+          live2dModel.scale.set(scale);
+          // Identical anchor + vertical placement to Talk: centered, sitting a
+          // little low so the face lands in the upper-middle with headroom above.
+          live2dModel.anchor.set(0.5, 0.5);
+          live2dModel.position.set(w / 2, h * 0.6);
         };
         fit();
         // The box may not be measured on the first synchronous pass (or while

@@ -21,6 +21,7 @@ import { useDebouncedSpeaking } from '../engine/useDebouncedSpeaking';
 import { useIsMobile } from '../engine/useIsMobile';
 import { LiveRoom } from '../components/LiveRoom';
 import { CenterAvatar } from '../live2d/CenterAvatar';
+import { avatarDefaults } from '../live2d/avatars';
 import { CallPresence } from '../components/CallPresence';
 import { MicControls } from '../components/MicControls';
 import { RoleplayBriefCard } from '../components/RoleplayBriefCard';
@@ -809,6 +810,7 @@ function RoleplayRoom({
             amplitude={amplitude}
             speaking={speaking}
             avatarId="chitose"
+            colors={avatarDefaults('chitose')}
           />
         }
         presence={
