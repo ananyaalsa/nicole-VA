@@ -22,27 +22,34 @@ function PanelSlot(props: PanelComponentProps & { type: PanelType }): JSX.Elemen
 }
 
 export function CanvasHost({ panels, token, onClose, children }: CanvasHostProps): JSX.Element {
-  if (panels.length === 0) {
-    return <div className="canvas-host canvas-host--idle" data-testid="canvas-host">{children}</div>;
-  }
+  const hasPanels = panels.length > 0;
+  // The `children` (WaveBackdrop + ResultDeck + idle/feed) are ALWAYS mounted, so
+  // opening a useCanvas panel (connect/note/integrations) never unmounts the
+  // ResultDeck — its overlays/pills persist alongside the panel. Panels render
+  // ABOVE the deck children when present.
   return (
-    <div className="canvas-host" data-testid="canvas-host">
-      <div className="canvas-host__head">Canvas · what Nicole opened</div>
-      {panels.map((p) => {
-        const provider = p.type === 'connect' ? String(p.args?.provider ?? '') : undefined;
-        return (
-          <div className="canvas-host__panel" key={p.key}>
-            <PanelFrame resetKey={p.nonce}>
-              <PanelSlot
-                type={p.type}
-                panel={p}
-                token={token}
-                onClose={() => onClose(p.type, provider)}
-              />
-            </PanelFrame>
-          </div>
-        );
-      })}
+    <div className={`canvas-host${hasPanels ? '' : ' canvas-host--idle'}`} data-testid="canvas-host">
+      {hasPanels && (
+        <>
+          <div className="canvas-host__head">Canvas · what Nicole opened</div>
+          {panels.map((p) => {
+            const provider = p.type === 'connect' ? String(p.args?.provider ?? '') : undefined;
+            return (
+              <div className="canvas-host__panel" key={p.key}>
+                <PanelFrame resetKey={p.nonce}>
+                  <PanelSlot
+                    type={p.type}
+                    panel={p}
+                    token={token}
+                    onClose={() => onClose(p.type, provider)}
+                  />
+                </PanelFrame>
+              </div>
+            );
+          })}
+        </>
+      )}
+      {children}
     </div>
   );
 }

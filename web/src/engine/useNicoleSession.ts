@@ -594,6 +594,12 @@ export function useNicoleSession(
 
       // Transcripts → accumulate into the in-progress realtime line per speaker.
       if (sc.inputTranscription?.text) {
+        // A NEW user utterance is beginning (no in-progress user line yet) → wipe
+        // the previous turn's search-grounding links so they can never leak into
+        // a later web_search/news card as this turn's results. Grounding for the
+        // answer to THIS utterance arrives afterward (during Nicole's reply), so
+        // clearing here never drops the current turn's links.
+        if (!realtimeRef.current.you) setSearchLinks((prev) => (prev.length ? [] : prev));
         appendPartial('you', sc.inputTranscription.text);
       }
       if (sc.outputTranscription?.text) {

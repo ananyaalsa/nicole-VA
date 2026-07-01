@@ -15,10 +15,17 @@ describe('CanvasHost', () => {
     render(<CanvasHost panels={[]} token="t" onClose={() => {}}><div data-testid="idle">home</div></CanvasHost>);
     expect(screen.getByTestId('idle')).toBeInTheDocument();
   });
-  it('renders open panels (newest last) instead of idle', () => {
-    render(<CanvasHost panels={[{ key: 'integrations', type: 'integrations' }]} token="t" onClose={() => {}}><div data-testid="idle" /></CanvasHost>);
-    expect(screen.queryByTestId('idle')).toBeNull();
+  it('renders open panels alongside — NOT instead of — the children (fix D: deck stays mounted)', () => {
+    // The children include the ResultDeck (represented here by data-testid="deck").
+    // Opening a panel must NOT unmount them — the deck's overlays/pills persist.
+    render(
+      <CanvasHost panels={[{ key: 'integrations', type: 'integrations' }]} token="t" onClose={() => {}}>
+        <div data-testid="deck" />
+      </CanvasHost>,
+    );
     expect(screen.getByTestId('p-integrations')).toBeInTheDocument();
+    // Deck children are STILL mounted with a panel open (previously they were unmounted).
+    expect(screen.getByTestId('deck')).toBeInTheDocument();
   });
   it('a crashing panel is contained by the error boundary', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});

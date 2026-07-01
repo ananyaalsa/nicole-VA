@@ -49,4 +49,36 @@ describe('useResultDeck', () => {
     const v2 = result.current.items[0].version;
     expect(v2).toBeGreaterThan(v1); // same id, new version → boundary resetKey changes
   });
+
+  it('caps the non-weather stack at 6, keeping the most recent (fix E)', () => {
+    const { result } = renderHook(() => useResultDeck());
+    // Push 8 non-weather items with distinguishable labels.
+    for (let n = 1; n <= 8; n++) {
+      act(() => { result.current.push('news', { items: [] }, { label: `News ${n}`, icon: '📰' }); });
+    }
+    const nonWeather = result.current.items.filter((i) => i.kind !== 'weather');
+    expect(nonWeather).toHaveLength(6);
+    // The 2 oldest (News 1, News 2) were trimmed; News 3–8 remain in order.
+    expect(nonWeather.map((i) => i.label)).toEqual(['News 3', 'News 4', 'News 5', 'News 6', 'News 7', 'News 8']);
+  });
+
+  it('the weather singleton survives the non-weather cap (fix E)', () => {
+    const { result } = renderHook(() => useResultDeck());
+    act(() => { result.current.push('weather', wx, { label: 'Weather · Chicago', icon: '☀️' }); });
+    for (let n = 1; n <= 8; n++) {
+      act(() => { result.current.push('products', { query: `q${n}`, products: [] }, { label: `P ${n}`, icon: '🛒' }); });
+    }
+    // Weather singleton preserved + 6 most-recent products = 7 total.
+    expect(result.current.items.filter((i) => i.kind === 'weather')).toHaveLength(1);
+    expect(result.current.items.filter((i) => i.kind !== 'weather')).toHaveLength(6);
+  });
+
+  it('clear() wipes the whole deck (fix G)', () => {
+    const { result } = renderHook(() => useResultDeck());
+    act(() => { result.current.push('weather', wx, { label: 'W', icon: '☀️' }); });
+    act(() => { result.current.push('news', { items: [] }, { label: 'N', icon: '📰' }); });
+    expect(result.current.items.length).toBeGreaterThan(0);
+    act(() => result.current.clear());
+    expect(result.current.items).toHaveLength(0);
+  });
 });

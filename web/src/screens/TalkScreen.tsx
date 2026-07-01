@@ -190,10 +190,20 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   // weather (canvas panel vs. the mobile overlay). `isWorkspace` is computed below
   // and assigned into this ref each render.
   const isWorkspaceRef = useRef(false);
-  // Latest search-grounding links, mirrored into a ref so handleToolResult (built
-  // BEFORE `session` exists, since it's passed into useNicoleSession) can read the
-  // current value without a circular/temporal-dead-zone dependency on `session`.
-  const searchLinksRef = useRef<{ url: string; title: string }[]>([]);
+  // A pending web_search PRESENTATION request. web_search is a presentation signal
+  // only — its tool-result carries an EMPTY payload; the real links arrive as
+  // Google-Search grounding chunks in LATER serverContent messages. We must NOT
+  // read searchLinks synchronously in handleToolResult (they'd be stale/empty or a
+  // prior query's). Instead we stash which presentation to show, then a reactive
+  // effect (below) pushes the deck card once the fresh grounding links land.
+  const pendingWebSearchRef = useRef<null | 'news' | 'search'>(null);
+  // Bumped whenever a web_search tool-result arrives, so the reactive effect below
+  // re-runs even when grounding links were ALREADY present for this turn (the
+  // grounding-before-tool-result ordering). Together with the per-turn link clear
+  // in useNicoleSession, this guarantees: no cross-turn stale links, no empty push,
+  // and no missed push regardless of whether grounding lands before or after the
+  // tool-result.
+  const [webSearchSignal, setWebSearchSignal] = useState(0);
 
   // Nicole controls the UI by voice — every command is registered in one place.
   const { onToolCall } = useUiCommands({
@@ -223,7 +233,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
         }
       });
     },
-    end_session: () => { camera.stop(); stop(); session.clearTranscript(); },
+    end_session: () => { camera.stop(); stop(); session.clearTranscript(); deck.clear(); },
     set_about: (a) => { if (typeof a.text === 'string') void profile.setAbout(a.text); },
     set_goal: (a) => { if ((a.action === 'add' || a.action === 'remove') && typeof a.goal === 'string') void profile.setGoal(a.action, a.goal); },
     set_display_name: (a) => { if (typeof a.name === 'string') void profile.setDisplayName(a.name); },
@@ -261,21 +271,22 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       // the toast already tells the user to connect. (Read the live value via ref.)
       if (r.needsConnect && isWorkspaceRef.current) canvas.open('connect', { provider: r.needsConnect });
 
-      // Result-deck payloads (web_search/search_products) — workspace only, same
-      // reasoning as above: no CanvasHost/ResultDeck is mounted on mobile/tablet.
+      // Result-deck payloads — workspace only, same reasoning as above: no
+      // CanvasHost/ResultDeck is mounted on mobile/tablet.
       if (r.data && isWorkspaceRef.current) {
         const d = r.data as { kind: 'weather' | 'news' | 'search' | 'products'; payload: any };
         if (d.kind === 'products') {
+          // Products carry a REAL, inline payload — push synchronously.
           const query = d.payload?.query ?? '';
           deck.push('products', { query, products: d.payload?.products ?? [] }, { label: query || 'Products', icon: '🛒' });
-        } else if (d.kind === 'news') {
-          // Fill from the grounding links captured this turn (Task 8 note).
-          const links = searchLinksRef.current;
-          const items = links.map((l) => ({ title: l.title, url: l.url, source: hostOf(l.url) }));
-          if (items.length) deck.push('news', { items }, { label: 'Top news', icon: '📰' });
-        } else if (d.kind === 'search') {
-          const links = searchLinksRef.current;
-          if (links.length) deck.push('search', { results: links }, { label: 'Results', icon: '🔎' });
+        } else if (d.kind === 'news' || d.kind === 'search') {
+          // web_search is a presentation SIGNAL — the payload is empty here and
+          // the real links arrive as grounding LATER (or already landed for this
+          // turn). Do NOT read searchLinks synchronously (that showed an empty or
+          // stale-cross-turn card). Record the pending presentation + bump the
+          // signal; the effect below pushes once fresh grounding links exist.
+          pendingWebSearchRef.current = d.kind;
+          setWebSearchSignal((n) => n + 1);
         }
       }
     },
@@ -284,7 +295,25 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
   const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, setMic, volume, muted, setVolume, setMuted, searchLinks, clearSearchLinks } = session;
-  searchLinksRef.current = searchLinks;
+
+  // Reactive web_search deck push (fix for the news/search race + cross-turn leak).
+  // Fires when EITHER the grounding links change OR a web_search tool-result just
+  // arrived (webSearchSignal). Only pushes when there's a pending web_search
+  // presentation, we're on the workspace, and fresh links actually exist — so it
+  // never shows an empty card, and (thanks to the per-turn link clear in
+  // useNicoleSession) never a prior query's stale links. Handles both orderings:
+  //   • grounding AFTER the tool-result → the links-change re-run pushes;
+  //   • grounding BEFORE the tool-result → the signal re-run pushes.
+  useEffect(() => {
+    const pending = pendingWebSearchRef.current;
+    if (!pending || !isWorkspaceRef.current || !searchLinks.length) return;
+    pendingWebSearchRef.current = null;
+    if (pending === 'news') {
+      deck.push('news', { items: searchLinks.map((l) => ({ title: l.title, url: l.url, source: hostOf(l.url) })) }, { label: 'Top news', icon: '📰' });
+    } else {
+      deck.push('search', { results: searchLinks }, { label: 'Results', icon: '🔎' });
+    }
+  }, [searchLinks, webSearchSignal, deck]);
 
   // "Connecting" guard so the Start button can't be spam-clicked between the tap
   // and the session going live (each extra click would open another session).
@@ -331,8 +360,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   }, [backgrounded, connected, token]);
 
   // End a session: stop the live connection AND wipe the transcript so the idle
-  // home screen never shows stale chat. Durable facts persist in memory.
-  const endSession = useCallback(() => { camera.stop(); stop(); clearTranscript(); }, [stop, clearTranscript]);
+  // home screen never shows stale chat. Also clear the result deck so old
+  // overlays/pills don't leak into the next session. Durable facts persist.
+  const endSession = useCallback(() => { camera.stop(); stop(); clearTranscript(); deck.clear(); }, [stop, clearTranscript, deck]);
 
   const camera = useCamera({ onFrame: session.sendVideoFrame });
   const teardownRef = useRef<() => void>(() => {});
@@ -659,18 +689,18 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
             <CanvasHost panels={canvas.panels} token={token} onClose={canvas.close}>
               <WaveBackdrop stateRef={auraStateRef} />
               <ResultDeck items={deck.items} onCollapse={deck.collapse} onExpand={deck.expand} onDismiss={deck.dismiss} />
-              {transcript.length === 0 && !realtime.you && !realtime.nicole ? (
+              {/* Idle greeting: only when the session is fresh AND no canvas panel is
+                  open. CanvasHost now ALWAYS renders these children (so the deck never
+                  unmounts when a panel opens); we gate the greeting HERE so it doesn't
+                  double up below an open panel. */}
+              {canvas.panels.length === 0 && transcript.length === 0 && !realtime.you && !realtime.nicole ? (
                 <div className="talk-empty">
                   <HomePanel
                     onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
                     onDrill={() => onTrain?.()}
                   />
                 </div>
-              ) : (
-                <div className="conversation-feed">
-                  {/* Idle center: brief realtime echo — transcript lives in the right column. */}
-                </div>
-              )}
+              ) : null}
             </CanvasHost>
 
             {/* RIGHT: scrollable conversation transcript. */}

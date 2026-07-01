@@ -101,13 +101,14 @@ vi.mock('../training/scoreApi', () => ({
   postLiveStatus: vi.fn(async () => {}),
   requestScore: vi.fn(async () => ({})),
 }));
-// CanvasHost — lightweight stub that renders panels by type.
+// CanvasHost — lightweight stub. Mirrors the real component (fix D): children
+// (WaveBackdrop + ResultDeck) are ALWAYS rendered so the deck never unmounts when
+// a panel opens; panels render ALONGSIDE the children.
 vi.mock('../canvas/CanvasHost', () => ({
   CanvasHost: ({ children, panels }: any) => (
     <div data-testid="canvas-host">
-      {panels.length === 0
-        ? children
-        : panels.map((p: any) => <div key={p.key} data-testid={`panel-${p.type}`} />)}
+      {panels.map((p: any) => <div key={p.key} data-testid={`panel-${p.type}`} />)}
+      {children}
     </div>
   ),
 }));
@@ -322,5 +323,57 @@ describe('TalkScreen', () => {
       });
     });
     expect(await screen.findByText('Sony XM5')).toBeInTheDocument();
+  });
+
+  it('DESKTOP web_search: NO news card while grounding links are empty; card appears once links land (fix A race)', async () => {
+    mockWidth = 1280; // desktop workspace
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    let capturedOnToolResult: ((r: any) => void) | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (useNicoleSessionMock as any).mockImplementation((opts: any) => { capturedOnToolResult = opts.onToolResult; return sessionState; });
+    // searchLinks start EMPTY (grounding hasn't arrived yet).
+    sessionState = { ...sessionState, connected: true, searchLinks: [] };
+    const { rerender } = render(<TalkScreen />);
+
+    // web_search tool-result arrives BEFORE any grounding → NO news card yet
+    // (the old code pushed nothing but Nicole claimed it was on screen → empty).
+    act(() => {
+      capturedOnToolResult?.({ name: 'web_search', ok: true, summary: 'Looking that up for you.', data: { kind: 'news', payload: {} } });
+    });
+    expect(screen.queryByText('Top news')).toBeNull();
+
+    // Now grounding links land: the session reports non-empty searchLinks and the
+    // screen re-renders → the reactive effect pushes the news card.
+    sessionState = { ...sessionState, connected: true, searchLinks: [
+      { url: 'https://nytimes.com/a', title: 'Big headline' },
+    ] };
+    await act(async () => { rerender(<TalkScreen />); });
+    expect(await screen.findByText('Big headline')).toBeInTheDocument();
+  });
+
+  it('DESKTOP keeps the ResultDeck mounted when a canvas panel opens (fix D)', async () => {
+    mockWidth = 1280; // desktop workspace
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    let capturedOnToolResult: ((r: any) => void) | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (useNicoleSessionMock as any).mockImplementation((opts: any) => { capturedOnToolResult = opts.onToolResult; return sessionState; });
+    sessionState = { ...sessionState, connected: true };
+    render(<TalkScreen />);
+    // Show a product card (goes into the ResultDeck).
+    act(() => {
+      capturedOnToolResult?.({
+        name: 'search_products', ok: true, summary: 'Found 1 on your screen.',
+        data: { kind: 'products', payload: { query: 'headset', products: [
+          { title: 'Sony XM5', price: '$328.00', image: null, rating: 4.6, reviews: 12, prime: true, url: 'https://a.com/1' }] } },
+      });
+    });
+    expect(await screen.findByText('Sony XM5')).toBeInTheDocument();
+    // Now a connect card opens (a useCanvas panel). The deck must NOT disappear.
+    act(() => {
+      capturedOnToolResult?.({ name: 'post_slack', ok: false, summary: '', needsConnect: 'slack' });
+    });
+    expect(await screen.findByTestId('panel-connect')).toBeInTheDocument();
+    // The product card is STILL rendered alongside the open panel (fix D).
+    expect(screen.getByText('Sony XM5')).toBeInTheDocument();
   });
 });

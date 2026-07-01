@@ -38,7 +38,10 @@ export function ResultDeck({ items, onCollapse, onExpand, onDismiss }: ResultDec
   return (
     <div className="result-deck" data-testid="result-deck">
       {overlays.map((item) => (
-        <OverlayFrame key={item.id} label={item.label} icon={item.icon}
+        // Key by id:version so a re-push (weather singleton reuses its id but bumps
+        // version, or an expand after collapse) REMOUNTS the frame and re-arms the
+        // 10s auto-collapse timer — the timer effect only runs on mount.
+        <OverlayFrame key={`${item.id}:${item.version}`} label={item.label} icon={item.icon}
           onCollapse={() => onCollapse(item.id)} onDismiss={() => onDismiss(item.id)}>
           <PresenterBoundary resetKey={String(item.version)}>{presenterFor(item)}</PresenterBoundary>
         </OverlayFrame>
