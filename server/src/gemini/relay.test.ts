@@ -369,6 +369,72 @@ describe('LiveSession result-tool dispatch (search_products)', () => {
     expect(toolResult.data.payload.products[0].title).toBe('Sony XM5');
     ls.close();
   });
+
+  it('sends NO data on an empty (non-blocked) product result so no empty overlay opens (fix I)', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client, sent } = makeClient();
+    // The scrape SUCCEEDS but returns zero products — not blocked, just empty.
+    const searchProducts = vi.fn(async () => ({ blocked: false, products: [] }));
+    const ls = new LiveSession({
+      ai, model: 'm', userId: 'u', client, now,
+      loadUserFacts: async () => [], loadDisplayName: async () => null, loadLiveStatus: async () => null,
+      searchProducts: searchProducts as any,
+    });
+    await ls.connect(CFG);
+    sessions[0].callbacks.onmessage?.({
+      toolCall: { functionCalls: [{ id: '1', name: 'search_products', args: { query: 'unobtainium' } }] },
+    });
+    await flushMicrotasks();
+    const toolResult = sent.find((m) => m.type === 'tool-result' && m.name === 'search_products');
+    expect(toolResult).toBeTruthy();
+    expect(toolResult.ok).toBe(false);
+    // No `data` → the client never opens an empty products overlay; Nicole speaks
+    // the "No products found — want me to try again?" summary instead.
+    expect(toolResult.data).toBeUndefined();
+    ls.close();
+  });
+});
+
+describe('LiveSession result-tool dispatch (web_search)', () => {
+  it('maps presentation "links" → deck kind "search" (fix C)', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client, sent } = makeClient();
+    const ls = new LiveSession({
+      ai, model: 'm', userId: 'u', client, now,
+      loadUserFacts: async () => [], loadDisplayName: async () => null, loadLiveStatus: async () => null,
+    });
+    await ls.connect(CFG);
+    sessions[0].callbacks.onmessage?.({
+      toolCall: { functionCalls: [{ id: '1', name: 'web_search', args: { query: 'best laptops', presentation: 'links' } }] },
+    });
+    await flushMicrotasks();
+    const toolResult = sent.find((m) => m.type === 'tool-result' && m.name === 'web_search');
+    expect(toolResult).toBeTruthy();
+    expect(toolResult.ok).toBe(true);
+    // Server maps the model-facing 'links' presentation to the client deck kind
+    // 'search' (the client never branches on 'links' → results were dropped).
+    expect(toolResult.data.kind).toBe('search');
+    // Neutral summary — no false "on your screen" claim (fix B).
+    expect(toolResult.summary.toLowerCase()).not.toContain('on your screen');
+    ls.close();
+  });
+
+  it('maps presentation "news" → deck kind "news"', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client, sent } = makeClient();
+    const ls = new LiveSession({
+      ai, model: 'm', userId: 'u', client, now,
+      loadUserFacts: async () => [], loadDisplayName: async () => null, loadLiveStatus: async () => null,
+    });
+    await ls.connect(CFG);
+    sessions[0].callbacks.onmessage?.({
+      toolCall: { functionCalls: [{ id: '1', name: 'web_search', args: { query: 'today headlines', presentation: 'news' } }] },
+    });
+    await flushMicrotasks();
+    const toolResult = sent.find((m) => m.type === 'tool-result' && m.name === 'web_search');
+    expect(toolResult.data.kind).toBe('news');
+    ls.close();
+  });
 });
 
 describe('tool declarations', () => {

@@ -92,7 +92,6 @@ export interface LiveSessionDeps {
   loadLiveStatus?: (userId: string) => Promise<import('../session/liveStatus.js').LiveStatus | null>;
   /** Override memory tool handler (tests). */
   onMemoryTool?: (name: string, args: any, userId: string) => Promise<{ ok: boolean }>;
-  /** Called when a training_mark_progress tool fires (frontend relays it). */
   /** Override the product search (tests inject a fake to avoid a real scrape). */
   searchProducts?: typeof searchProductsDefault;
 }
@@ -528,19 +527,31 @@ export class LiveSession {
                 : `No products found — want me to try again?`;
             responses.push({ id: call?.id, name, response: { result: 'ok', summary } });
             if (this.deps.client.isOpen()) {
+              // No products (blocked OR genuinely empty) → send NO data so the
+              // client never opens an empty products overlay. Nicole speaks the
+              // summary instead. Only a non-empty result carries a `data` payload.
+              const hasProducts = !blocked && products.length > 0;
               this.deps.client.send({
                 type: 'tool-result',
                 name,
-                ok: !blocked && products.length > 0,
+                ok: hasProducts,
                 summary,
-                data: blocked ? undefined : { kind: 'products', payload: { query, products } },
+                data: hasProducts ? { kind: 'products', payload: { query, products } } : undefined,
               });
             }
           } else {
             // web_search: a presentation SIGNAL only — the client fills the
             // payload from the grounding chunks it already receives this turn.
             const presentation = args.presentation === 'news' ? 'news' : 'links';
-            const summary = `Here's what I found — it's on your screen.`;
+            // Map the model-facing presentation vocabulary ('news' | 'links') to
+            // the deck kind the CLIENT renders ('news' | 'search'). The client
+            // never branches on 'links', so 'links' → 'search' (SearchCard).
+            const deckKind = presentation === 'news' ? 'news' : 'search';
+            // Neutral ack: the server can't know whether grounding will yield any
+            // links, so it must NOT claim results are "on your screen" (that lie
+            // showed an empty canvas). The prompt tells Nicole to speak the actual
+            // answer; this is just a fallback acknowledgement.
+            const summary = `Looking that up for you.`;
             responses.push({ id: call?.id, name, response: { result: 'ok', summary } });
             if (this.deps.client.isOpen()) {
               this.deps.client.send({
@@ -548,7 +559,7 @@ export class LiveSession {
                 name,
                 ok: true,
                 summary,
-                data: { kind: presentation, payload: {} },
+                data: { kind: deckKind, payload: {} },
               });
             }
           }
