@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { friendlyError } from '../ui/friendlyError';
 import './MemoryPanel.css';
 
 export interface MemoryPanelProps {
@@ -72,11 +73,11 @@ export function MemoryPanel({ onClose }: MemoryPanelProps): JSX.Element {
     setLoading(true);
     fetch('/api/memory', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((r) => {
-        if (!r.ok) throw new Error('Could not load your memory');
+        if (!r.ok) throw new Error('memory_load_failed');
         return r.json() as Promise<{ facts: MemoryFact[] }>;
       })
       .then((d) => { if (alive) { setFacts(d.facts ?? []); setLoading(false); } })
-      .catch((e: unknown) => { if (alive) { setError(e instanceof Error ? e.message : 'Failed to load'); setLoading(false); } });
+      .catch(() => { if (alive) { setError(friendlyError('generic')); setLoading(false); } });
     return () => { alive = false; };
   }, [token]);
 

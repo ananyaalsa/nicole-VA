@@ -28,6 +28,7 @@ import { RoleplayBriefCard } from '../components/RoleplayBriefCard';
 import { synthesizeBrief, briefOverlay, type RoleplayBrief } from '../training/roleplayBrief';
 import { SessionResults } from '../components/SessionResults';
 import { requestScore, postLiveStatus, type ResultLine, type Scorecard } from '../training/scoreApi';
+import { friendlyError } from '../ui/friendlyError';
 import '../components/ProfilePanel.css';
 import './RoleplayScreen.css';
 
@@ -135,7 +136,7 @@ export function RoleplayScreen({ onExit, onTrain }: RoleplayScreenProps): JSX.El
       })
       .catch((err: unknown) => {
         if (!alive) return;
-        setProfileError(err instanceof Error ? err.message : 'Failed to load profiles');
+        setProfileError(friendlyError('generic'));
         setLoadingProfiles(false);
       });
     return () => {

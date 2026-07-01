@@ -7,6 +7,7 @@ import {
   disconnectIntegration,
   type IntegrationStatus,
 } from '../integrations/integrationsApi';
+import { friendlyError } from '../ui/friendlyError';
 import './IntegrationsPanel.css';
 
 /* Provider brand glyphs, keyed by the server's provider id. */
@@ -73,7 +74,7 @@ export function IntegrationsPanel(): JSX.Element {
       setItems(await fetchIntegrations(token));
       setError(null);
     } catch {
-      setError("Couldn't load integrations. Is the server running?");
+      setError(friendlyError('integrations_load'));
     }
   }, [token]);
 

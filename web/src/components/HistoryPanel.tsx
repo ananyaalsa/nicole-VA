@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { fetchHistory, type TrainingRun } from '../training/trainingApi';
 import { useAuth } from '../auth/AuthContext';
+import { friendlyError } from '../ui/friendlyError';
 import './HistoryPanel.css';
 
 export interface HistoryPanelProps {
@@ -73,7 +74,7 @@ export function HistoryPanel({ onClose }: HistoryPanelProps): JSX.Element {
       })
       .catch((err: unknown) => {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : 'Failed to load history');
+        setError(friendlyError('generic'));
         setLoading(false);
       });
     return () => {
