@@ -61,7 +61,7 @@ describe('UI_CONTROL_TOOL_DECLS', () => {
     expect(UI_CONTROL_TOOL_NAMES.has('open_panel')).toBe(true);
     expect(UI_CONTROL_TOOL_NAMES.has('close_panel')).toBe(true);
     const open = UI_CONTROL_TOOL_DECLS.find((d) => d.name === 'open_panel')!;
-    expect(open.parameters.properties.type.enum).toEqual(['connect','weather','search_results','note','integrations']);
+    expect(open.parameters.properties.type.enum).toEqual(['connect','note','integrations']);
     expect(open.parameters.required).toContain('type');
   });
 });

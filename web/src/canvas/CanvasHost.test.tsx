@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 vi.mock('./panels/registry', () => ({
   PANELS: {
-    weather: () => <div data-testid="p-weather">W</div>,
+    integrations: () => <div data-testid="p-integrations">I</div>,
     note: () => { throw new Error('boom'); },
-    connect: () => <div>C</div>, search_results: () => <div>S</div>, integrations: () => <div>I</div>,
+    connect: () => <div>C</div>,
   },
 }));
 import { CanvasHost } from './CanvasHost';
@@ -16,9 +16,9 @@ describe('CanvasHost', () => {
     expect(screen.getByTestId('idle')).toBeInTheDocument();
   });
   it('renders open panels (newest last) instead of idle', () => {
-    render(<CanvasHost panels={[{ key: 'weather', type: 'weather' }]} token="t" onClose={() => {}}><div data-testid="idle" /></CanvasHost>);
+    render(<CanvasHost panels={[{ key: 'integrations', type: 'integrations' }]} token="t" onClose={() => {}}><div data-testid="idle" /></CanvasHost>);
     expect(screen.queryByTestId('idle')).toBeNull();
-    expect(screen.getByTestId('p-weather')).toBeInTheDocument();
+    expect(screen.getByTestId('p-integrations')).toBeInTheDocument();
   });
   it('a crashing panel is contained by the error boundary', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});

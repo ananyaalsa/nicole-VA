@@ -240,13 +240,13 @@ export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
       "Open a rich panel on the user's CANVAS (the center of the screen) so they " +
       'can see and act on something. Use for: a connect card when you need an ' +
       'integration that is not connected (type "connect", provider e.g. "slack"); ' +
-      'a note the user might want to keep (type "note", text = the content); the ' +
-      'weather; search results; or the integrations manager. Say ONE short line ' +
-      'that it is on their screen — do not read the panel contents aloud.',
+      'a note the user might want to keep (type "note", text = the content); or ' +
+      'the integrations manager. Say ONE short line that it is on their screen — ' +
+      'do not read the panel contents aloud.',
     parameters: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['connect', 'weather', 'search_results', 'note', 'integrations'], description: 'Which panel to open.' },
+        type: { type: 'string', enum: ['connect', 'note', 'integrations'], description: 'Which panel to open.' },
         provider: { type: 'string', description: 'For type "connect": the integration id, e.g. "slack", "google", "notion", "todoist".' },
         reason: { type: 'string', description: 'For "connect": one short line on why (e.g. "post to your team").' },
         text: { type: 'string', description: 'For "note": the note content to show.' },
@@ -260,7 +260,7 @@ export const UI_CONTROL_TOOL_DECLS: ToolDecl[] = [
     parameters: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['connect', 'weather', 'search_results', 'note', 'integrations'], description: 'Which panel to close; omit to close all.' },
+        type: { type: 'string', enum: ['connect', 'note', 'integrations'], description: 'Which panel to close; omit to close all.' },
         provider: { type: 'string', description: 'For "connect": which provider card to close.' },
       },
       required: [],

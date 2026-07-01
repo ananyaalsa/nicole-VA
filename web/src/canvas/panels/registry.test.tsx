@@ -4,7 +4,6 @@ vi.mock('../../integrations/useIntegrations', () => ({ useIntegrations: () => ({
   { id: 'slack', name: 'Slack', description: '', configured: true, connected: false, scopes: [], connectedAt: null },
   { id: 'gmail', name: 'Gmail', description: '', configured: true, connected: true, scopes: [], connectedAt: '2026-01-01' },
 ], loading: false, error: false, refresh: () => {} }) }));
-vi.mock('../../components/LinkCards', () => ({ LinkCards: () => <div data-testid="link-cards" /> }));
 vi.mock('../../integrations/integrationsApi', () => ({
   connectIntegration: vi.fn().mockResolvedValue({ ok: true }),
   disconnectIntegration: vi.fn().mockResolvedValue({}),
@@ -16,26 +15,12 @@ const P = (type: keyof typeof PANELS, args: Record<string, unknown>) =>
   render(PANELS[type]({ panel: { key: type, type, args }, token: 't', onClose: () => {} }));
 
 describe('PANELS registry', () => {
-  it('has all five v1 panel types', () => {
-    expect(Object.keys(PANELS).sort()).toEqual(['connect','integrations','note','search_results','weather']);
+  it('has all three v2 panel types', () => {
+    expect(Object.keys(PANELS).sort()).toEqual(['connect','integrations','note']);
   });
   it('note panel shows its text', () => {
     P('note', { text: 'remember this' });
     expect(screen.getByText('remember this')).toBeInTheDocument();
-  });
-  it('weather panel shows temperature + place', () => {
-    P('weather', { place: 'Pune', tempC: 24, condition: 'Partly cloudy', icon: '⛅', feelsC: 26, forecast: [] });
-    expect(screen.getByText(/pune/i)).toBeInTheDocument();
-    expect(screen.getByText(/24/)).toBeInTheDocument();
-  });
-  it('search_results panel renders LinkCards', () => {
-    P('search_results', { links: [{ url: 'https://x.com', title: 'X' }] });
-    expect(screen.getByTestId('link-cards')).toBeInTheDocument();
-  });
-  it('search_results panel shows a friendly empty state with no links', () => {
-    P('search_results', {});
-    expect(screen.getByText(/no results to show yet/i)).toBeInTheDocument();
-    expect(screen.queryByTestId('link-cards')).toBeNull();
   });
   it('integrations panel lists providers with connected state', () => {
     P('integrations', {});

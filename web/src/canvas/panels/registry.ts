@@ -2,8 +2,6 @@
 import { createElement, type JSX } from 'react';
 import type { Panel, PanelType } from '../canvasTypes';
 import { ConnectPanel } from './ConnectPanel';
-import { WeatherPanel } from './WeatherPanel';
-import { SearchResultsPanel } from './SearchResultsPanel';
 import { NotePanel } from './NotePanel';
 import { IntegrationsPanel } from './IntegrationsPanel';
 import './panels.css';
@@ -21,8 +19,6 @@ export const PANELS: Record<PanelType, (props: PanelComponentProps) => JSX.Eleme
     token: props.token,
     onClose: props.onClose,
   }),
-  weather: (props) => createElement(WeatherPanel, props),
-  search_results: (props) => createElement(SearchResultsPanel, props),
   note: (props) => createElement(NotePanel, props),
   integrations: (props) => createElement(IntegrationsPanel, props),
 };
