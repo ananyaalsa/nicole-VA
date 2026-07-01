@@ -152,3 +152,12 @@ describe('buildSystemPrompt', () => {
     expect(talk).toContain(NICOLE_BASE_PROMPT);
   });
 });
+
+describe('nicolePrompt anti-hallucination', () => {
+  it('contains the screen-share and no-fabrication rules', () => {
+    expect(NICOLE_BASE_PROMPT).toMatch(/only what you can (actually )?see/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/can't read that clearly/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/never (invent|make up|add) (products|prices|headlines|data)/i);
+    expect(NICOLE_BASE_PROMPT).toMatch(/search_products|web_search/);
+  });
+});
