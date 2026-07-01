@@ -1,0 +1,27 @@
+/* web/src/canvas/panels/ConnectPanel.css */
+.connect-panel {
+  position: relative; border-radius: var(--radius-lg, 18px); padding: 16px 18px;
+  background: rgba(255,255,255,.55);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.6);
+  box-shadow: 0 10px 34px rgba(11,61,56,.14), inset 0 1px 0 rgba(255,255,255,.5);
+  overflow: hidden;
+}
+.connect-panel::before { content:''; position:absolute; inset:0; pointer-events:none;
+  background: radial-gradient(400px 120px at 0% 0%, rgba(var(--accent-rgb,15,118,110),.18), transparent 70%); }
+.connect-panel__x { position:absolute; top:10px; right:12px; border:0; background:transparent; color:var(--text-3); font-size:1rem; line-height:1; cursor:pointer; }
+.connect-panel__row { display:flex; align-items:center; gap:13px; }
+.connect-panel__logo { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; flex-shrink:0; color:#fff; font-weight:800; font-size:1.1rem; background:var(--accent); box-shadow:0 4px 14px rgba(0,0,0,.12); }
+.logo--slack { background:#4A154B; } .logo--gmail, .logo--google { background:#EA4335; } .logo--notion { background:#111; } .logo--todoist { background:#e44332; }
+.connect-panel__txt strong { font-size:.98rem; } .connect-panel__txt p { margin:2px 0 0; color:var(--text-2); font-size:.84rem; }
+.connect-panel__err { margin:8px 0 0; font-size:.82rem; color:var(--danger,#b91c1c); }
+.connect-panel__actions { display:flex; gap:10px; margin-top:13px; }
+.connect-panel__btn { border:0; border-radius:999px; padding:9px 18px; font:inherit; font-weight:700; cursor:pointer; }
+.connect-panel__btn.primary { background:var(--accent); color:#fff; }
+.connect-panel__btn.primary:disabled { opacity:.7; cursor:default; }
+.connect-panel__btn.ghost { background:transparent; color:var(--text-2); border:1px solid var(--border); }
+.connect-panel__timer { position:absolute; left:0; bottom:0; height:3px; width:100%; transform-origin:left;
+  background:linear-gradient(90deg,var(--accent),#5ec8bb); animation:connect-timer 10s linear forwards; }
+.connect-panel:hover .connect-panel__timer, .connect-panel:focus-within .connect-panel__timer { animation-play-state:paused; }
+@keyframes connect-timer { from{transform:scaleX(1)} to{transform:scaleX(0)} }
+@media (prefers-reduced-motion: reduce) { .connect-panel__timer { animation:none; display:none; } }
