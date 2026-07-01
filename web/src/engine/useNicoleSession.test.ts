@@ -511,4 +511,13 @@ describe('useNicoleSession', () => {
     act(() => { emit({ interrupted: true }); });
     expect(fired).toBe(true);
   });
+
+  it('forwards needsConnect from a tool-result to onToolResult', async () => {
+    const onToolResult = vi.fn();
+    await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live', onToolResult });
+    act(() => {
+      FakeWebSocket.last().emit({ type: 'tool-result', name: 'post_slack', ok: false, summary: 'Connect Slack first.', needsConnect: 'slack' });
+    });
+    expect(onToolResult).toHaveBeenCalledWith(expect.objectContaining({ name: 'post_slack', ok: false, needsConnect: 'slack' }));
+  });
 });
