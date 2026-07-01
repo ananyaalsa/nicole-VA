@@ -1,0 +1,18 @@
+/* web/src/canvas/resultDeck/ResultDeck.css */
+.result-deck { position: relative; height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 14px; overflow-y: auto; }
+.result-deck__pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.result-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px;
+  background: rgba(20,45,42,.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.16); color: var(--text-1, #eafaf4); font-size: .82rem; font-weight: 600; cursor: pointer; }
+
+.result-overlay { position: relative; border-radius: 16px; padding: 14px 16px; overflow: hidden;
+  background: rgba(16,40,37,.52); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.14); box-shadow: 0 16px 46px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.1);
+  color: var(--text-1, #eafaf4); }
+.result-overlay__x { position: absolute; top: 10px; right: 12px; border: 0; background: transparent; color: inherit; font-size: 1rem; line-height: 1; cursor: pointer; opacity: .8; }
+.result-overlay__head { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: #9fe8d5; font-weight: 700; margin-bottom: 10px; }
+.result-overlay__timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; transform-origin: left;
+  background: linear-gradient(90deg, #37b39f, #7fe3d3); animation: result-timer 10s linear forwards; }
+.result-overlay:hover .result-overlay__timer, .result-overlay:focus-within .result-overlay__timer { animation-play-state: paused; }
+@keyframes result-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .result-overlay__timer { animation: none; display: none; } }
