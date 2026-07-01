@@ -340,6 +340,37 @@ describe('LiveSession.close', () => {
   });
 });
 
+describe('LiveSession result-tool dispatch (search_products)', () => {
+  it('runs the injected searchProducts and sends a data-carrying tool-result to the browser', async () => {
+    const { ai, sessions } = makeFakeAI();
+    const { client, sent } = makeClient();
+    const searchProducts = vi.fn(async () => ({
+      blocked: false,
+      products: [
+        { title: 'Sony XM5', price: '$328.00', image: null, rating: 4.6, reviews: 12, prime: true, url: 'https://a.com/1' },
+      ],
+    }));
+    const ls = new LiveSession({
+      ai, model: 'm', userId: 'u', client, now,
+      loadUserFacts: async () => [], loadDisplayName: async () => null, loadLiveStatus: async () => null,
+      searchProducts: searchProducts as any,
+    });
+    await ls.connect(CFG);
+    sessions[0].callbacks.onmessage?.({
+      toolCall: { functionCalls: [{ id: '1', name: 'search_products', args: { query: 'headset' } }] },
+    });
+    await flushMicrotasks();
+    expect(searchProducts).toHaveBeenCalledWith('headset', { limit: 5 });
+    expect(sessions[0].sendToolResponse).toHaveBeenCalled();
+    const toolResult = sent.find((m) => m.type === 'tool-result' && m.name === 'search_products');
+    expect(toolResult).toBeTruthy();
+    expect(toolResult.ok).toBe(true);
+    expect(toolResult.data.kind).toBe('products');
+    expect(toolResult.data.payload.products[0].title).toBe('Sony XM5');
+    ls.close();
+  });
+});
+
 describe('tool declarations', () => {
   it('declares training_mark_progress to Gemini', async () => {
     // buildConfig is private; assert via the declarations export instead.

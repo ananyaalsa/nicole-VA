@@ -24,8 +24,10 @@ import { formatMemoryBlock } from '../memory/memoryBlock.js';
 import { buildActivityDigest } from '../memory/activityDigest.js';
 import { MEMORY_TOOL_DECLS, handleMemoryTool } from '../memory/memoryTools.js';
 import { UI_CONTROL_TOOL_DECLS, UI_CONTROL_TOOL_NAMES, TRAINING_TOOL_DECLS } from './uiControlTools.js';
+import { RESULT_TOOL_NAMES, RESULT_TOOL_DECLS } from './resultTools.js';
 import { allConfiguredToolDecls } from '../integrations/registry.js';
 import { isIntegrationTool, dispatchIntegrationTool } from '../integrations/toolDispatch.js';
+import { searchProducts as searchProductsDefault } from '../products/productSearch.js';
 import { loadFacts, loadDisplayName } from '../memory/db.js';
 import { summarizeTurns } from './summarizer.js';
 import { shouldSummarize, splitForSummary, estimateTokens } from '../session/summaryTrigger.js';
@@ -91,6 +93,8 @@ export interface LiveSessionDeps {
   /** Override memory tool handler (tests). */
   onMemoryTool?: (name: string, args: any, userId: string) => Promise<{ ok: boolean }>;
   /** Called when a training_mark_progress tool fires (frontend relays it). */
+  /** Override the product search (tests inject a fake to avoid a real scrape). */
+  searchProducts?: typeof searchProductsDefault;
 }
 
 /** Max length of a single client text directive forwarded to Gemini (chars).
@@ -328,7 +332,7 @@ export class LiveSession {
     const integrationDecls = mode === 'talk' ? allConfiguredToolDecls() : [];
     const functionDeclarations =
       mode === 'talk'
-        ? [...MEMORY_TOOL_DECLS, ...UI_CONTROL_TOOL_DECLS, ...integrationDecls]
+        ? [...MEMORY_TOOL_DECLS, ...UI_CONTROL_TOOL_DECLS, ...RESULT_TOOL_DECLS, ...integrationDecls]
         : mode === 'coach'
           ? [...MEMORY_TOOL_DECLS, ...TRAINING_TOOL_DECLS]
           : []; // prospect: no tools at all
@@ -496,6 +500,58 @@ export class LiveSession {
         // Gemini so the turn completes.
         else if (UI_CONTROL_TOOL_NAMES.has(name)) {
           responses.push({ id: call?.id, name, response: { result: 'ok' } });
+        }
+        // Result-deck tools (web_search / search_products) run SERVER-SIDE (or,
+        // for web_search, are a presentation signal only — see resultTools.ts /
+        // productSearch.ts) and echo a structured `data` payload to the browser
+        // so it can render a rich deck card, in addition to Gemini's spoken ack.
+        else if (RESULT_TOOL_NAMES.has(name)) {
+          // HARD GATE: only Talk mode shows result decks — a coach/prospect
+          // session must never surface a live product/search card mid-lesson.
+          if ((this.sessionConfig?.mode ?? 'talk') !== 'talk') {
+            responses.push({
+              id: call?.id,
+              name,
+              response: { result: 'error', summary: 'Not available during a practice session.' },
+            });
+            continue;
+          }
+          if (name === 'search_products') {
+            const query = typeof args.query === 'string' ? args.query : '';
+            const limit = typeof args.limit === 'number' ? Math.min(8, Math.max(1, args.limit)) : 5;
+            const search = this.deps.searchProducts ?? searchProductsDefault;
+            const { blocked, products } = await search(query, { limit });
+            const summary = blocked
+              ? `I couldn't load products just now — try again?`
+              : products.length
+                ? `Found ${products.length} on your screen.`
+                : `No products found — want me to try again?`;
+            responses.push({ id: call?.id, name, response: { result: 'ok', summary } });
+            if (this.deps.client.isOpen()) {
+              this.deps.client.send({
+                type: 'tool-result',
+                name,
+                ok: !blocked && products.length > 0,
+                summary,
+                data: blocked ? undefined : { kind: 'products', payload: { query, products } },
+              });
+            }
+          } else {
+            // web_search: a presentation SIGNAL only — the client fills the
+            // payload from the grounding chunks it already receives this turn.
+            const presentation = args.presentation === 'news' ? 'news' : 'links';
+            const summary = `Here's what I found — it's on your screen.`;
+            responses.push({ id: call?.id, name, response: { result: 'ok', summary } });
+            if (this.deps.client.isOpen()) {
+              this.deps.client.send({
+                type: 'tool-result',
+                name,
+                ok: true,
+                summary,
+                data: { kind: presentation, payload: {} },
+              });
+            }
+          }
         }
         // Integration tools (calendar/email/tasks/slack/notion/spotify) run
         // SERVER-SIDE because the OAuth tokens live here. We return a short,
