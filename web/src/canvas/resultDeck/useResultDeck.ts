@@ -13,6 +13,7 @@ export interface ResultDeck {
 export function useResultDeck(): ResultDeck {
   const [items, setItems] = useState<ResultItem[]>([]);
   const seq = useRef(0);
+  const ver = useRef(0);
 
   const push = useCallback((kind: ResultKind, payload: ResultPayload, meta: ResultMeta): string => {
     // weather is a singleton — replace its payload and re-open as an overlay.
@@ -23,15 +24,15 @@ export function useResultDeck(): ResultDeck {
         if (existing) {
           id = existing.id;
           return prev.map((i) => i.kind === 'weather'
-            ? { ...i, payload, label: meta.label, icon: meta.icon, state: 'overlay' as const } : i);
+            ? { ...i, payload, label: meta.label, icon: meta.icon, state: 'overlay' as const, version: ++ver.current } : i);
         }
         id = `r${++seq.current}`;
-        return [...prev, { id, kind, payload, label: meta.label, icon: meta.icon, state: 'overlay' as const }];
+        return [...prev, { id, kind, payload, label: meta.label, icon: meta.icon, state: 'overlay' as const, version: ++ver.current }];
       });
       return id;
     }
     const id = `r${++seq.current}`;
-    setItems((prev) => [...prev, { id, kind, payload, label: meta.label, icon: meta.icon, state: 'overlay' }]);
+    setItems((prev) => [...prev, { id, kind, payload, label: meta.label, icon: meta.icon, state: 'overlay', version: ++ver.current }]);
     return id;
   }, []);
 

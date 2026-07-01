@@ -40,4 +40,13 @@ describe('useResultDeck', () => {
     act(() => { result.current.push('products', { query: 'x', products: [] }, { label: 'Headsets', icon: '🛒' }); });
     expect(result.current.items).toHaveLength(2);
   });
+
+  it('bumps version on every push (incl. weather singleton replace) so the error boundary can reset', () => {
+    const { result } = renderHook(() => useResultDeck());
+    act(() => { result.current.push('weather', wx, { label: 'W', icon: '☀️' }); });
+    const v1 = result.current.items[0].version;
+    act(() => { result.current.push('weather', { ...wx, tempC: 28 }, { label: 'W', icon: '☀️' }); });
+    const v2 = result.current.items[0].version;
+    expect(v2).toBeGreaterThan(v1); // same id, new version → boundary resetKey changes
+  });
 });

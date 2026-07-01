@@ -19,5 +19,6 @@ export type ResultPayload = WeatherPayload | NewsPayload | SearchPayload | Produ
 export interface ResultItem {
   id: string; kind: ResultKind; payload: ResultPayload;
   label: string; icon: string; state: 'overlay' | 'pill';
+  version: number;
 }
 export interface ResultMeta { label: string; icon: string; }

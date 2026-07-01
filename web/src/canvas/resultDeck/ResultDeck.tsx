@@ -9,7 +9,7 @@ import { ProductGrid } from './presenters/ProductGrid';
 import { friendlyError } from '../../ui/friendlyError';
 import './ResultDeck.css';
 
-class PresenterBoundary extends Component<{ resetKey: string; children: ReactNode }, { crashed: boolean }> {
+export class PresenterBoundary extends Component<{ resetKey: string; children: ReactNode }, { crashed: boolean }> {
   state = { crashed: false };
   static getDerivedStateFromError() { return { crashed: true }; }
   componentDidUpdate(prev: { resetKey: string }) { if (prev.resetKey !== this.props.resetKey && this.state.crashed) this.setState({ crashed: false }); }
@@ -40,7 +40,7 @@ export function ResultDeck({ items, onCollapse, onExpand, onDismiss }: ResultDec
       {overlays.map((item) => (
         <OverlayFrame key={item.id} label={item.label} icon={item.icon}
           onCollapse={() => onCollapse(item.id)} onDismiss={() => onDismiss(item.id)}>
-          <PresenterBoundary resetKey={item.id}>{presenterFor(item)}</PresenterBoundary>
+          <PresenterBoundary resetKey={String(item.version)}>{presenterFor(item)}</PresenterBoundary>
         </OverlayFrame>
       ))}
       {pills.length > 0 && (
