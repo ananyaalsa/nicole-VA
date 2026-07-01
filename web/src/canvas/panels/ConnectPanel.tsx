@@ -20,14 +20,16 @@ export interface ConnectPanelProps {
 export function ConnectPanel({ provider, reason, token, onClose }: ConnectPanelProps): JSX.Element {
   const [state, setState] = useState<'idle' | 'connecting' | 'done' | 'error'>('idle');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
   }, []);
   const armTimer = useCallback(() => {
     clearTimer();
-    timerRef.current = setTimeout(() => onClose(), AUTO_DISMISS_MS);
-  }, [clearTimer, onClose]);
+    timerRef.current = setTimeout(() => onCloseRef.current(), AUTO_DISMISS_MS);
+  }, [clearTimer]);
 
   // Arm on mount; pause on hover/focus; clean up on unmount.
   useEffect(() => { armTimer(); return clearTimer; }, [armTimer, clearTimer]);
@@ -40,12 +42,12 @@ export function ConnectPanel({ provider, reason, token, onClose }: ConnectPanelP
     if (r.ok) {
       window.dispatchEvent(new Event('nicole:integrations-updated'));
       setState('done');
-      timerRef.current = setTimeout(() => onClose(), 1200); // brief "Connected ✓" flash
+      timerRef.current = setTimeout(() => onCloseRef.current(), 1200); // brief "Connected ✓" flash
     } else {
       setState('error');
       armTimer(); // resume auto-dismiss
     }
-  }, [token, provider, clearTimer, armTimer, onClose]);
+  }, [token, provider, clearTimer, armTimer]);
 
   const l = label(provider);
   return (
@@ -57,7 +59,7 @@ export function ConnectPanel({ provider, reason, token, onClose }: ConnectPanelP
       onFocus={clearTimer}
       onBlur={armTimer}
     >
-      <button type="button" className="connect-panel__x" onClick={onClose} aria-label="Dismiss">✕</button>
+      <button type="button" className="connect-panel__x" onClick={onClose} aria-label={`Dismiss ${l}`}>✕</button>
       <div className="connect-panel__row">
         <span className={`connect-panel__logo logo--${provider}`} aria-hidden="true">{l.charAt(0)}</span>
         <div className="connect-panel__txt">
