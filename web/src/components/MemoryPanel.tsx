@@ -73,7 +73,7 @@ export function MemoryPanel({ onClose }: MemoryPanelProps): JSX.Element {
     setLoading(true);
     fetch('/api/memory', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((r) => {
-        if (!r.ok) throw new Error('memory_load_failed');
+        if (!r.ok) throw new Error('Could not load your memory');
         return r.json() as Promise<{ facts: MemoryFact[] }>;
       })
       .then((d) => { if (alive) { setFacts(d.facts ?? []); setLoading(false); } })
