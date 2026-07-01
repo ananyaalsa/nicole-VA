@@ -3,8 +3,11 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 
 // WaveBackdrop draws on a <canvas>; jsdom has no 2D context. Stub it so the
 // screen renders without the "getContext not implemented" noise/crash.
+// Also stub scrollTo: on desktop the .talk-chat__feed always mounts, triggering
+// the auto-scroll useLayoutEffect even with an empty transcript.
 beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as never;
+  (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
 });
 
 // Mock the session hook — it touches AudioContext / getUserMedia / WebSocket.
@@ -32,8 +35,10 @@ let sessionState = {
   sendText,
   sendVideoFrame,
 };
+const useNicoleSessionMock = vi.fn(function() { return sessionState; });
 vi.mock('../engine/useNicoleSession', () => ({
-  useNicoleSession: () => sessionState,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  useNicoleSession: (opts: any) => (useNicoleSessionMock as any)(opts),
 }));
 // Mock the camera hook so we can assert the button wiring without real getUserMedia.
 const cameraStart = vi.fn(async () => {});
@@ -91,6 +96,38 @@ vi.mock('../training/scoreApi', () => ({
   postLiveStatus: vi.fn(async () => {}),
   requestScore: vi.fn(async () => ({})),
 }));
+// CanvasHost — lightweight stub that renders panels by type.
+vi.mock('../canvas/CanvasHost', () => ({
+  CanvasHost: ({ children, panels }: any) => (
+    <div data-testid="canvas-host">
+      {panels.length === 0
+        ? children
+        : panels.map((p: any) => <div key={p.key} data-testid={`panel-${p.type}`} />)}
+    </div>
+  ),
+}));
+// useCanvas — use real React state so open() triggers re-renders and CanvasHost
+// receives updated panels (enabling findByTestId('panel-connect') in tests).
+vi.mock('../canvas/useCanvas', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  return {
+    useCanvas: () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [panels, setPanels] = React.useState([]) as [any[], React.Dispatch<React.SetStateAction<any[]>>];
+      const open = React.useCallback((type: string, args?: any) => {
+        const key = type === 'connect' ? `connect:${String(args?.provider ?? 'unknown')}` : type;
+        setPanels((prev: any[]) => [...prev.filter((p: any) => p.key !== key), { key, type, args }]);
+      }, []);
+      const close = React.useCallback((type: string, provider?: string) => {
+        const key = type === 'connect' ? `connect:${provider ?? 'unknown'}` : type;
+        setPanels((prev: any[]) => prev.filter((p: any) => p.key !== key));
+      }, []);
+      const closeAll = React.useCallback(() => setPanels([]), []);
+      return { panels, open, close, closeAll };
+    },
+  };
+});
 
 import { TalkScreen } from './TalkScreen';
 
@@ -106,6 +143,8 @@ beforeEach(() => {
   mockIsMobile = false;
   sessionState = { connected: false, micOn: true, transcript: [], searchLinks: [], clearSearchLinks, realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
   cameraState = { on: false, stream: null, facing: 'user', source: null, start: cameraStart, startScreen: cameraStartScreen, stop: cameraStop, flip: vi.fn(), error: null };
+  useNicoleSessionMock.mockClear();
+  useNicoleSessionMock.mockImplementation(function() { return sessionState; });
 });
 
 describe('TalkScreen', () => {
@@ -222,5 +261,26 @@ describe('TalkScreen', () => {
     // Entering the background stops the live session so it stops burning credits
     // while Training/Roleplay (their own paid sessions) are active.
     expect(stop).toHaveBeenCalled();
+  });
+
+  it('DESKTOP renders the 3-panel workspace', () => {
+    mockIsMobile = false;
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    sessionState = { ...sessionState, connected: true, searchLinks: [], transcript: [{ id: 'l1', speaker: 'you', text: 'hi', streaming: false } as any] };
+    render(<TalkScreen />);
+    expect(screen.getByTestId('canvas-host')).toBeInTheDocument();
+    expect(screen.getByText('hi')).toBeInTheDocument();
+  });
+
+  it('DESKTOP opens a connect panel when a tool-result needs one', async () => {
+    mockIsMobile = false;
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    let captured: ((r: any) => void) | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (useNicoleSessionMock as any).mockImplementation((opts: any) => { captured = opts.onToolResult; return sessionState; });
+    sessionState = { ...sessionState, connected: true };
+    render(<TalkScreen />);
+    act(() => captured?.({ name: 'post_slack', ok: false, summary: '', needsConnect: 'slack' }));
+    expect(await screen.findByTestId('panel-connect')).toBeInTheDocument();
   });
 });

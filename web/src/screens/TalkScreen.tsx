@@ -26,6 +26,9 @@ import { makeProfileActions } from '../engine/profileActions';
 import { useAuth } from '../auth/AuthContext';
 import { fetchLiveStatus } from '../training/scoreApi';
 import { VOICES, DEFAULT_VOICE } from '../audio/voices';
+import { useCanvas } from '../canvas/useCanvas';
+import { CanvasHost } from '../canvas/CanvasHost';
+import type { PanelType } from '../canvas/canvasTypes';
 import './TalkScreen.css';
 
 const SPEAKING_AMP = 0.06;
@@ -166,6 +169,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   // Profile actions Nicole can perform by voice (About / Goals / display name).
   const profile = useMemo(() => makeProfileActions(token, updateUser), [token, updateUser]);
 
+  // Canvas state — panels open/close in the center column of the desktop workspace.
+  const canvas = useCanvas();
+
   // Nicole controls the UI by voice — every command is registered in one place.
   const { onToolCall } = useUiCommands({
     set_camera: (a) => { if (a.on) void camera.start(); else camera.stop(); },
@@ -180,14 +186,20 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       const loc = typeof a.location === 'string' ? a.location : undefined;
       void weatherRef.current?.open(loc).then((w) => {
         // Feed Nicole the actual reading so she speaks accurate numbers, not a guess.
-        if (w) session.sendText(`[WEATHER DATA — read this to the user warmly in one sentence] ${speakWeather(w)} High ${w.forecast[0]?.hiC}, low ${w.forecast[0]?.loC}.`);
-        else session.sendText('[WEATHER unavailable — tell the user you could not get their location or the weather right now.]');
+        if (w) {
+          session.sendText(`[WEATHER DATA — read this to the user warmly in one sentence] ${speakWeather(w)} High ${w.forecast[0]?.hiC}, low ${w.forecast[0]?.loC}.`);
+          canvas.open('weather', { place: w.place, tempC: w.tempC, feelsC: w.feelsC, condition: w.condition, icon: w.icon, forecast: w.forecast });
+        } else {
+          session.sendText('[WEATHER unavailable — tell the user you could not get their location or the weather right now.]');
+        }
       });
     },
     end_session: () => { camera.stop(); stop(); session.clearTranscript(); },
     set_about: (a) => { if (typeof a.text === 'string') void profile.setAbout(a.text); },
     set_goal: (a) => { if ((a.action === 'add' || a.action === 'remove') && typeof a.goal === 'string') void profile.setGoal(a.action, a.goal); },
     set_display_name: (a) => { if (typeof a.name === 'string') void profile.setDisplayName(a.name); },
+    open_panel: (a) => canvas.open(a.type as PanelType, a as Record<string, unknown>),
+    close_panel: (a) => a.type ? canvas.close(a.type as PanelType, a.provider as string | undefined) : canvas.closeAll(),
   });
 
   // Wrap onToolCall so integration tool calls also raise an in-progress toast,
@@ -206,7 +218,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   );
 
   const handleToolResult = useCallback(
-    (r: { name: string; ok: boolean; summary: string }) => {
+    (r: { name: string; ok: boolean; summary: string; needsConnect?: string }) => {
       const id = toastIdsRef.current[r.name];
       delete toastIdsRef.current[r.name];
       if (id) {
@@ -214,12 +226,17 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       } else {
         toast.show({ kind: r.ok ? 'success' : 'error', text: r.summary });
       }
+      if (r.needsConnect) canvas.open('connect', { provider: r.needsConnect });
     },
-    [toast],
+    [toast, canvas],
   );
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
   const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, setMic, volume, muted, setVolume, setMuted, searchLinks, clearSearchLinks } = session;
+
+  // When search results arrive, open the canvas panel so they show in the workspace.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (searchLinks.length) canvas.open('search_results', { links: searchLinks }); }, [searchLinks]);
 
   // "Connecting" guard so the Start button can't be spam-clicked between the tap
   // and the session going live (each extra click would open another session).
@@ -434,7 +451,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
       {camera.error && <p className="camera-error" role="alert">{camera.error}</p>}
 
-      <div className="talk-body">
+      <div className={`talk-body${!isMobile ? ' talk-body--workspace' : ''}`}>
         <aside className="talk-presence">
           <div className={`presence-avatar presence-avatar--live presence-avatar--state-${auraState}`} data-testid="nicole-aura">
             {/* The MOVING Live2D Nicole fills the presence box (same size/spot the
@@ -493,12 +510,11 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
           <WeatherWidget inline handleRef={(h) => { weatherRef.current = h; }} />
         </aside>
 
-        <section className="talk-conversation">
-          <WaveBackdrop stateRef={auraStateRef} />
-          {isMobile ? (
-            // MOBILE: the big centered lip-syncing avatar is ALWAYS the hero — both
-            // idle (resting) and live (speaking). No transcript. When idle, a
-            // compact home header (greeting + brief icons) sits at the top.
+        {isMobile ? (
+          // MOBILE: unchanged — the big centered lip-syncing avatar is ALWAYS the
+          // hero. No transcript. Controls are inside the section.
+          <section className="talk-conversation">
+            <WaveBackdrop stateRef={auraStateRef} />
             <div className={`talk-center-stage${connected ? ' is-live' : ''}`} data-testid="talk-center-stage">
               {!connected && (
                 <HomePanel
@@ -517,83 +533,146 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
                 <p className="center-stage__status">{speaking ? 'Nicole is speaking…' : 'Listening…'}</p>
               )}
             </div>
-          ) : transcript.length === 0 && !realtime.you && !realtime.nicole ? (
-            <div className="talk-empty">
-              <HomePanel
-                onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
-                onDrill={() => onTrain?.()}
-              />
-            </div>
-          ) : (
-            <div className="conversation-feed" ref={feedRef} onScroll={onFeedScroll}>
-              <ChatTranscript lines={transcript} realtime={realtime} />
-              {showJumpLatest && (
-                <button type="button" className="jump-latest" onClick={jumpToLatest} aria-label="Jump to latest message">
-                  ↓ Latest
-                </button>
-              )}
-            </div>
-          )}
-          {/* Web-search result cards (products / flights / hotels) — thumbnail +
-              title + link, so the user gets the actual links, not just spoken data. */}
-          {searchLinks.length > 0 && (
-            <div className="talk-links">
-              <LinkCards links={searchLinks} onClose={clearSearchLinks} />
-            </div>
-          )}
-          <div className="talk-controls">
-            {!connected ? (
-              <button type="button" className="talk-start-btn" onClick={beginSession} disabled={starting} aria-busy={starting} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                {starting ? 'Connecting…' : 'Start talking'}
-              </button>
-            ) : (
-              <div className="live-controls live-controls--icons">
-                <button type="button" className={`ctrl-icon${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? 'false' : 'true'} aria-label={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
-                  <Icon name={micOn ? 'mic' : 'mic-off'} size={20} />
-                </button>
-                <button type="button" className={`ctrl-icon${camera.on && camera.source === 'camera' ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on && camera.source === 'camera' ? camera.stop() : void camera.start())} aria-label={camera.source === 'camera' ? 'Turn off camera' : 'Turn on camera'} data-tooltip={camera.source === 'camera' ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
-                  <Icon name="camera" size={20} />
-                </button>
-                <button type="button" className={`ctrl-icon${camera.on && camera.source === 'screen' ? ' is-active' : ''}`} data-testid="screen-button" onClick={() => (camera.on && camera.source === 'screen' ? camera.stop() : void camera.startScreen())} aria-label={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip-pos="top">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="2.5" y="4" width="19" height="13" rx="2" />
-                    <path d="M8.5 21h7M12 17v4" />
-                  </svg>
-                </button>
-                <button type="button" className={`ctrl-icon${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} aria-pressed={aiMuted ? 'true' : 'false'} aria-label={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
-                  <Icon name={aiMuted ? 'speaker-off' : 'speaker'} size={20} />
-                </button>
-                <div className="ctrl-volume">
-                  <button type="button" className={`ctrl-icon${muted ? ' is-muted' : ''}`} data-testid="volume-button" onClick={() => setVolumeOpen((o) => !o)} aria-expanded={volumeOpen ? 'true' : 'false'} aria-label={`Volume ${volume}`} data-tooltip="Volume" data-tooltip-pos="top">
-                    <Icon name={muted || volume === 0 ? 'volume-off' : volume < 45 ? 'volume-low' : 'volume'} size={20} />
-                  </button>
-                  {volumeOpen && (
-                    <div className="volume-pop" role="group" aria-label="Volume">
-                      <button type="button" className="volume-pop__mute" onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute' : 'Mute'}>
-                        <Icon name={muted || volume === 0 ? 'volume-off' : 'volume'} size={16} />
-                      </button>
-                      <input
-                        type="range" min={0} max={100} step={1} value={volume}
-                        onChange={(e) => setVolume(Number(e.target.value))}
-                        className="volume-pop__slider" aria-label="Volume"
-                        style={{ ['--vol' as string]: `${volume}%` }}
-                      />
-                      <span className="volume-pop__val">{volume}</span>
-                    </div>
-                  )}
-                </div>
-                <button type="button" className="ctrl-icon ctrl-icon--end" onClick={endSession} aria-label="End this session" data-tooltip="End this session" data-tooltip-pos="top">
-                  <Icon name="end" size={20} />
-                </button>
+            {searchLinks.length > 0 && (
+              <div className="talk-links">
+                <LinkCards links={searchLinks} onClose={clearSearchLinks} />
               </div>
             )}
-          </div>
+            <div className="talk-controls">
+              {!connected ? (
+                <button type="button" className="talk-start-btn" onClick={beginSession} disabled={starting} aria-busy={starting} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  {starting ? 'Connecting…' : 'Start talking'}
+                </button>
+              ) : (
+                <div className="live-controls live-controls--icons">
+                  <button type="button" className={`ctrl-icon${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? 'false' : 'true'} aria-label={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
+                    <Icon name={micOn ? 'mic' : 'mic-off'} size={20} />
+                  </button>
+                  <button type="button" className={`ctrl-icon${camera.on && camera.source === 'camera' ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on && camera.source === 'camera' ? camera.stop() : void camera.start())} aria-label={camera.source === 'camera' ? 'Turn off camera' : 'Turn on camera'} data-tooltip={camera.source === 'camera' ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
+                    <Icon name="camera" size={20} />
+                  </button>
+                  <button type="button" className={`ctrl-icon${camera.on && camera.source === 'screen' ? ' is-active' : ''}`} data-testid="screen-button" onClick={() => (camera.on && camera.source === 'screen' ? camera.stop() : void camera.startScreen())} aria-label={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip-pos="top">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="2.5" y="4" width="19" height="13" rx="2" />
+                      <path d="M8.5 21h7M12 17v4" />
+                    </svg>
+                  </button>
+                  <button type="button" className={`ctrl-icon${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} aria-pressed={aiMuted ? 'true' : 'false'} aria-label={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
+                    <Icon name={aiMuted ? 'speaker-off' : 'speaker'} size={20} />
+                  </button>
+                  <div className="ctrl-volume">
+                    <button type="button" className={`ctrl-icon${muted ? ' is-muted' : ''}`} data-testid="volume-button" onClick={() => setVolumeOpen((o) => !o)} aria-expanded={volumeOpen ? 'true' : 'false'} aria-label={`Volume ${volume}`} data-tooltip="Volume" data-tooltip-pos="top">
+                      <Icon name={muted || volume === 0 ? 'volume-off' : volume < 45 ? 'volume-low' : 'volume'} size={20} />
+                    </button>
+                    {volumeOpen && (
+                      <div className="volume-pop" role="group" aria-label="Volume">
+                        <button type="button" className="volume-pop__mute" onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute' : 'Mute'}>
+                          <Icon name={muted || volume === 0 ? 'volume-off' : 'volume'} size={16} />
+                        </button>
+                        <input
+                          type="range" min={0} max={100} step={1} value={volume}
+                          onChange={(e) => setVolume(Number(e.target.value))}
+                          className="volume-pop__slider" aria-label="Volume"
+                          style={{ ['--vol' as string]: `${volume}%` }}
+                        />
+                        <span className="volume-pop__val">{volume}</span>
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" className="ctrl-icon ctrl-icon--end" onClick={endSession} aria-label="End this session" data-tooltip="End this session" data-tooltip-pos="top">
+                    <Icon name="end" size={20} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        ) : (
+          // DESKTOP: 3-panel workspace — Nicole (left, already rendered as aside) |
+          // Canvas (center, CanvasHost) | Chat (right, .talk-chat). Controls span all.
+          <>
+            {/* CENTER: canvas workspace — shows idle HomePanel when no panel open,
+                or one/more canvas panels (search results, weather, connect, …). */}
+            <CanvasHost panels={canvas.panels} token={token} onClose={canvas.close}>
+              <WaveBackdrop stateRef={auraStateRef} />
+              {transcript.length === 0 && !realtime.you && !realtime.nicole ? (
+                <div className="talk-empty">
+                  <HomePanel
+                    onStarter={(prompt) => { pendingPromptRef.current = prompt; promptSentRef.current = false; beginSession(); }}
+                    onDrill={() => onTrain?.()}
+                  />
+                </div>
+              ) : (
+                <div className="conversation-feed">
+                  {/* Idle center: brief realtime echo — transcript lives in the right column. */}
+                </div>
+              )}
+            </CanvasHost>
 
-          {/* The moving Nicole now lives in the presence panel (desktop) and the
-              center stage (mobile), so the old bottom-right corner companion is
-              gone — no duplicate canvas. */}
-        </section>
+            {/* RIGHT: scrollable conversation transcript. */}
+            <div className="talk-chat">
+              <div className="talk-chat__head">Conversation</div>
+              <div className="talk-chat__feed" ref={feedRef} onScroll={onFeedScroll}>
+                <ChatTranscript lines={transcript} realtime={realtime} />
+                {showJumpLatest && (
+                  <button type="button" className="jump-latest" onClick={jumpToLatest} aria-label="Jump to latest message">
+                    ↓ Latest
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* CONTROLS: span all 3 columns via grid-column: 1 / -1 in CSS. */}
+            <div className="talk-controls">
+              {!connected ? (
+                <button type="button" className="talk-start-btn" onClick={beginSession} disabled={starting} aria-busy={starting} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  {starting ? 'Connecting…' : 'Start talking'}
+                </button>
+              ) : (
+                <div className="live-controls live-controls--icons">
+                  <button type="button" className={`ctrl-icon${!micOn ? ' is-muted' : ''}`} data-testid="mute-mic-button" onClick={toggleMic} aria-pressed={micOn ? 'false' : 'true'} aria-label={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip={micOn ? 'Mute your microphone' : 'Unmute your microphone'} data-tooltip-pos="top">
+                    <Icon name={micOn ? 'mic' : 'mic-off'} size={20} />
+                  </button>
+                  <button type="button" className={`ctrl-icon${camera.on && camera.source === 'camera' ? ' is-active' : ''}`} data-testid="camera-button" onClick={() => (camera.on && camera.source === 'camera' ? camera.stop() : void camera.start())} aria-label={camera.source === 'camera' ? 'Turn off camera' : 'Turn on camera'} data-tooltip={camera.source === 'camera' ? 'Turn off camera' : 'Let Nicole see you through your camera'} data-tooltip-pos="top">
+                    <Icon name="camera" size={20} />
+                  </button>
+                  <button type="button" className={`ctrl-icon${camera.on && camera.source === 'screen' ? ' is-active' : ''}`} data-testid="screen-button" onClick={() => (camera.on && camera.source === 'screen' ? camera.stop() : void camera.startScreen())} aria-label={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip={camera.source === 'screen' ? 'Stop sharing your screen' : 'Share your screen with Nicole'} data-tooltip-pos="top">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="2.5" y="4" width="19" height="13" rx="2" />
+                      <path d="M8.5 21h7M12 17v4" />
+                    </svg>
+                  </button>
+                  <button type="button" className={`ctrl-icon${aiMuted ? ' is-muted' : ''}`} data-testid="mute-ai-button" onClick={() => setAiMuted((m) => !m)} aria-pressed={aiMuted ? 'true' : 'false'} aria-label={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip={aiMuted ? "Unmute Nicole's voice" : "Mute Nicole's voice"} data-tooltip-pos="top">
+                    <Icon name={aiMuted ? 'speaker-off' : 'speaker'} size={20} />
+                  </button>
+                  <div className="ctrl-volume">
+                    <button type="button" className={`ctrl-icon${muted ? ' is-muted' : ''}`} data-testid="volume-button" onClick={() => setVolumeOpen((o) => !o)} aria-expanded={volumeOpen ? 'true' : 'false'} aria-label={`Volume ${volume}`} data-tooltip="Volume" data-tooltip-pos="top">
+                      <Icon name={muted || volume === 0 ? 'volume-off' : volume < 45 ? 'volume-low' : 'volume'} size={20} />
+                    </button>
+                    {volumeOpen && (
+                      <div className="volume-pop" role="group" aria-label="Volume">
+                        <button type="button" className="volume-pop__mute" onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute' : 'Mute'}>
+                          <Icon name={muted || volume === 0 ? 'volume-off' : 'volume'} size={16} />
+                        </button>
+                        <input
+                          type="range" min={0} max={100} step={1} value={volume}
+                          onChange={(e) => setVolume(Number(e.target.value))}
+                          className="volume-pop__slider" aria-label="Volume"
+                          style={{ ['--vol' as string]: `${volume}%` }}
+                        />
+                        <span className="volume-pop__val">{volume}</span>
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" className="ctrl-icon ctrl-icon--end" onClick={endSession} aria-label="End this session" data-tooltip="End this session" data-tooltip-pos="top">
+                    <Icon name="end" size={20} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {camera.on && camera.source === 'camera' && (
