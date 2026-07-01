@@ -160,13 +160,17 @@ export const googleAdapter: ProviderAdapter = {
         name: 'draft_email',
         description:
           'Create a Gmail DRAFT (not sent) addressed to someone. Use when the ' +
-          'user wants to write/prepare an email; they can review & send it.',
+          'user wants to write/prepare an email; they can review & send it. ' +
+          'Include real URLs/links in the body when relevant (product/flight/hotel ' +
+          'links, etc.) — they become clickable. For a nicely STRUCTURED email ' +
+          '(tables, headings, lists), pass bodyHtml with HTML markup.',
         parameters: {
           type: 'object',
           properties: {
             to: { type: 'string', description: 'Recipient email address.' },
             subject: { type: 'string', description: 'Email subject.' },
-            body: { type: 'string', description: 'Email body text.' },
+            body: { type: 'string', description: 'Plain-text email body (also the fallback for HTML). Put full URLs on their own so they are clickable.' },
+            bodyHtml: { type: 'string', description: 'OPTIONAL rich HTML body for a beautifully structured email — use <h2>/<h3> headings, <table>/<tr>/<td> for tabular data, <ul>/<li> lists, and <a href="…"> links. Use ONLY when the user wants it formatted/structured.' },
           },
           required: ['to', 'subject', 'body'],
         },
@@ -176,13 +180,15 @@ export const googleAdapter: ProviderAdapter = {
         description:
           'Send an email immediately via Gmail. This delivers the message, so first ' +
           'tell the user what you will send and to whom and get a verbal yes, ' +
-          'THEN call this with confirmed:true.',
+          'THEN call this with confirmed:true. Include real links in the body when ' +
+          'relevant; for a structured/beautiful email pass bodyHtml with HTML.',
         parameters: {
           type: 'object',
           properties: {
             to: { type: 'string', description: 'Recipient email address.' },
             subject: { type: 'string', description: 'Email subject.' },
-            body: { type: 'string', description: 'Email body text.' },
+            body: { type: 'string', description: 'Plain-text email body (also the fallback for HTML). Put full URLs on their own so they are clickable.' },
+            bodyHtml: { type: 'string', description: 'OPTIONAL rich HTML body for a beautifully structured email — <h2>/<h3> headings, <table> for tabular data, <ul>/<li> lists, <a href="…"> links. Use ONLY when the user wants it formatted/structured.' },
             confirmed: {
               type: 'boolean',
               description: 'Set true ONLY after the user has verbally confirmed sending.',
@@ -389,12 +395,38 @@ function loadAvatarB64(): string | null {
 
 const AVATAR_CID = 'nicole-avatar@alsatalk';
 
+/** Turn bare URLs in escaped plain text into clickable <a> links. Runs AFTER
+ *  escapeHtml, so the text is safe; we only wrap http(s) runs. */
+function autoLink(escaped: string): string {
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (u) => {
+    // Strip a trailing sentence punctuation so the link is clean.
+    const trail = /[.,)]$/.test(u) ? u.slice(-1) : '';
+    const href = trail ? u.slice(0, -1) : u;
+    return `<a href="${href}" style="color:#0f766e;">${href}</a>${trail}`;
+  });
+}
+
+/** Very small allow-list sanitizer for a model-provided HTML body: strip
+ *  <script>/<style>/<iframe> and on* event attributes and javascript: URLs, so
+ *  the rich-HTML path can't inject anything active. Keeps normal formatting tags. */
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*\/?>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
+}
+
 /** Wrap the user's body in a polished, email-client-safe branded template.
  *  Table-based layout + inline styles (the only thing email clients render
  *  consistently). The avatar uses cid: so it shows even offline; when it can't
- *  be loaded, a teal "N" monogram stands in. */
-function brandedHtml(bodyText: string, ownerName: string, hasAvatar: boolean): string {
-  const bodyHtml = escapeHtml(bodyText).replace(/\r?\n/g, '<br>');
+ *  be loaded, a teal "N" monogram stands in. `richHtml`, when provided, is used
+ *  as the body verbatim (sanitized) for structured emails; otherwise the plain
+ *  text is escaped, auto-linked, and newline-wrapped. */
+function brandedHtml(bodyText: string, ownerName: string, hasAvatar: boolean, richHtml?: string): string {
+  const bodyHtml = richHtml
+    ? sanitizeHtml(richHtml)
+    : autoLink(escapeHtml(bodyText)).replace(/\r?\n/g, '<br>');
   const avatarCell = hasAvatar
     ? `<img src="cid:${AVATAR_CID}" alt="Nicole" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.6);" />`
     : `<div style="width:48px;height:48px;border-radius:50%;background:#0b3d38;color:#fff;font:700 20px/48px -apple-system,Segoe UI,Arial,sans-serif;text-align:center;">N</div>`;
@@ -443,6 +475,7 @@ async function draftEmail(
   const to = String(args.to ?? '');
   const subject = String(args.subject ?? '');
   const body = String(args.body ?? '');
+  const bodyHtml = typeof args.bodyHtml === 'string' && args.bodyHtml.trim() ? args.bodyHtml : undefined;
 
   // Who the assistant is acting for, e.g. "Ananya".
   let ownerName: string | null = null;
@@ -453,7 +486,7 @@ async function draftEmail(
     : null;
 
   const avatarB64 = loadAvatarB64();
-  const html = brandedHtml(body, ownerName ?? '', avatarB64 !== null);
+  const html = brandedHtml(body, ownerName ?? '', avatarB64 !== null, bodyHtml);
 
   // MIME structure:
   //   multipart/alternative

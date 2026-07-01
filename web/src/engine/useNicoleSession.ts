@@ -73,6 +73,10 @@ export interface UseNicoleSessionResult {
   ready: boolean;
   micOn: boolean;
   transcript: TranscriptLine[];
+  /** Source links from the most recent web-searched answer (for on-screen cards). */
+  searchLinks: SearchLink[];
+  /** Clear the on-screen search-link cards. */
+  clearSearchLinks: () => void;
   /** The in-progress (not-yet-committed) line per speaker, rendered as a single
    *  live bubble each. Empty string when that speaker has no pending utterance. */
   realtime: { you: string; nicole: string };
@@ -164,6 +168,10 @@ interface GeminiPart {
   text?: string;
 }
 
+/** One web source Gemini used to ground its answer (title + url). */
+interface GroundingChunk {
+  web?: { uri?: string; title?: string };
+}
 interface GeminiServerContent {
   modelTurn?: { parts?: GeminiPart[] };
   inputTranscription?: { text?: string };
@@ -174,6 +182,14 @@ interface GeminiServerContent {
   generationComplete?: boolean;
   /** Model turn canceled (barge-in) → flush audio + close Nicole's bubble. */
   interrupted?: boolean;
+  /** Web-search grounding: the sources behind this answer (→ on-screen links). */
+  groundingMetadata?: { groundingChunks?: GroundingChunk[] };
+}
+
+/** A web result surfaced from search grounding, for on-screen link cards. */
+export interface SearchLink {
+  url: string;
+  title: string;
 }
 
 interface GeminiServerMessage {
@@ -227,6 +243,8 @@ export function useNicoleSession(
   const [ready, setReady] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
+  // Web-search results from the LAST grounded answer, for on-screen link cards.
+  const [searchLinks, setSearchLinks] = useState<SearchLink[]>([]);
   const [amplitude, setAmplitude] = useState(0);
   // Reactive copies of volume state for the UI slider/icon. The ref (declared
   // below) is the source of truth for the audio graph (no re-render to apply gain).
@@ -537,6 +555,22 @@ export function useNicoleSession(
 
       const sc = msg.payload?.serverContent;
       if (!sc) return;
+
+      // Web-search grounding → capture the source links for on-screen cards. A
+      // grounded answer carries groundingChunks with {web:{uri,title}}; dedupe by
+      // url and keep this turn's set (replaces the previous turn's links).
+      const chunks = sc.groundingMetadata?.groundingChunks;
+      if (chunks && chunks.length) {
+        const seen = new Set<string>();
+        const links: SearchLink[] = [];
+        for (const c of chunks) {
+          const url = c.web?.uri;
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          links.push({ url, title: c.web?.title || url });
+        }
+        if (links.length) setSearchLinks(links);
+      }
 
       // Audio parts → decode → enqueue → schedule playback. When the AI is muted
       // we DROP the audio (don't play it) but keep the session fully live.
@@ -1138,6 +1172,8 @@ export function useNicoleSession(
     ready,
     micOn,
     transcript,
+    searchLinks,
+    clearSearchLinks: useCallback(() => setSearchLinks([]), []),
     realtime,
     amplitude,
     start,

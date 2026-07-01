@@ -18,6 +18,7 @@ import { handleIntegrationsRoute } from './integrations/routes.js';
 import { handleBriefRoute } from './integrations/briefRoute.js';
 import { handleWeatherRoute } from './weather/routes.js';
 import { handleActivityRoute } from './activity/routes.js';
+import { handleLinksRoute } from './links/routes.js';
 import { ensureSchema } from './memory/db.js';
 import { ensureActivitySchema } from './activity/activityDb.js';
 import { ensureTrainingSchema } from './training/historyDb.js';
@@ -85,6 +86,11 @@ const httpServer = createServer((req, res) => {
 
   if (url.pathname.startsWith('/api/activity')) {
     void handleActivityRoute(req, res).catch((err) => sendServerError(res, err, 'activity'));
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/links')) {
+    void handleLinksRoute(req, res).catch((err) => sendServerError(res, err, 'links'));
     return;
   }
 

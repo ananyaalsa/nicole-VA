@@ -1,0 +1,78 @@
+/* On-screen web-search result cards (thumbnail + title + site), shown when Nicole
+   answers a shoppable/actionable query. A horizontally-scrollable row so several
+   results fit without dominating the view. */
+
+.link-cards {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.link-cards__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+.link-cards__title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.link-cards__close {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: transparent; color: var(--text-3);
+  font-size: 0.9rem; line-height: 1; cursor: pointer;
+}
+.link-cards__close:hover { background: var(--surface-2); color: var(--text); }
+
+.link-cards__row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.link-card {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+.link-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 8px 20px rgba(0,0,0,0.08));
+  border-color: var(--accent);
+}
+.link-card__thumb {
+  height: 116px;
+  background: linear-gradient(160deg, var(--accent-light), var(--surface-2, rgba(0,0,0,0.03)));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.link-card__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.link-card__thumb-fallback {
+  font-size: 2rem; font-weight: 700; color: var(--accent);
+}
+.link-card__body { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.link-card__title {
+  font-size: 0.85rem; font-weight: 600; color: var(--text); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.link-card__site { font-size: 0.72rem; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (prefers-reduced-motion: reduce) {
+  .link-card { transition: none; }
+}

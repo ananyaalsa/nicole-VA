@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import type { AuraState } from '../components/NicoleAura';
 import { Transcript } from '../components/Transcript';
 import { ChatTranscript } from '../components/ChatTranscript';
+import { LinkCards } from '../components/LinkCards';
 import { CameraPreview } from '../components/CameraPreview';
 import { Icon } from '../components/Icon';
 import { TopBar } from '../components/TopBar';
@@ -14,7 +15,6 @@ import { useToast } from '../ui/toast';
 import { TOOL_TOASTS } from '../ui/toolToasts';
 import { WeatherWidget, type WeatherWidgetHandle } from '../weather/WeatherWidget';
 import { speakWeather } from '../weather/weatherApi';
-import { Live2DCompanion } from '../live2d/Live2DCompanion';
 import { CenterAvatar } from '../live2d/CenterAvatar';
 import { loadAvatarPrefs, type AvatarPrefs } from '../live2d/avatars';
 import { useNicoleSession } from '../engine/useNicoleSession';
@@ -113,18 +113,6 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [aiMuted, setAiMuted] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
-  // Live2D companion visibility (persisted), controlled here so the toggle can
-  // live inside the controls bar rather than as a floating button.
-  const [companionShown, setCompanionShown] = useState<boolean>(() => {
-    try { return localStorage.getItem('nicole_companion') !== 'off'; } catch { return true; }
-  });
-  const toggleCompanion = useCallback(() => {
-    setCompanionShown((s) => {
-      const next = !s;
-      try { localStorage.setItem('nicole_companion', next ? 'on' : 'off'); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
   // Which avatar (Aria/Noah/Off) + its wardrobe colors, from the user's prefs.
   // Re-read on the 'nicole:avatar-updated' event the Profile panel fires so
   // changes apply live without a reload.
@@ -231,7 +219,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   );
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
-  const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, setMic, volume, muted, setVolume, setMuted } = session;
+  const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, setMic, volume, muted, setVolume, setMuted, searchLinks, clearSearchLinks } = session;
 
   // "Connecting" guard so the Start button can't be spam-clicked between the tap
   // and the session going live (each extra click would open another session).
@@ -402,9 +390,6 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   const activeVoice = VOICES.find((v) => v.name === voice);
   const femaleVoices = VOICES.filter((v) => v.gender === 'female');
   const maleVoices   = VOICES.filter((v) => v.gender === 'male');
-  // Always Nicole's avatar regardless of the chosen voice — she's Nicole whether
-  // she speaks in a female or male voice (no separate "male voice" avatar).
-  const avatarSrc = '/nicole-avatar.png';
   const userInitial = user?.displayName?.trim().charAt(0).toUpperCase() ?? '?';
 
   // Mobile = the "big centered lip-syncing avatar, no transcript" voice view.
@@ -451,8 +436,21 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
       <div className="talk-body">
         <aside className="talk-presence">
-          <div className={`presence-avatar presence-avatar--state-${auraState}`} data-testid="nicole-aura">
-            <img src={avatarSrc} alt="Nicole" className="presence-img" />
+          <div className={`presence-avatar presence-avatar--live presence-avatar--state-${auraState}`} data-testid="nicole-aura">
+            {/* The MOVING Live2D Nicole fills the presence box (same size/spot the
+                static PNG used to occupy), lip-syncing to her voice. Desktop only —
+                on mobile the big CENTER-STAGE avatar is the one shown (this panel is
+                hidden), so we don't mount a second canvas here. */}
+            {!isMobile && (
+              <CenterAvatar
+                key={`${companionId}:${JSON.stringify(companionColors ?? {})}`}
+                amplitude={amplitude}
+                speaking={speaking}
+                avatarId={companionId}
+                colors={companionColors}
+                className="presence-live2d"
+              />
+            )}
           </div>
           <p className="presence-state">{connected ? 'Live' : 'Your Personal VA'}</p>
 
@@ -536,6 +534,13 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
               )}
             </div>
           )}
+          {/* Web-search result cards (products / flights / hotels) — thumbnail +
+              title + link, so the user gets the actual links, not just spoken data. */}
+          {searchLinks.length > 0 && (
+            <div className="talk-links">
+              <LinkCards links={searchLinks} onClose={clearSearchLinks} />
+            </div>
+          )}
           <div className="talk-controls">
             {!connected ? (
               <button type="button" className="talk-start-btn" onClick={beginSession} disabled={starting} aria-busy={starting} data-tooltip="Start a live voice session with Nicole" data-tooltip-pos="top">
@@ -585,20 +590,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
             )}
           </div>
 
-          {/* Live2D companion (Aria/Noah) — bottom-right, toggleable. Lip-syncs
-              to the live Nicole voice. Avatar + wardrobe colors from prefs. */}
-          <Live2DCompanion
-            // Remount when the avatar OR its wardrobe colors change so a Save in
-            // the Avatar panel reflects on screen immediately — no page refresh.
-            key={`${avatarPrefs.avatar}:${JSON.stringify(avatarPrefs.colors[avatarPrefs.avatar === 'noah' ? 'noah' : 'aria'] ?? {})}`}
-            amplitude={amplitude}
-            speaking={speaking}
-            // On mobile the big CENTER avatar takes over, so the corner companion
-            // is hidden (never two canvases at once).
-            shown={!isMobile && companionShown && avatarPrefs.avatar !== 'off'}
-            avatarId={avatarPrefs.avatar === 'noah' ? 'noah' : 'aria'}
-            colors={avatarPrefs.colors[avatarPrefs.avatar === 'noah' ? 'noah' : 'aria']}
-          />
+          {/* The moving Nicole now lives in the presence panel (desktop) and the
+              center stage (mobile), so the old bottom-right corner companion is
+              gone — no duplicate canvas. */}
         </section>
       </div>
 
@@ -613,27 +607,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       {memoryOpen && <MemoryPanel onClose={() => setMemoryOpen(false)} />}
 
       {/* Show/hide-avatar toggle. Only on the ACTIVE Talk screen — TalkScreen
-          stays mounted (hidden) when Training/Roleplay are open, but this portal
-          renders to document.body and would escape that display:none, so gate it
-          on !backgrounded. Also only when an avatar is selected (not 'Off'). */}
-      {!backgrounded && avatarPrefs.avatar !== 'off' && createPortal(
-        <button
-          type="button"
-          className={`l2d-toggle-btn${companionShown ? ' is-on' : ''}`}
-          onClick={toggleCompanion}
-          aria-pressed={companionShown ? 'true' : 'false'}
-          aria-label={companionShown ? 'Hide the avatar' : 'Show the avatar'}
-          data-tooltip={companionShown ? 'Hide avatar' : 'Show avatar'}
-          data-tooltip-pos="left"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="3.2" />
-            <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
-            {!companionShown && <path d="M3 3l18 18" />}
-          </svg>
-        </button>,
-        document.body,
-      )}
+          stays mounted (hidden) when Training/Roleplay are open. The moving Nicole
+          now lives in the presence panel / center stage, so the old show/hide
+          corner-avatar toggle was removed. */}
     </div>
   );
 }

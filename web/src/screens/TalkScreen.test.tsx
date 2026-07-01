@@ -15,10 +15,13 @@ const setVoice = vi.fn();
 const sendText = vi.fn();
 const sendVideoFrame = vi.fn();
 const setMic = vi.fn();
+const clearSearchLinks = vi.fn();
 let sessionState = {
   connected: false,
   micOn: true,
   transcript: [] as any[],
+  searchLinks: [] as any[],
+  clearSearchLinks,
   realtime: { you: '', nicole: '' },
   amplitude: 0,
   start,
@@ -101,7 +104,7 @@ beforeEach(() => {
   mockFetchLiveStatus.mockClear();
   mockFetchLiveStatus.mockResolvedValue(null);
   mockIsMobile = false;
-  sessionState = { connected: false, micOn: true, transcript: [], realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
+  sessionState = { connected: false, micOn: true, transcript: [], searchLinks: [], clearSearchLinks, realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
   cameraState = { on: false, stream: null, facing: 'user', source: null, start: cameraStart, startScreen: cameraStartScreen, stop: cameraStop, flip: vi.fn(), error: null };
 });
 
