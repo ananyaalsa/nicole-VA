@@ -41,10 +41,26 @@ export async function dispatchIntegrationTool(
   userId: string,
 ): Promise<ToolResult> {
   const adapter = adapterForTool(name);
-  if (!adapter) return { ok: false, summary: `I don't have a tool called "${name}".` };
+  // Don't leak the internal tool name into user-facing copy — keep it generic.
+  if (!adapter) return { ok: false, summary: `I can't do that yet.` };
   if (!adapter.isConfigured()) {
-    return { ok: false, summary: `${adapter.name} isn't set up on the server yet.` };
+    return { ok: false, summary: `${adapter.name} isn't set up yet.` };
   }
+
+  // CONNECTION CHECK FIRST. If the user hasn't connected this provider, pop the
+  // Connect card immediately — do NOT run the confirmation gate for an action that
+  // physically can't fire. (Previously the confirm gate ran first, forcing an
+  // unconnected user through a full "are you sure?" for send_email / post_slack
+  // before we ever told them to connect.)
+  const connection = await getFreshConnection(userId, adapter.id);
+  if (!connection) {
+    return {
+      ok: false,
+      summary: `Connect ${adapter.name} first and I'll do it.`,
+      needsConnect: adapter.id,
+    };
+  }
+
   // CODE-LEVEL CONFIRMATION GATE for irreversible, externally-visible actions.
   // A mis-transcription must never auto-send an email or post to Slack. The
   // prompt has Nicole preview the action and add confirmed:true only after the
@@ -57,25 +73,22 @@ export async function dispatchIntegrationTool(
     };
   }
 
-  const connection = await getFreshConnection(userId, adapter.id);
-  if (!connection) {
-    return {
-      ok: false,
-      summary: `Connect ${adapter.name} first and I'll do it.`,
-      needsConnect: adapter.id,
-    };
-  }
   try {
     return await adapter.runTool(name, args, { userId, connection });
   } catch (err) {
     const msg = (err as Error).message ?? 'something went wrong';
-    // 401 means the token is dead/revoked — tell the user to reconnect.
+    // 401 means the token is dead/revoked — the connection exists but needs
+    // reconnecting. Set needsConnect so the client re-opens the Connect card
+    // (inline reconnect), not just a dead-end toast. Keep the copy short & clean.
     if (/401|invalid_grant|unauthorized|invalid_token/i.test(msg)) {
       return {
         ok: false,
-        summary: `Your ${adapter.name} connection needs refreshing. Please reconnect it in Integrations.`,
+        summary: `Reconnect ${adapter.name} to continue.`,
+        needsConnect: adapter.id,
       };
     }
-    return { ok: false, summary: `I couldn't complete that ${adapter.name} action: ${msg.slice(0, 120)}` };
+    // Never interpolate the raw adapter/HTTP error (status codes, JSON, internals)
+    // into user copy — use a short friendly literal instead.
+    return { ok: false, summary: `Something went wrong with ${adapter.name}. Try again?` };
   }
 }

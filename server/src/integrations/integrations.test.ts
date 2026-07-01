@@ -98,10 +98,13 @@ describe('integrations/confirmation gate', () => {
   // reports "not set up"; we assert the gate independently below by reasoning
   // about the order: the gate runs only AFTER the configured check. Here we
   // verify the not-connected / not-configured graceful paths never throw.
-  it('returns a friendly message for an unknown tool', async () => {
+  it('returns a friendly message for an unknown tool (no tool-name leak)', async () => {
     const r = await dispatchIntegrationTool('does_not_exist', {}, 'u1');
     expect(r.ok).toBe(false);
-    expect(r.summary).toMatch(/don't have a tool/i);
+    // FIX E: the summary must be a short generic line, NOT echo the internal tool
+    // name back to the user.
+    expect(r.summary).not.toMatch(/does_not_exist/);
+    expect(r.summary).toMatch(/can't do that/i);
   });
 
   it('reports not-configured rather than throwing when keys are absent', async () => {
