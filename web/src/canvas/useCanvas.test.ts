@@ -35,6 +35,17 @@ describe('useCanvas', () => {
     expect(result.current.panels.map((p) => p.key)).toEqual(['weather']);
   });
 
+  it("close('connect') with NO provider closes ALL connect cards", () => {
+    const { result } = renderHook(() => useCanvas());
+    act(() => result.current.open('connect', { provider: 'slack' }));
+    act(() => result.current.open('connect', { provider: 'gmail' }));
+    act(() => result.current.open('weather'));
+    // Nicole calling close_panel({ type: 'connect' }) with no provider must clear
+    // every connect card (not build a bogus connect:unknown key that matches none).
+    act(() => result.current.close('connect'));
+    expect(result.current.panels.map((p) => p.key)).toEqual(['weather']);
+  });
+
   it('closeAll empties the canvas', () => {
     const { result } = renderHook(() => useCanvas());
     act(() => result.current.open('weather'));

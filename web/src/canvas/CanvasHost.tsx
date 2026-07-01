@@ -32,7 +32,7 @@ export function CanvasHost({ panels, token, onClose, children }: CanvasHostProps
         const provider = p.type === 'connect' ? String(p.args?.provider ?? '') : undefined;
         return (
           <div className="canvas-host__panel" key={p.key}>
-            <PanelFrame>
+            <PanelFrame resetKey={p.nonce}>
               <PanelSlot
                 type={p.type}
                 panel={p}

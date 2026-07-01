@@ -5,4 +5,7 @@ export interface Panel {
   key: string;
   type: PanelType;
   args?: Record<string, unknown>;
+  /** Monotonic version bumped on each (re)open. Used by CanvasHost/PanelFrame to
+   *  reset a once-crashed error boundary when the panel reopens with fresh data. */
+  nonce?: number;
 }

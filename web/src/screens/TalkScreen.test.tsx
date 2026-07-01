@@ -86,9 +86,14 @@ vi.mock('../live2d/CenterAvatar', () => ({
 vi.mock('../live2d/Live2DCompanion', () => ({
   Live2DCompanion: () => <div data-testid="live2d-companion" />,
 }));
-// Mobile detection — controllable per test.
-let mockIsMobile = false;
-vi.mock('../engine/useIsMobile', () => ({ useIsMobile: () => mockIsMobile }));
+// Mobile / workspace detection — controllable per test. The screen calls
+// useIsMobile() (≤640px → mobile center-stage) AND useIsMobile(1024) (≤1024px →
+// NOT the ≥1025px workspace). Drive both from a single mock viewport width so a
+// tablet width (~900) correctly reports "not mobile" AND "not workspace".
+let mockWidth = 1280;
+vi.mock('../engine/useIsMobile', () => ({
+  useIsMobile: (maxWidth = 640) => mockWidth <= maxWidth,
+}));
 // scoreApi — stub fetchLiveStatus so TalkScreen [STATUS] tests stay deterministic.
 const mockFetchLiveStatus = vi.fn(async (_token?: string) => null as any);
 vi.mock('../training/scoreApi', () => ({
@@ -140,7 +145,7 @@ beforeEach(() => {
   setMic.mockClear();
   mockFetchLiveStatus.mockClear();
   mockFetchLiveStatus.mockResolvedValue(null);
-  mockIsMobile = false;
+  mockWidth = 1280;
   sessionState = { connected: false, micOn: true, transcript: [], searchLinks: [], clearSearchLinks, realtime: { you: '', nicole: '' }, amplitude: 0, start, stop, toggleMic, setMic, setVoice, sendText, sendVideoFrame };
   cameraState = { on: false, stream: null, facing: 'user', source: null, start: cameraStart, startScreen: cameraStartScreen, stop: cameraStop, flip: vi.fn(), error: null };
   useNicoleSessionMock.mockClear();
@@ -224,7 +229,7 @@ describe('TalkScreen', () => {
   });
 
   it('MOBILE + connected: shows the big center avatar and NO transcript', () => {
-    mockIsMobile = true;
+    mockWidth = 500;
     sessionState = {
       ...sessionState,
       connected: true,
@@ -239,7 +244,7 @@ describe('TalkScreen', () => {
   });
 
   it('DESKTOP keeps the transcript (no center stage)', () => {
-    mockIsMobile = false;
+    mockWidth = 1280;
     // jsdom doesn't implement Element.scrollTo; the feed auto-scroll uses it.
     (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
     sessionState = {
@@ -264,7 +269,7 @@ describe('TalkScreen', () => {
   });
 
   it('DESKTOP renders the 3-panel workspace', () => {
-    mockIsMobile = false;
+    mockWidth = 1280;
     (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
     sessionState = { ...sessionState, connected: true, searchLinks: [], transcript: [{ id: 'l1', speaker: 'you', text: 'hi', streaming: false } as any] };
     render(<TalkScreen />);
@@ -272,8 +277,25 @@ describe('TalkScreen', () => {
     expect(screen.getByText('hi')).toBeInTheDocument();
   });
 
+  it('TABLET band (641–1024) falls back to 2-column Talk — NO 3-panel workspace', () => {
+    // At a tablet width the JS workspace gate (useIsMobile(1024) → ≤1024 = not
+    // workspace) and the CSS gate (≥1025px) now agree: the 3-panel workspace must
+    // NOT mount (no CanvasHost), avoiding the broken/unstyled tablet layout. The
+    // pre-branch single-column conversation still shows the transcript.
+    mockWidth = 900;
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    sessionState = { ...sessionState, connected: true, transcript: [{ id: 'l1', speaker: 'you', text: 'tablet-line', streaming: false } as any] };
+    render(<TalkScreen />);
+    // Workspace-only children are absent…
+    expect(screen.queryByTestId('canvas-host')).toBeNull();
+    // …and it is NOT the mobile center-stage either.
+    expect(screen.queryByTestId('talk-center-stage')).toBeNull();
+    // The 2-column conversation still renders the transcript.
+    expect(screen.getByText('tablet-line')).toBeInTheDocument();
+  });
+
   it('DESKTOP opens a connect panel when a tool-result needs one', async () => {
-    mockIsMobile = false;
+    mockWidth = 1280;
     (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
     let captured: ((r: any) => void) | undefined;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

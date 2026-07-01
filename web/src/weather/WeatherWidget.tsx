@@ -47,9 +47,12 @@ function WeatherCard({ w, onClose }: { w: Weather; onClose?: () => void }): JSX.
 }
 
 export interface WeatherWidgetHandle {
-  /** Open the dialog for a named place (or current location when omitted).
-   *  Resolves with a spoken-style line, or null on failure. */
-  open: (location?: string) => Promise<Weather | null>;
+  /** Fetch the weather for a named place (or current location when omitted) and
+   *  resolve with the reading (or null on failure). By default this ALSO shows the
+   *  centered auto-dismiss overlay; pass `{ overlay: false }` to fetch silently
+   *  (used on the desktop workspace where the canvas weather panel shows it
+   *  instead, so the overlay would be a duplicate). */
+  open: (location?: string, opts?: { overlay?: boolean }) => Promise<Weather | null>;
 }
 
 /**
@@ -84,7 +87,7 @@ export function WeatherWidget({
     return () => { alive = false; };
   }, []);
 
-  const openDialog = useCallback(async (location?: string): Promise<Weather | null> => {
+  const openDialog = useCallback(async (location?: string, opts?: { overlay?: boolean }): Promise<Weather | null> => {
     try {
       let w: Weather;
       if (location && location.trim()) {
@@ -97,10 +100,15 @@ export function WeatherWidget({
         w = await fetchWeatherAt(c.lat, c.lon);
         setAmbient(w);
       }
-      setDialog(w);
-      // Auto-dismiss after ~6s (she's done speaking by then).
-      if (dismissTimer.current) clearTimeout(dismissTimer.current);
-      dismissTimer.current = setTimeout(() => setDialog(null), 6000);
+      // Only show the centered overlay when asked (default). On the desktop
+      // workspace the caller passes overlay:false so the canvas panel is the only
+      // weather card — otherwise both would show (the portaled overlay obscuring it).
+      if (opts?.overlay !== false) {
+        setDialog(w);
+        // Auto-dismiss after ~6s (she's done speaking by then).
+        if (dismissTimer.current) clearTimeout(dismissTimer.current);
+        dismissTimer.current = setTimeout(() => setDialog(null), 6000);
+      }
       return w;
     } catch {
       return null;

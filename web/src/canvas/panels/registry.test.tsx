@@ -32,6 +32,11 @@ describe('PANELS registry', () => {
     P('search_results', { links: [{ url: 'https://x.com', title: 'X' }] });
     expect(screen.getByTestId('link-cards')).toBeInTheDocument();
   });
+  it('search_results panel shows a friendly empty state with no links', () => {
+    P('search_results', {});
+    expect(screen.getByText(/no results to show yet/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('link-cards')).toBeNull();
+  });
   it('integrations panel lists providers with connected state', () => {
     P('integrations', {});
     expect(screen.getByText('Slack')).toBeInTheDocument();
