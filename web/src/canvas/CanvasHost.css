@@ -1,0 +1,6 @@
+/* web/src/canvas/CanvasHost.css */
+.canvas-host { height:100%; overflow:auto; padding:22px; }
+.canvas-host--idle { display:flex; align-items:center; justify-content:center; padding:0; }
+.canvas-host__head { font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:12px; }
+.canvas-host__panel { margin-bottom:16px; }
+.canvas-panel-error { padding:14px 16px; border:1px dashed var(--border); border-radius:12px; color:var(--text-3); font-size:.85rem; }
