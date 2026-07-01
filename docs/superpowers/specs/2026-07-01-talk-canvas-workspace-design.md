@@ -100,6 +100,10 @@ A `PANELS` map from `PanelType` → React component. Each panel is pure, typed, 
 
 Adding a panel later = one component + one registry entry (e.g. a future `calendar` panel showing today's brief events).
 
+### The canvas IS the home for old-Nicole "artifacts" (forward-looking)
+
+The earlier Nicole had a popup/artifact system for richer UI elements — "presentation making and all." The `open_panel` canvas is deliberately the modern, smoother home for those: each old artifact becomes a **canvas panel** (e.g. a future `presentation` panel Nicole builds slide-by-slide) rather than a floating popup, so it lives in one consistent place with the same open/close/dismiss model and no window-management jank. This is **not in v1** (don't force it) — but the panel registry + `open_panel` tool are designed so those artifacts drop in later as additional `PanelType`s with zero architectural change.
+
 ## Inline Connect card (headline feature)
 
 - **One card per integration**, keyed by provider, glassmorphism styling (frosted translucent bg, subtle border, soft shadow, teal accent).

@@ -23,14 +23,18 @@ export interface Weather {
   forecast: WeatherDay[];
 }
 
-/** Ask the browser for coordinates (resolves null if denied/unavailable). */
+/** Ask the browser for coordinates (resolves null if denied/unavailable).
+ *  enableHighAccuracy asks for the GPS/precise fix rather than the coarse
+ *  IP/WiFi estimate — the coarse one resolves to the ISP's city and was the
+ *  cause of "the weather is wrong for me". A short maximumAge keeps the fix
+ *  fresh (a 10-min-old coarse position compounded the error). */
 export function getCoords(): Promise<{ lat: number; lon: number } | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       () => resolve(null),
-      { timeout: 8000, maximumAge: 10 * 60 * 1000 },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60 * 1000 },
     );
   });
 }
