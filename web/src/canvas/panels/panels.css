@@ -1,0 +1,176 @@
+/* ── Weather Panel ─────────────────────────────────────────── */
+.canvas-weather {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: var(--text-1, #e8e8e8);
+}
+
+.canvas-weather__now {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+}
+
+.canvas-weather__ic {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.canvas-weather__temp {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent, #7c6aff);
+}
+
+.canvas-weather__place {
+  font-size: 0.8rem;
+  color: var(--text-3, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.canvas-weather__days {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.canvas-weather__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  background: var(--surface, #1a1a2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-3, #888);
+}
+
+/* ── Note Panel ────────────────────────────────────────────── */
+.canvas-note {
+  position: relative;
+  padding: 0.75rem 1rem;
+  color: var(--text-1, #e8e8e8);
+}
+
+.canvas-note__copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  background: var(--surface, #1a1a2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 4px;
+  color: var(--text-3, #888);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.canvas-note__copy:hover {
+  color: var(--accent, #7c6aff);
+  border-color: var(--accent, #7c6aff);
+}
+
+.canvas-note__body {
+  margin: 0;
+  padding: 0.25rem 0 0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-1, #e8e8e8);
+}
+
+/* ── Integrations Panel ────────────────────────────────────── */
+.canvas-integrations {
+  padding: 0.75rem 1rem;
+  color: var(--text-1, #e8e8e8);
+}
+
+.canvas-integrations__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.canvas-integrations__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface, #1a1a2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.canvas-integrations__logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 4px;
+  background: var(--accent, #7c6aff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.canvas-integrations__name {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-1, #e8e8e8);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-integrations__st {
+  border: none;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.canvas-integrations__st:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.canvas-integrations__st.ok {
+  background: rgba(124, 106, 255, 0.15);
+  color: var(--accent, #7c6aff);
+  border: 1px solid rgba(124, 106, 255, 0.3);
+}
+
+.canvas-integrations__st.no {
+  background: var(--surface, #1a1a2e);
+  color: var(--text-3, #888);
+  border: 1px solid var(--border, #2a2a3e);
+}
+
+.canvas-integrations__st.no:hover {
+  color: var(--accent, #7c6aff);
+  border-color: var(--accent, #7c6aff);
+}
+
+.canvas-integrations__err {
+  color: var(--text-3, #888);
+  font-size: 0.85rem;
+  margin: 0;
+}
