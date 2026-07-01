@@ -61,7 +61,8 @@ export async function dispatchIntegrationTool(
   if (!connection) {
     return {
       ok: false,
-      summary: `You haven't connected ${adapter.name} yet. Open Integrations in your profile to connect it, then ask me again.`,
+      summary: `Connect ${adapter.name} first and I'll do it.`,
+      needsConnect: adapter.id,
     };
   }
   try {

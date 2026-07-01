@@ -40,6 +40,11 @@ export interface ToolResult {
   summary: string;
   /** Optional structured data (not spoken; for the UI if needed). */
   data?: unknown;
+  /**
+   * Present when the provider isn't connected for this user. The client can
+   * use this to pop an inline Connect card for the named provider id.
+   */
+  needsConnect?: string;
 }
 
 /** Context handed to a capability call. */

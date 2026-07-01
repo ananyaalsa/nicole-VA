@@ -527,6 +527,7 @@ export class LiveSession {
               name,
               ok: result.ok,
               summary: result.summary,
+              needsConnect: result.needsConnect,
             });
           }
         }
