@@ -29,7 +29,15 @@ import { VOICES, DEFAULT_VOICE } from '../audio/voices';
 import { useCanvas } from '../canvas/useCanvas';
 import { CanvasHost } from '../canvas/CanvasHost';
 import type { PanelType } from '../canvas/canvasTypes';
+import { useResultDeck } from '../canvas/resultDeck/useResultDeck';
+import { ResultDeck } from '../canvas/resultDeck/ResultDeck';
 import './TalkScreen.css';
+
+/** Bare hostname for a URL (e.g. "nytimes.com"), stripped of "www." — mirrors
+ *  the helper in LinkCards for the deck's news/search presenters. */
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+}
 
 const SPEAKING_AMP = 0.06;
 
@@ -171,6 +179,9 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
 
   // Canvas state — panels open/close in the center column of the desktop workspace.
   const canvas = useCanvas();
+  // Result deck — timed overlay→pill cards (weather/news/search/products) driven
+  // by tool-result `data`, rendered in the workspace canvas center.
+  const deck = useResultDeck();
   // Latest "are we in the 3-panel workspace?" signal, mirrored into a ref so the
   // stable tool-call/tool-result callbacks and effects below can read it WITHOUT
   // depending on it (avoids re-creating them + stale closures). The workspace only
@@ -179,6 +190,10 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   // weather (canvas panel vs. the mobile overlay). `isWorkspace` is computed below
   // and assigned into this ref each render.
   const isWorkspaceRef = useRef(false);
+  // Latest search-grounding links, mirrored into a ref so handleToolResult (built
+  // BEFORE `session` exists, since it's passed into useNicoleSession) can read the
+  // current value without a circular/temporal-dead-zone dependency on `session`.
+  const searchLinksRef = useRef<{ url: string; title: string }[]>([]);
 
   // Nicole controls the UI by voice — every command is registered in one place.
   const { onToolCall } = useUiCommands({
@@ -193,14 +208,16 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
     get_weather: (a) => {
       const loc = typeof a.location === 'string' ? a.location : undefined;
       const workspace = isWorkspaceRef.current;
-      // On the WORKSPACE (≥1025px) the canvas weather panel replaces the old
-      // body-portaled overlay, so fetch WITHOUT opening the overlay. On mobile/
-      // tablet (no canvas) keep the overlay so the reading is still shown. Either
-      // way we feed Nicole the actual numbers so she speaks accurately.
+      // On the WORKSPACE (≥1025px) the result deck replaces the old body-portaled
+      // overlay, so fetch WITHOUT opening the overlay. On mobile/tablet (no canvas)
+      // keep the overlay so the reading is still shown. Either way we feed Nicole
+      // the actual numbers so she speaks accurately.
       void weatherRef.current?.open(loc, { overlay: !workspace }).then((w) => {
         if (w) {
           session.sendText(`[WEATHER DATA — read this to the user warmly in one sentence] ${speakWeather(w)} High ${w.forecast[0]?.hiC}, low ${w.forecast[0]?.loC}.`);
-          if (workspace) canvas.open('weather', { place: w.place, tempC: w.tempC, feelsC: w.feelsC, condition: w.condition, icon: w.icon, forecast: w.forecast });
+          if (workspace) {
+            deck.push('weather', { place: w.place, tempC: w.tempC, feelsC: w.feelsC, condition: w.condition, icon: w.icon, forecast: w.forecast }, { label: `Weather · ${w.place}`, icon: w.icon || '☀️' });
+          }
         } else {
           session.sendText('[WEATHER unavailable — tell the user you could not get their location or the weather right now.]');
         }
@@ -230,7 +247,7 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
   );
 
   const handleToolResult = useCallback(
-    (r: { name: string; ok: boolean; summary: string; needsConnect?: string }) => {
+    (r: { name: string; ok: boolean; summary: string; needsConnect?: string; data?: { kind: string; payload: unknown } }) => {
       const id = toastIdsRef.current[r.name];
       delete toastIdsRef.current[r.name];
       if (id) {
@@ -243,20 +260,31 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
       // stale panel that pops if the viewport later grows to the workspace width;
       // the toast already tells the user to connect. (Read the live value via ref.)
       if (r.needsConnect && isWorkspaceRef.current) canvas.open('connect', { provider: r.needsConnect });
+
+      // Result-deck payloads (web_search/search_products) — workspace only, same
+      // reasoning as above: no CanvasHost/ResultDeck is mounted on mobile/tablet.
+      if (r.data && isWorkspaceRef.current) {
+        const d = r.data as { kind: 'weather' | 'news' | 'search' | 'products'; payload: any };
+        if (d.kind === 'products') {
+          const query = d.payload?.query ?? '';
+          deck.push('products', { query, products: d.payload?.products ?? [] }, { label: query || 'Products', icon: '🛒' });
+        } else if (d.kind === 'news') {
+          // Fill from the grounding links captured this turn (Task 8 note).
+          const links = searchLinksRef.current;
+          const items = links.map((l) => ({ title: l.title, url: l.url, source: hostOf(l.url) }));
+          if (items.length) deck.push('news', { items }, { label: 'Top news', icon: '📰' });
+        } else if (d.kind === 'search') {
+          const links = searchLinksRef.current;
+          if (links.length) deck.push('search', { results: links }, { label: 'Results', icon: '🔎' });
+        }
+      }
     },
-    [toast, canvas],
+    [toast, canvas, deck],
   );
 
   const session = useNicoleSession({ voiceName: voice, mode: 'talk', stylePrompt, systemOverlay, aiMuted, onToolCall: handleToolCall, onToolResult: handleToolResult, authToken: token });
   const { connected, micOn, transcript, realtime, amplitude, start, stop, clearTranscript, toggleMic, setMic, volume, muted, setVolume, setMuted, searchLinks, clearSearchLinks } = session;
-
-  // When search results arrive, open the canvas panel so they show in the workspace.
-  // Only on the workspace (≥1025px): on mobile/tablet CanvasHost isn't mounted and
-  // the .talk-links LinkCards already show the results, so opening here would just
-  // stash a stale panel that pops on a later resize. (Read isWorkspace via ref so
-  // this effect stays keyed on searchLinks alone.)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (searchLinks.length && isWorkspaceRef.current) canvas.open('search_results', { links: searchLinks }); }, [searchLinks]);
+  searchLinksRef.current = searchLinks;
 
   // "Connecting" guard so the Start button can't be spam-clicked between the tap
   // and the session going live (each extra click would open another session).
@@ -625,9 +653,12 @@ export function TalkScreen({ onTrain, onRoleplay, onSwitchMode, defaultVoice, ba
           // Canvas (center, CanvasHost) | Chat (right, .talk-chat). Controls span all.
           <>
             {/* CENTER: canvas workspace — shows idle HomePanel when no panel open,
-                or one/more canvas panels (search results, weather, connect, …). */}
+                or one/more canvas panels (connect, …). The result deck (weather/
+                news/search/products) renders above it as overlay→pill cards; it
+                is harmless/empty until a tool-result pushes an item. */}
             <CanvasHost panels={canvas.panels} token={token} onClose={canvas.close}>
               <WaveBackdrop stateRef={auraStateRef} />
+              <ResultDeck items={deck.items} onCollapse={deck.collapse} onExpand={deck.expand} onDismiss={deck.dismiss} />
               {transcript.length === 0 && !realtime.you && !realtime.nicole ? (
                 <div className="talk-empty">
                   <HomePanel

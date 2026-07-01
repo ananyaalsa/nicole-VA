@@ -55,7 +55,7 @@ export interface UseNicoleSessionOptions {
   /** Called when Nicole calls UI-control tools (set_camera, switch_mode, …). */
   onToolCall?: (calls: { name: string; args: Record<string, unknown> }[]) => void;
   /** Called when a server-side integration tool finishes (for success toasts). */
-  onToolResult?: (r: { name: string; ok: boolean; summary: string; needsConnect?: string }) => void;
+  onToolResult?: (r: { name: string; ok: boolean; summary: string; needsConnect?: string; data?: { kind: string; payload: unknown } }) => void;
   /** When true, Nicole's audio output is muted (session stays live). */
   aiMuted?: boolean;
   /**
@@ -207,6 +207,9 @@ interface RelayMessage {
   ok?: boolean;
   summary?: string;
   needsConnect?: string;
+  /** Optional result-deck payload (weather/news/search/products) from tools
+   *  like get_weather/web_search/search_products. */
+  data?: { kind: string; payload: unknown };
 }
 
 /**
@@ -533,7 +536,7 @@ export function useNicoleSession(
           return;
         case 'tool-result':
           if (msg.name) {
-            onToolResultRef.current?.({ name: msg.name, ok: !!msg.ok, summary: msg.summary ?? '', needsConnect: msg.needsConnect });
+            onToolResultRef.current?.({ name: msg.name, ok: !!msg.ok, summary: msg.summary ?? '', needsConnect: msg.needsConnect, data: msg.data });
           }
           return;
         case 'message':

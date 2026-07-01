@@ -305,4 +305,22 @@ describe('TalkScreen', () => {
     act(() => captured?.({ name: 'post_slack', ok: false, summary: '', needsConnect: 'slack' }));
     expect(await screen.findByTestId('panel-connect')).toBeInTheDocument();
   });
+
+  it('DESKTOP shows a product overlay when a tool-result carries product data', async () => {
+    mockWidth = 1280; // desktop workspace
+    (HTMLElement.prototype as any).scrollTo = (HTMLElement.prototype as any).scrollTo ?? (() => {});
+    let capturedOnToolResult: ((r: any) => void) | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (useNicoleSessionMock as any).mockImplementation((opts: any) => { capturedOnToolResult = opts.onToolResult; return sessionState; });
+    sessionState = { ...sessionState, connected: true };
+    render(<TalkScreen />);
+    act(() => {
+      capturedOnToolResult?.({
+        name: 'search_products', ok: true, summary: 'Found 1 on your screen.',
+        data: { kind: 'products', payload: { query: 'headset', products: [
+          { title: 'Sony XM5', price: '$328.00', image: null, rating: 4.6, reviews: 12, prime: true, url: 'https://a.com/1' }] } },
+      });
+    });
+    expect(await screen.findByText('Sony XM5')).toBeInTheDocument();
+  });
 });

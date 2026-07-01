@@ -520,4 +520,19 @@ describe('useNicoleSession', () => {
     });
     expect(onToolResult).toHaveBeenCalledWith(expect.objectContaining({ name: 'post_slack', ok: false, needsConnect: 'slack' }));
   });
+
+  it('forwards the result-deck `data` payload from a tool-result to onToolResult', async () => {
+    const onToolResult = vi.fn();
+    await startSession({ voiceName: 'Aoede', serverWs: 'ws://test/ai-live', onToolResult });
+    act(() => {
+      FakeWebSocket.last().emit({
+        type: 'tool-result', name: 'search_products', ok: true, summary: 'Found 1.',
+        data: { kind: 'products', payload: { query: 'headset', products: [] } },
+      });
+    });
+    expect(onToolResult).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'search_products', ok: true,
+      data: { kind: 'products', payload: { query: 'headset', products: [] } },
+    }));
+  });
 });
