@@ -121,10 +121,19 @@ Adding a panel later = one component + one registry entry (e.g. a future `calend
 
 ## Error handling
 
-- OAuth popup blocked/cancelled → the Connect button returns to idle with a small "Couldn't connect, try again" inline note; card stays open (timer reset).
-- Integration status fetch fails → grid/cards show a quiet "Couldn't load — retry" state; never crash the canvas.
-- Unknown `open_panel` type → ignored (logged), never throws.
-- A panel component error is contained (error boundary around each panel) so one bad panel can't take down the canvas or the session.
+**Principle — every user-facing error is SHORT and human-friendly.** One plain sentence, no codes, no stack traces, no jargon; it says what happened and what to do next, in Nicole's calm voice. This applies to the new canvas AND is a pass over existing user-facing error strings (toasts, connect/weather/search failures, integration errors) to shorten anything technical. Examples of the tone:
+
+- OAuth popup blocked/cancelled → "Couldn't connect Slack — want to try again?" (Connect button returns to idle; card stays open, timer reset).
+- Integration status fetch fails → "Couldn't load your integrations. Retry?" (quiet inline state; never crashes the canvas).
+- A tool/integration action fails → "That didn't go through. Try once more?" (not the raw server error).
+- Search/weather unavailable → "Couldn't reach that right now." (no error object shown).
+
+Rules for writing them: ≤ ~8 words where possible; active voice; no "Error:", no HTTP status, no provider/tool internal names; offer the next step ("Retry?", "Try again?") when there is one. A short helper (`friendlyError(kind)`) centralizes the strings so tone stays consistent.
+
+**Containment:**
+
+- Unknown `open_panel` type → ignored (logged to console only), never throws, no user-facing message.
+- A panel component error is contained by a per-panel error boundary showing a tiny "This didn't load." — one bad panel can't take down the canvas or the session.
 
 ## Testing
 
