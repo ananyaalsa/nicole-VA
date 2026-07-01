@@ -15,8 +15,12 @@ export interface PanelComponentProps {
 }
 
 export const PANELS: Record<PanelType, (props: PanelComponentProps) => JSX.Element> = {
-  connect: ({ panel, token, onClose }) =>
-    ConnectPanel({ provider: String(panel.args?.provider ?? ''), reason: panel.args?.reason as string | undefined, token, onClose }),
+  connect: (props) => createElement(ConnectPanel, {
+    provider: String(props.panel.args?.provider ?? ''),
+    reason: props.panel.args?.reason as string | undefined,
+    token: props.token,
+    onClose: props.onClose,
+  }),
   weather: (props) => createElement(WeatherPanel, props),
   search_results: (props) => createElement(SearchResultsPanel, props),
   note: (props) => createElement(NotePanel, props),

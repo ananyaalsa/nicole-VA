@@ -5,6 +5,10 @@ vi.mock('../../integrations/useIntegrations', () => ({ useIntegrations: () => ({
   { id: 'gmail', name: 'Gmail', description: '', configured: true, connected: true, scopes: [], connectedAt: '2026-01-01' },
 ], loading: false, error: false, refresh: () => {} }) }));
 vi.mock('../../components/LinkCards', () => ({ LinkCards: () => <div data-testid="link-cards" /> }));
+vi.mock('../../integrations/integrationsApi', () => ({
+  connectIntegration: vi.fn().mockResolvedValue({ ok: true }),
+  disconnectIntegration: vi.fn().mockResolvedValue({}),
+}));
 import { render, screen } from '@testing-library/react';
 import { PANELS } from './registry';
 
@@ -33,5 +37,14 @@ describe('PANELS registry', () => {
     expect(screen.getByText('Slack')).toBeInTheDocument();
     expect(screen.getByText('Gmail')).toBeInTheDocument();
     expect(screen.getByText(/connected/i)).toBeInTheDocument();
+  });
+  it('connect panel renders via createElement without crashing and shows provider button', async () => {
+    const { act } = await import('@testing-library/react');
+    vi.useFakeTimers();
+    await act(async () => {
+      render(PANELS.connect({ panel: { key: 'connect:slack', type: 'connect', args: { provider: 'slack' } }, token: 't', onClose: () => {} }));
+    });
+    expect(screen.getByText(/connect slack/i)).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

@@ -17,6 +17,7 @@ export function WeatherPanel({ panel }: PanelComponentProps): JSX.Element {
         <div className="canvas-weather__days">
           {forecast.map((d) => (
             <div key={d.date} className="canvas-weather__day">
+              <span className="canvas-weather__day-label">{new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' })}</span>
               <span aria-hidden="true">{d.icon}</span>
               <span>{d.hiC}°/{d.loC}°</span>
             </div>
